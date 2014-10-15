@@ -34,7 +34,7 @@ def select_log_part(raw_logs, part_identifiers=[('Testing','Testing', 4, 2), ('T
 
     log_list = list(itertools.chain(*real_logs))
 
-    floating_number_detector = re.compile('=\s[0-9][0-9]*\.[0-9]+')
+    floating_number_detector = re.compile('=\s?[0-9][0-9]*\.[0-9]+')
 
     iteration_line_locater = re.compile('Iteration ([0-9]+)')
 

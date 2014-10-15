@@ -15,7 +15,7 @@ def get_value_coord(diction, value_idx=0):
 
     return coord,value
 
-def draw_loss(numbers, axe=None):
+def draw_loss(numbers, axe=None, training_loss_id=3, testing_loss_id=2):
     """
     The function for drawing loss curve
     :param numbers:
@@ -25,14 +25,14 @@ def draw_loss(numbers, axe=None):
     training_loss = numbers['Training']['loss']
     testing_loss = numbers['Testing']['loss']
 
-    training_loss_iter, training_loss_total_value = get_value_coord(training_loss, 3)
-    testing_loss_iter, testing_loss_total_value = get_value_coord(testing_loss, 2)
-
-
-
+    training_loss_iter, training_loss_total_value = get_value_coord(training_loss, training_loss_id)
+    testing_loss_iter, testing_loss_total_value = get_value_coord(testing_loss, testing_loss_id)
 
     if axe is None:
         axe = pyplot
+
+    axe.cla()
+    axe.grid(True)
     return axe.plot(training_loss_iter, training_loss_total_value), axe.plot(testing_loss_iter, testing_loss_total_value)
 
 def draw_acc(numbers, axe=None):
@@ -49,10 +49,10 @@ def draw_acc(numbers, axe=None):
 
     if axe is None:
         axe = pyplot
+
+    axe.cla()
+    axe.grid(True)
     return axe.plot(testing_acc_iter, testing_acc_value)
-
-    # pyplot()
-
 
 def draw_both(numbers):
     fig = pyplot.figure(num=1, figsize=(15,9))

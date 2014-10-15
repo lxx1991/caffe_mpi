@@ -137,6 +137,7 @@ void CompactDataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
     break;
   case DataParameter_DB_LMDB:
     //LOG(FATAL) << "do not support LMDB at present";
+	LOG(INFO) << "Opening LMDB " << this->layer_param_.data_param().source();
     CHECK_EQ(mdb_env_create(&mdb_env_), MDB_SUCCESS) << "mdb_env_create failed";
     CHECK_EQ(mdb_env_set_mapsize(mdb_env_, 1099511627776), MDB_SUCCESS);  // 1TB
     CHECK_EQ(mdb_env_open(mdb_env_,

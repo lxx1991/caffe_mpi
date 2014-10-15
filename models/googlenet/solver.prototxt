@@ -4,14 +4,14 @@ test_interval: 1000
 base_lr: 0.04
 lr_policy: "step"
 update_interval: 2
-gamma: 0.9
-stepsize: 5000
+gamma: 0.85
+stepsize: 10000
 display: 20
 max_iter: 450000
 momentum: 0.9
 weight_decay: 0.00025
 snapshot: 5000
-snapshot_prefix: "models/googlenet/googlenet_train"
+snapshot_prefix: "models/googlenet/googlenet_models/googlenet_train"
 solver_mode: GPU
 test_initialization: true
 #debug_info: true
