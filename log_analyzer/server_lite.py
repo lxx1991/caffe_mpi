@@ -8,11 +8,28 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from matplotlib.dates import DateFormatter
 from matplotlib.figure import Figure
 
+import argparse
+
 app = Flask(__name__)
 
-log_file_list = [
-    '/home/common/log_compact_multiscale.txt'
-]
+parser = argparse.ArgumentParser()
+parser.add_argument('logs', type=str, nargs='+',
+                    help="the path to log file")
+parser.add_argument('--ip', dest="server_ip",
+                    help='The ip of the server, set it to your actual ip to make it available to all ip')
+parser.add_argument('--update', dest='refresh_interval',
+                    default=10,
+                    help='The interval between page refresh')
+parser.add_argument('--msg', dest="msg", type=str, nargs='+',
+                    default=[''],
+                    help='add setup msgs')
+
+args = parser.parse_args()
+
+
+log_file_list = args.logs
+
+setup_msg = ' '.join(args.msg)
 
 
 
@@ -62,9 +79,10 @@ def draw_curve():
 
 @app.route('/')
 def get_panel():
-    return render_template('main_panel.html', server_ip='192.168.72.107')
+    return render_template('main_panel.html', server_ip='192.168.72.107', refresh_interval=args.refresh_interval,
+                           setup=setup_msg)
 
 if __name__ == "__main__":
-    app.run(host='192.168.72.107', port=10000, debug=True)
+    app.run(host=args.server_ip, port=10000, debug=True)
 
 
