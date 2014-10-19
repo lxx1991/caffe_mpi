@@ -41,7 +41,9 @@ if __name__ == "__main__":
         # '../models/googlenet/log/oct11_35000_70000.5614',
         # '../models/googlenet/log/oct11_70000_85000.26819',
         # '../models/googlenet/log/oct12_85000_105000.24475',
-        '../models/googlenet/log/caffe.mmlab-107.alex.log.INFO.20141014-110026.14019'
+        # '../models/googlenet/log/caffe.mmlab-107.alex.log.INFO.20141014-110026.14019',
+        # '../models/googlenet/log/caffe.mmlab-107.alex.log.INFO.20141017-101322.1001',
+        '/home/common/log_compact_multiscale.txt'
         # '/media/ssd/backup/caffe.pvg-gpu-desktop.zhirongw.log.INFO.20141012-131959.4493'
         # '/media/ssd/backup/googlenet_2510_slowlr.log'
     ]
@@ -49,7 +51,7 @@ if __name__ == "__main__":
     fig = pyplot.figure(num=1, figsize=(15,9))
 
     # am = animate_monitor(log_files, fig, testing_loss_id=0, training_loss_id=1)
-    am = animate_monitor(log_files, fig)
+    am = animate_monitor(log_files, fig, training_loss_id=1, testing_loss_id=0)
 
     anime = animation.FuncAnimation(fig, am.show_value, blit=False, interval=5000, init_func=am.start)
 

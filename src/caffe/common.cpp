@@ -39,6 +39,7 @@ void GlobalInit(int* pargc, char*** pargv) {
   ::gflags::ParseCommandLineFlags(pargc, pargv, true);
   // Google logging.
   ::google::InitGoogleLogging(*(pargv)[0]);
+  ::google::InstallFailureSignalHandler();
 
 #ifdef USE_MPI
   int rank, all_rank;
