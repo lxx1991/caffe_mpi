@@ -1,7 +1,6 @@
 __author__ = 'alex'
 
 from flask import Flask, make_response, render_template
-from flask.ext.script import Manager, Server
 from log_loader import *
 from progress_visulization import *
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
@@ -23,6 +22,15 @@ parser.add_argument('--update', dest='refresh_interval',
 parser.add_argument('--msg', dest="msg", type=str, nargs='+',
                     default=[''],
                     help='add setup msgs')
+parser.add_argument('--train', dest='train_loss_id', type=int,
+                    default=0)
+parser.add_argument('--test', dest='test_loss_id', type=int,
+                    default=0)
+parser.add_argument('--test_acc', dest='test_acc_id', type=int,
+                    default=0)
+
+parser.add_argument('--port', dest='port', type=int,
+                    default=10000)
 
 args = parser.parse_args()
 
@@ -34,7 +42,7 @@ setup_msg = ' '.join(args.msg)
 
 
 class WebMonitor(object):
-    def __init__(self, log_files, fig, training_loss_id=3, testing_loss_id=2):
+    def __init__(self, log_files, fig, training_loss_id=3, testing_loss_id=2, testing_acc_id=0):
         """
         Initialize and record log list
         :param log_files:
@@ -45,15 +53,16 @@ class WebMonitor(object):
         self.axes = []
         self.training_loss_id=training_loss_id
         self.testing_loss_id = testing_loss_id
+        self.testing_acc_id = testing_acc_id
 
     def show_value(self, fd=None):
         """
         Internal function to read updated progress
         :return:
         """
-        numbers = select_log_part(load_log(self.log_files),[('Testing','Testing', 8, 2), ('Training','loss', 4, 0)])
-        y0, y1 = draw_loss(numbers, self.axes[0], self.training_loss_id, self.testing_loss_id)
-        y2 = draw_acc(numbers, self.axes[1])
+        numbers = select_log_part(load_log(self.log_files),[('Testing','Testing', 6, 5), ('Training','loss', 6, 0)])
+        y0, y1, latest_train_loss, latest_test_loss = draw_loss(numbers, self.axes[0], self.training_loss_id, self.testing_loss_id)
+        y2, latest_test_loss = draw_acc(numbers, self.axes[1], self.testing_acc_id)
         return self.fig
 
     def render(self):
@@ -63,11 +72,10 @@ class WebMonitor(object):
         return self.show_value()
 
 
-
 @app.route('/get_image')
 def draw_curve():
     fig = Figure(figsize=(20,10))
-    monitor = WebMonitor(log_file_list, fig, training_loss_id=1, testing_loss_id=0)
+    monitor = WebMonitor(log_file_list, fig, training_loss_id=args.train_loss_id, testing_loss_id=args.test_loss_id, testing_acc_id=args.test_acc_id)
     render_fig = monitor.render()
     canvas = FigureCanvas(render_fig)
     import StringIO
@@ -79,10 +87,10 @@ def draw_curve():
 
 @app.route('/')
 def get_panel():
-    return render_template('main_panel.html', server_ip='192.168.72.107', refresh_interval=args.refresh_interval,
+    return render_template('main_panel.html', server_ip=args.server_ip, refresh_interval=args.refresh_interval,
                            setup=setup_msg)
 
 if __name__ == "__main__":
-    app.run(host=args.server_ip, port=10000, debug=True)
+    app.run(host=args.server_ip, port=args.port, debug=True)
 
 

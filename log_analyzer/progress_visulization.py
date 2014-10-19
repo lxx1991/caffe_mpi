@@ -33,9 +33,13 @@ def draw_loss(numbers, axe=None, training_loss_id=3, testing_loss_id=2):
 
     axe.cla()
     axe.grid(True)
-    return axe.plot(training_loss_iter, training_loss_total_value), axe.plot(testing_loss_iter, testing_loss_total_value)
+    axe.plot(training_loss_iter, training_loss_total_value), axe.plot(testing_loss_iter, testing_loss_total_value)
+    axe.text(0.5,.7, 'Latest iteration: {:}'.format(training_loss_iter[-1]), transform=axe.transAxes)
+    axe.text(0.5,.9, 'Latest Testing Loss: {:}'.format(testing_loss_total_value[-1]), transform=axe.transAxes)
+    axe.text(0.5,0.85, 'Latest 5 Training Loss: {:}, {:}, {:}, {:}, {:}'.format(*training_loss_total_value[-5:]), transform=axe.transAxes)
+    return axe, axe, training_loss_total_value[-1], testing_loss_total_value[-1]
 
-def draw_acc(numbers, axe=None):
+def draw_acc(numbers, axe=None, acc_id=0):
     """
     Draw testing accuracy curve
     :param numbers:
@@ -44,7 +48,7 @@ def draw_acc(numbers, axe=None):
 
     testing_acc = numbers['Testing']['accuracy']
 
-    testing_acc_iter, testing_acc_value = get_value_coord(testing_acc,0)
+    testing_acc_iter, testing_acc_value = get_value_coord(testing_acc,acc_id)
 
 
     if axe is None:
@@ -52,7 +56,9 @@ def draw_acc(numbers, axe=None):
 
     axe.cla()
     axe.grid(True)
-    return axe.plot(testing_acc_iter, testing_acc_value)
+    axe.text(0.5,.9, 'Latest Testing Accuracy: {:}'.format(testing_acc_value[-1]), transform=axe.transAxes)
+    axe.text(0.5,.8, 'Latest Testing Iteration: {:}'.format(testing_acc_iter[-1]), transform=axe.transAxes)
+    return axe.plot(testing_acc_iter, testing_acc_value), testing_acc_value[-1]
 
 def draw_both(numbers):
     fig = pyplot.figure(num=1, figsize=(15,9))

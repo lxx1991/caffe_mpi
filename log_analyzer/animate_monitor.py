@@ -29,9 +29,9 @@ class animate_monitor():
         Internal function to read updated progress
         :return:
         """
-        numbers = select_log_part(load_log(self.log_files),[('Testing','Testing', 8, 2), ('Training','loss', 4, 0)])
-        y0, y1 = draw_loss(numbers, self.axes[0], self.training_loss_id, self.testing_loss_id)
-        y2 = draw_acc(numbers, self.axes[1])
+        numbers = select_log_part(load_log(self.log_files),[('Testing','Testing', 8, 2), ('Training','loss', 6, 0)])
+        y0, y1, latest_train_loss, latest_test_loss = draw_loss(numbers, self.axes[0], self.training_loss_id, self.testing_loss_id)
+        y2, latest_test_acc = draw_acc(numbers, self.axes[1])
         # return self.fig
 
 if __name__ == "__main__":
