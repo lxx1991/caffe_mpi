@@ -169,6 +169,21 @@ void DataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
     }
   }
 #endif
+
+  //Set up mem bbox map
+      if (this->layer_param_.data_param().has_mem_data_source()){
+      	string key_name;
+      	int coord[4];
+      	int label;
+      	std::ifstream infile(this->layer_param_.data_param().mem_data_source().c_str());
+      	int cnt_ = 0;
+      	while(infile>>key_name>>label>>coord[0]>>coord[1]>>coord[2]>>coord[3]){
+      		this->bbox_data[key_name] = vector<int>(coord, coord + sizeof(coord)/sizeof(int));
+      		cnt_++;
+      	}
+      	LOG(INFO)<<"Pushed "<<cnt_<<" coord records";
+      }
+
   // Read a data point, and use it to initialize the top blob.
   Datum datum;
   switch (this->layer_param_.data_param().backend()) {

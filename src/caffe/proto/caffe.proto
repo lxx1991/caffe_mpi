@@ -410,6 +410,7 @@ message ConvolutionParameter {
 }
 
 // Message that stores parameters used by DataLayer
+// Next available ID: 17
 message DataParameter {
   enum DB {
     LEVELDB = 0;
@@ -417,6 +418,7 @@ message DataParameter {
   }
   // Specify the data source.
   optional string source = 1;
+  optional string mem_data_source = 16;
   // Specify the batch size.
   optional uint32 batch_size = 4;
   // The rand_skip variable is for the data layer to skip a few data points
