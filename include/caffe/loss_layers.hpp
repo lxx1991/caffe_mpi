@@ -845,6 +845,9 @@ class MultiLabelAccuracyLayer : public Layer<Dtype> {
   virtual void SetUp(const vector<Blob<Dtype>*>& bottom,
       vector<Blob<Dtype>*>* top);
 
+  virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
+        vector<Blob<Dtype>*>* top);
+
   virtual inline LayerParameter_LayerType type() const {
     return LayerParameter_LayerType_MULTI_LABEL_ACCURACY;
   }
