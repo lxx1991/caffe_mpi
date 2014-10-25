@@ -78,6 +78,8 @@ void CompactDataLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
   CHECK_GE(tmp.width(), crop_size);
   int w_off = (tmp.width() - crop_size) / 2;
   int h_off = (tmp.height() - crop_size) / 2;
+
+  // Why are we only using the mean of center crop? by Alex
   for (int c = 0; c < this->datum_channels_; c++) {
     for (int h = 0; h < crop_size; h++) {
       for (int w = 0; w < crop_size; w++) {
@@ -186,7 +188,7 @@ void CompactDataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
     	std::ifstream infile(this->layer_param_.data_param().mem_data_source().c_str());
     	int cnt_ = 0;
     	while(infile>>key_name>>label>>coord[0]>>coord[1]>>coord[2]>>coord[3]){
-    		this->bbox_data[key_name] = vector<int>(coord, coord + sizeof(coord)/sizeof(int));
+    		this->bbox_data_[key_name] = vector<int>(coord, coord + sizeof(coord)/sizeof(int));
     		cnt_++;
     	}
     	LOG(INFO)<<"Pushed "<<cnt_<<" coord records";
@@ -237,6 +239,17 @@ void CompactDataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
   this->datum_width_ = crop_size;
   this->datum_size_ = this->datum_channels_ * this->datum_height_ * this->datum_width_;
 
+  if(this->layer_param_.top_size()>=3){
+	if (this->layer_param_.data_param().has_mem_data_source()){
+		// Just reshape  the top blob to size of the crop
+		(*top)[2]->Reshape(this->layer_param_.data_param().batch_size(),1, crop_size, crop_size);
+	}
+	else{
+		LOG(ERROR)<<"To use bbox mask, please provide a bbox text file.";
+	}
+
+}
+
 
 }
 
@@ -244,9 +257,10 @@ void CompactDataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
 template <typename Dtype>
 void CompactDataLayer<Dtype>::InternalThreadEntry() {
   Datum datum;
-  string value;
+  string key, value;
   CvMat mat;
   IplImage *img = NULL;
+  vector<int> bbox;
   CHECK(this->prefetch_data_.count());
   Dtype* top_data = this->prefetch_data_.mutable_cpu_data();
   Dtype* top_label = NULL;  // suppress warnings about uninitialized variables
@@ -270,8 +284,8 @@ void CompactDataLayer<Dtype>::InternalThreadEntry() {
       CHECK(iter_);
       CHECK(iter_->Valid());
       value = iter_->value().ToString();
+      key = iter_->key().ToString();
       mat = cvMat(1, 1000 * 1000, CV_8UC1, const_cast<char *>(value.data()) + sizeof(int));
-
       // datum.ParseFromString(iter_->value().ToString());
       break;
     case DataParameter_DB_LMDB:
@@ -279,13 +293,16 @@ void CompactDataLayer<Dtype>::InternalThreadEntry() {
       CHECK_EQ(mdb_cursor_get(mdb_cursor_, &mdb_key_,
               &mdb_value_, MDB_GET_CURRENT), MDB_SUCCESS);
       mat = cvMat(1, 1000 * 1000 * 3, CV_8UC1, (char *)(mdb_value_.mv_data) + sizeof(int));
+      key = (char*)mdb_key_.mv_data;
       // datum.ParseFromArray(mdb_value_.mv_data,
       //     mdb_value_.mv_size);
       break;
     default:
       LOG(FATAL) << "Unknown database backend";
     }
-
+    if (this->layer_param_.top_size() == 3){
+	bbox = this->bbox_data_[key];
+	}
     img = cvDecodeImage(&mat, 1);
     // Apply data transformations (mirror, scale, crop...)
     this->data_transformer_.Transform(item_id, img, this->mean_, top_data);
@@ -304,6 +321,8 @@ void CompactDataLayer<Dtype>::InternalThreadEntry() {
       }
       // LOG(INFO) << "label: " << top_label[item_id];
     }
+    //generate the bbox mask
+    
 #ifdef USE_MPI
 	}
 	else{

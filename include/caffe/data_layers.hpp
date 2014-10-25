@@ -160,7 +160,8 @@ class CompactDataLayer : public BasePrefetchingDataLayer<Dtype> {
   MDB_cursor* mdb_cursor_;
   MDB_val mdb_key_, mdb_value_;
 
-  std::map<string, vector<int> > bbox_data;
+  std::map<string, vector<int> > bbox_data_;
+  Blob<Dtype> prefetch_bbox_mask_;
 };
 
 /**

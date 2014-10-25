@@ -68,7 +68,8 @@ void DataTransformer<Dtype>::TransformSingle(const int batch_item_id,
   // }
   // cvReleaseImage(&dest);
   ////// -------------------------------------------------------
-  if (mirror && Rand() % 2) {
+  bool is_mirror;
+  if (is_mirror =( mirror && Rand() % 2)) {
     // Copy mirrored version
     for (int c = 0; c < channels; c++) {
       for (int h = 0; h < crop_size; h++) {
@@ -80,6 +81,19 @@ void DataTransformer<Dtype>::TransformSingle(const int batch_item_id,
           Dtype datum_element = static_cast<Dtype>(data[data_index]);
           transformed_data[top_index] = (datum_element - mean[mean_index]) * scale;
         }
+      }
+    }
+    for (int h = 0; h < crop_size; h++){
+      for (int w = 0; w < crop_size; w++){
+        int top_index = ((batch_item_id) * crop_size + h)
+                          * crop_size + (crop_size - 1 - w);
+        int data_h = h + h_off;
+	int data_w = w + w_off;
+
+	// FOR TEST USE: TODO: change to real memory block
+	Dtype mask_value = Dtype(
+				((data_h) && (data_w))?
+				1.:0.);
       }
     }
   } else {
