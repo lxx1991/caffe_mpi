@@ -8,6 +8,7 @@ layers {
     source: "examples/mnist/mnist_train_lmdb"
     backend: LMDB
     batch_size: 32
+    mem_data_source: "/media/ssd/backup/train_bbox_All_max_localization_list.txt"
   }
   transform_param {
     scale: 0.00390625

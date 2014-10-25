@@ -182,6 +182,20 @@ void CompactDataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
       }
     }
   }
+  //Set up mem bbox map
+    if (this->layer_param_.data_param().has_mem_data_source()){
+    	string key_name;
+    	int coord[4];
+    	int label;
+    	std::ifstream infile(this->layer_param_.data_param().mem_data_source().c_str());
+    	int cnt_ = 0;
+    	while(infile>>key_name>>label>>coord[0]>>coord[1]>>coord[2]>>coord[3]){
+    		this->bbox_data[key_name] = vector<int>(coord, coord + sizeof(coord)/sizeof(int));
+    		cnt_++;
+    	}
+    	LOG(INFO)<<"Pushed "<<cnt_<<" coord records";
+    }
+
   // Read a data point, and use it to initialize the top blob.
   Datum datum;
   string value;
@@ -226,6 +240,8 @@ void CompactDataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
   this->datum_height_ = crop_size;
   this->datum_width_ = crop_size;
   this->datum_size_ = this->datum_channels_ * this->datum_height_ * this->datum_width_;
+
+
 }
 
 // This function is used to create a thread that prefetches the data.
