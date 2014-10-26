@@ -178,7 +178,7 @@ void DataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
       	std::ifstream infile(this->layer_param_.data_param().mem_data_source().c_str());
       	int cnt_ = 0;
       	while(infile>>key_name>>label>>coord[0]>>coord[1]>>coord[2]>>coord[3]){
-      		this->bbox_data[key_name] = vector<int>(coord, coord + sizeof(coord)/sizeof(int));
+      		this->bbox_data_[key_name] = vector<int>(coord, coord + sizeof(coord)/sizeof(int));
       		cnt_++;
       	}
       	LOG(INFO)<<"Pushed "<<cnt_<<" coord records";
@@ -225,6 +225,22 @@ void DataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
   this->datum_height_ = datum.height();
   this->datum_width_ = datum.width();
   this->datum_size_ = datum.channels() * datum.height() * datum.width();
+
+	if((this->layer_param_.top_size()>=3) && (!this->layer_param_.data_param().has_mem_data_source())) {
+		LOG(ERROR)<<"To use bbox mask, please provide a bbox text file.";
+	}
+	// Reshape the top blob 3 to record bbox info
+	// 4 numbers for bbox coordinates, 2 numbers for corresponding image size
+	if (this->layer_param_.top_size()>=3){
+		(*top)[2]->Reshape(this->layer_param_.data_param().batch_size(), 6, 1, 1);
+	}
+
+
+	if (this->layer_param_.data_param().has_mem_data_source()) {
+		this->prefetch_bbox_mask_.Reshape(this->layer_param_.data_param().batch_size(), 6, 1, 1);
+		this->prefetch_bbox_mask_.mutable_cpu_data();
+		this->prefetch_aux_data_.insert( this->prefetch_aux_data_.begin(), &this->prefetch_bbox_mask_); // register the auxiliary prefetching data to the base class
+	}
 }
 
 // This function is used to create a thread that prefetches the data.
@@ -232,13 +248,20 @@ template <typename Dtype>
 void DataLayer<Dtype>::InternalThreadEntry() {
   Datum datum;
   CHECK(this->prefetch_data_.count());
+  string key;
   Dtype* top_data = this->prefetch_data_.mutable_cpu_data();
   Dtype* top_label = NULL;  // suppress warnings about uninitialized variables
+  Dtype* top_bbox = NULL;
+  vector<int> bbox;
+
   if (this->output_labels_) {
     top_label = this->prefetch_label_.mutable_cpu_data();
   }
   const int batch_size = this->layer_param_.data_param().batch_size();
-
+  if (this->layer_param_.top_size() == 3){
+  	  top_bbox = this->prefetch_bbox_mask_.mutable_cpu_data();
+    }
+  int crop_size = this->layer_param_.transform_param().crop_size();
 #ifndef USE_MPI
   for (int item_id = 0; item_id < batch_size; ++item_id) {
 #else
@@ -253,17 +276,28 @@ void DataLayer<Dtype>::InternalThreadEntry() {
       CHECK(iter_);
       CHECK(iter_->Valid());
       datum.ParseFromString(iter_->value().ToString());
+      key = iter_->key().ToString();
       break;
     case DataParameter_DB_LMDB:
       CHECK_EQ(mdb_cursor_get(mdb_cursor_, &mdb_key_,
               &mdb_value_, MDB_GET_CURRENT), MDB_SUCCESS);
       datum.ParseFromArray(mdb_value_.mv_data,
           mdb_value_.mv_size);
+      key = (char*)mdb_key_.mv_data;
 //      LOG(INFO)<<"Read "<<item_id<<" "<<(char*)mdb_key_.mv_data;
       break;
     default:
       LOG(FATAL) << "Unknown database backend";
     }
+
+    //get the corresponding bounding box coordinates
+	if (this->layer_param_.data_param().has_mem_data_source()){
+		try{
+			bbox = this->bbox_data_.at(key);
+		}catch(const std::out_of_range& oor){
+			bbox = vector<int>(4, 1);
+		}
+	}
 
     // Apply data transformations (mirror, scale, crop...)
     this->data_transformer_.Transform(item_id, datum, this->mean_, top_data);
@@ -271,6 +305,15 @@ void DataLayer<Dtype>::InternalThreadEntry() {
     if (this->output_labels_) {
       top_label[item_id] = datum.label();
     }
+		//Write the bbox coordinates to the prefetch buffer
+	if (this->layer_param_.data_param().has_mem_data_source()) {
+		for (int i = 0; i < 4; i++) {
+			top_bbox[item_id * 6 + i] = bbox[i];
+		}
+		top_bbox[item_id * 6 + 4] = crop_size;
+		top_bbox[item_id * 6 + 5] = crop_size;
+
+	}
 #ifdef USE_MPI
 	}
 	else{

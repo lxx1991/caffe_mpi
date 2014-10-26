@@ -94,6 +94,7 @@ class BasePrefetchingDataLayer :
  protected:
   Blob<Dtype> prefetch_data_;
   Blob<Dtype> prefetch_label_;
+  vector<Blob<Dtype>*> prefetch_aux_data_;
 };
 
 template <typename Dtype>
@@ -110,7 +111,7 @@ class DataLayer : public BasePrefetchingDataLayer<Dtype> {
   }
   virtual inline int ExactNumBottomBlobs() const { return 0; }
   virtual inline int MinTopBlobs() const { return 1; }
-  virtual inline int MaxTopBlobs() const { return 2; }
+  virtual inline int MaxTopBlobs() const { return 3; }
 
  protected:
   virtual void InternalThreadEntry();
@@ -125,7 +126,8 @@ class DataLayer : public BasePrefetchingDataLayer<Dtype> {
   MDB_cursor* mdb_cursor_;
   MDB_val mdb_key_, mdb_value_;
 
-  std::map<string, vector<int> > bbox_data;
+  std::map<string, vector<int> > bbox_data_;
+  Blob<Dtype> prefetch_bbox_mask_;
 
 };
 

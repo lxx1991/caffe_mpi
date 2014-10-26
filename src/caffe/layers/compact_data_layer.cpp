@@ -97,6 +97,11 @@ void CompactDataLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
   if (this->output_labels_) {
     this->prefetch_label_.mutable_cpu_data();
   }
+
+  if (this->layer_param_.top_size()>=3){
+	  this->prefetch_bbox_mask_.mutable_cpu_data();
+	  this->prefetch_aux_data_.insert( this->prefetch_aux_data_.begin(), &this->prefetch_bbox_mask_); // register the auxiliary prefetching data to the base class
+  }
   DLOG(INFO) << "Initializing prefetch";
   this->CreatePrefetchThread();
   DLOG(INFO) << "Prefetch initialized.";
@@ -183,7 +188,7 @@ void CompactDataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
   //Set up mem bbox map
     if (this->layer_param_.data_param().has_mem_data_source()){
     	string key_name;
-    	int coord[4];
+    	int coord[4]; // the order is: w_min, h_min, w_max, h_max
     	int label;
     	std::ifstream infile(this->layer_param_.data_param().mem_data_source().c_str());
     	int cnt_ = 0;
@@ -239,16 +244,18 @@ void CompactDataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
   this->datum_width_ = crop_size;
   this->datum_size_ = this->datum_channels_ * this->datum_height_ * this->datum_width_;
 
-  if(this->layer_param_.top_size()>=3){
-	if (this->layer_param_.data_param().has_mem_data_source()){
-		// Just reshape  the top blob to size of the crop
-		(*top)[2]->Reshape(this->layer_param_.data_param().batch_size(),1, crop_size, crop_size);
-	}
-	else{
+	if((this->layer_param_.top_size()>=3) && (!this->layer_param_.data_param().has_mem_data_source())) {
 		LOG(ERROR)<<"To use bbox mask, please provide a bbox text file.";
 	}
+	// Reshape the top blob 3 to record bbox info
+	// 4 numbers for bbox coordinates, 2 numbers for corresponding image size
+	if (this->layer_param_.top_size()>=3){
+			(*top)[2]->Reshape(this->layer_param_.data_param().batch_size(), 6, 1, 1);
+	}
+	if (this->layer_param_.data_param().has_mem_data_source()){
+		this->prefetch_bbox_mask_.Reshape(this->layer_param_.data_param().batch_size(), 6, 1, 1);
+	}
 
-}
 
 
 }
@@ -264,11 +271,18 @@ void CompactDataLayer<Dtype>::InternalThreadEntry() {
   CHECK(this->prefetch_data_.count());
   Dtype* top_data = this->prefetch_data_.mutable_cpu_data();
   Dtype* top_label = NULL;  // suppress warnings about uninitialized variables
+
+  Dtype* top_bbox = NULL;
+
   if (this->output_labels_) {
     top_label = this->prefetch_label_.mutable_cpu_data();
   }
   const int batch_size = this->layer_param_.data_param().batch_size();
 
+  if (this->layer_param_.data_param().has_mem_data_source()){
+	  top_bbox = this->prefetch_bbox_mask_.mutable_cpu_data();
+  }
+  int crop_size = this->layer_param_.transform_param().crop_size();
 #ifndef USE_MPI
   for (int item_id = 0; item_id < batch_size; ++item_id) {
 #else
@@ -300,12 +314,16 @@ void CompactDataLayer<Dtype>::InternalThreadEntry() {
     default:
       LOG(FATAL) << "Unknown database backend";
     }
-    if (this->layer_param_.top_size() == 3){
-	bbox = this->bbox_data_[key];
+
+    //get the corresponding bounding box coordinates
+    if (this->layer_param_.data_param().has_mem_data_source()){
+    	bbox = this->bbox_data_.at(key);
 	}
+
+
     img = cvDecodeImage(&mat, 1);
     // Apply data transformations (mirror, scale, crop...)
-    this->data_transformer_.Transform(item_id, img, this->mean_, top_data);
+    this->data_transformer_.Transform(item_id, img, this->mean_, top_data, bbox);
     cvReleaseImage(&img);  // release current image
     if (this->output_labels_) {
       //top_label[item_id] = datum.label();
@@ -321,7 +339,15 @@ void CompactDataLayer<Dtype>::InternalThreadEntry() {
       }
       // LOG(INFO) << "label: " << top_label[item_id];
     }
-    //generate the bbox mask
+    //Write the bbox coordinates to the prefetch buffer
+     if (this->layer_param_.data_param().has_mem_data_source()){
+    	 for (int i = 0; i < 4; i++){
+    		 top_bbox[item_id * 6 + i] = bbox[i];
+    	 }
+    	 top_bbox[item_id * 6 + 4] = crop_size;
+    	 top_bbox[item_id * 6 + 5] = crop_size;
+
+     }
     
 #ifdef USE_MPI
 	}
