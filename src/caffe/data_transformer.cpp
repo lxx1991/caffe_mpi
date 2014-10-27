@@ -1,16 +1,12 @@
 #include <string>
 #include <opencv2/core/core_c.h>
-#include <opencv2/core/core.hpp>
-#include <opencv2/highgui/highgui.hpp>
 #include <opencv2/highgui/highgui_c.h>
-#include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/imgproc/imgproc_c.h>
 
 #include "caffe/data_transformer.hpp"
 #include "caffe/util/math_functions.hpp"
 #include "caffe/util/rng.hpp"
 
-using namespace cv;
 namespace caffe {
 
 template<typename Dtype>
@@ -38,7 +34,7 @@ void DataTransformer<Dtype>::TransformSingle(const int batch_item_id,
   FillInOffsets(w, h, width, height, crop_size);
   int h_off, w_off;
   // We only do random crop when we do training.
-  if (phase_ == Caffe::TRAIN) {
+  if (Caffe::phase() == Caffe::TRAIN) {
     int r = Rand() % 5;
     h_off = h[r];
     w_off = w[r];
@@ -121,7 +117,7 @@ void DataTransformer<Dtype>::TransformMultiple(const int batch_item_id,
   int sc = 3;  //(224, 224)
   int cr = 4;  // center crop
   // We only do random cropping & scaling when we do training.
-  if (phase_ == Caffe::TRAIN) {
+  if (Caffe::phase() == Caffe::TRAIN) {
     sc = Rand() % 9;
     cr = Rand() % 5;
   }
@@ -216,7 +212,7 @@ void DataTransformer<Dtype>::Transform(const int batch_item_id,
     CHECK(data.size()) << "Image cropping only support uint8 data";
     int h_off, w_off;
     // We only do random crop when we do training.
-    if (phase_ == Caffe::TRAIN) {
+    if (Caffe::phase() == Caffe::TRAIN) {
       h_off = Rand() % (height - crop_size);
       w_off = Rand() % (width - crop_size);
     } else {
@@ -274,7 +270,7 @@ void DataTransformer<Dtype>::Transform(const int batch_item_id,
 
 template <typename Dtype>
 void DataTransformer<Dtype>::InitRand() {
-  const bool needs_rand = (phase_ == Caffe::TRAIN) &&
+  const bool needs_rand = (Caffe::phase() == Caffe::TRAIN) &&
       (param_.mirror() || param_.crop_size());
   if (needs_rand) {
     const unsigned int rng_seed = caffe_rng_rand();
