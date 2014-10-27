@@ -1009,6 +1009,53 @@ class MultiLabelAccuracyLayer : public Layer<Dtype> {
   }
 };
 
+/**
+ * @brief Compute the difference of regressed map with the groundtruth map
+ *
+ */
+template <typename Dtype>
+class MapRegressionLossLayer : public LossLayer<Dtype> {
+ public:
+  explicit MapRegressionLossLayer(const LayerParameter& param)
+      : LossLayer<Dtype>(param), diff_map_() {}
+  virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
+      vector<Blob<Dtype>*>* top);
+
+  virtual inline int ExactNumBottomBlobs() const { return 2; }
+  virtual inline LayerParameter_LayerType type() const {
+    return LayerParameter_LayerType_MAP_REGRESSION_LOSS;
+  }
+  /* *
+   * We cannot back propagate to the mask
+   *
+   */
+  virtual inline bool AllowForceBackward(const int bottom_index) const {
+    return bottom_index != 1;
+  }
+
+ protected:
+  /// @copydoc MapRegressionLossLayer
+  virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+      vector<Blob<Dtype>*>* top);
+  virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+      vector<Blob<Dtype>*>* top);
+
+  /**
+   * @brief Computes the difference between the regressed map and the groundtruth map
+   *
+   *
+   */
+  virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, vector<Blob<Dtype>*>* bottom);
+  virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, vector<Blob<Dtype>*>* bottom);
+
+  Blob<Dtype> diff_map_;  // cached for backward pass
+  Blob<Dtype> dist_sq_;  // cached for backward pass
+  Blob<Dtype> diff_sq_;  // tmp storage for gpu forward pass
+  Blob<Dtype> summer_vec_;  // tmp storage for gpu forward pass
+};
+
 }  // namespace caffe
 
 #endif  // CAFFE_LOSS_LAYERS_HPP_

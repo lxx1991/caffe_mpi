@@ -147,7 +147,7 @@ class CompactDataLayer : public BasePrefetchingDataLayer<Dtype> {
   }
   virtual inline int ExactNumBottomBlobs() const { return 0; }
   virtual inline int MinTopBlobs() const { return 1; }
-  virtual inline int MaxTopBlobs() const { return 2; }
+  virtual inline int MaxTopBlobs() const { return 3; }
 
  protected:
   virtual void InternalThreadEntry();

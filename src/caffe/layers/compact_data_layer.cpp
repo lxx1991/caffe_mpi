@@ -274,6 +274,8 @@ void CompactDataLayer<Dtype>::InternalThreadEntry() {
 
   Dtype* top_bbox = NULL;
 
+
+
   if (this->output_labels_) {
     top_label = this->prefetch_label_.mutable_cpu_data();
   }
@@ -283,6 +285,7 @@ void CompactDataLayer<Dtype>::InternalThreadEntry() {
 	  top_bbox = this->prefetch_bbox_mask_.mutable_cpu_data();
   }
   int crop_size = this->layer_param_.transform_param().crop_size();
+  static const int default_bbox_array[6] = {0, 0, crop_size - 1, crop_size - 1, crop_size, crop_size};
 #ifndef USE_MPI
   for (int item_id = 0; item_id < batch_size; ++item_id) {
 #else
@@ -317,9 +320,15 @@ void CompactDataLayer<Dtype>::InternalThreadEntry() {
 
     //get the corresponding bounding box coordinates
     if (this->layer_param_.data_param().has_mem_data_source()){
-    	bbox = this->bbox_data_.at(key);
-	}
+//    	LOG(INFO)<<key.substr(9, key.length()-10);
+    	try{
+    		bbox = this->bbox_data_.at(key.substr(9, key.length()-10));
+    	}catch(const std::out_of_range& oor){
+    		DLOG(INFO)<<"image key not found in bbox list, maybe not annotated.";
+    		bbox = vector<int>(default_bbox_array, default_bbox_array + sizeof(default_bbox_array)/sizeof(int));
+		}
 
+	}
 
     img = cvDecodeImage(&mat, 1);
     // Apply data transformations (mirror, scale, crop...)

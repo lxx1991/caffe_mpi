@@ -3,7 +3,7 @@ layers {
   name: "data"
   type: COMPACT_DATA
   top: "data"
-  top: "label"
+  
   data_param {
     source: "/media/ssd/caffe-official/examples/imagenet/imagenet_train_compact_lmdb"
     backend: LMDB
@@ -12,7 +12,7 @@ layers {
   transform_param {
     crop_size: 224
     mean_file: "data/ilsvrc12/imagenet_mean.binaryproto"
-    mirror: true
+    mirror: false
     multiscale: false
   }
   include: { phase: TRAIN }

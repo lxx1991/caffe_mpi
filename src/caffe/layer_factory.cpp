@@ -267,6 +267,8 @@ Layer<Dtype>* GetLayer(const LayerParameter& param) {
     return new AccuracyTreeLayer<Dtype>(param);
   case LayerParameter_LayerType_WINDOW_DATA:
     return new WindowDataLayer<Dtype>(param);
+  case LayerParameter_LayerType_MAP_REGRESSION_LOSS:
+	  return new MapRegressionLossLayer<Dtype>(param);
   case LayerParameter_LayerType_NONE:
     LOG(FATAL) << "Layer " << name << " has unspecified type.";
   default:
