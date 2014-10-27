@@ -1,6 +1,7 @@
 net: "models/googlenet/train_val4.prototxt"
 test_iter: 2500
 test_interval: 1000
+update_interval: 2
 base_lr: 0.04
 lr_policy: "step"
 update_interval: 2
