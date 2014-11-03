@@ -301,7 +301,7 @@ int main(int argc, char** argv) {
   switch (my_rank){
   case 0: FLAGS_gpu=0;break;
   case 1: FLAGS_gpu=1;break;
-  case 2: FLAGS_gpu=2;break;
+  case 2: FLAGS_gpu=3;break;
   case 3: FLAGS_gpu=3;break;
   }
   LOG(INFO)<<FLAGS_gpu;

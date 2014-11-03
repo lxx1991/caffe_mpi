@@ -39,6 +39,8 @@ void MapRegressionLossLayer<Dtype>::Forward_cpu(
     const vector<Blob<Dtype>*>& bottom,
     vector<Blob<Dtype>*>* top) {
 
+
+	Dtype lambda = Dtype(0.1);
 	Dtype loss(0.);
 	const Dtype* bbox_data = bottom[1]->cpu_data();
 	const Dtype* map_data = bottom[0]->cpu_data();
@@ -62,7 +64,7 @@ void MapRegressionLossLayer<Dtype>::Forward_cpu(
 							)?Dtype(1.):Dtype(0.);
 
 				//Cache difference map for gradients
-				diff_map_data_row[w] = ref - map_data_row[w];
+				diff_map_data_row[w] = (map_data_row[w] - ref) * (lambda + ref);
 
 				// Loss relates to a square sum over the diff map
 				loss += (diff_map_data_row[w]) * (diff_map_data_row[w]);
@@ -80,7 +82,7 @@ void MapRegressionLossLayer<Dtype>::Backward_cpu(
 		const vector<Blob<Dtype>*>& top, const vector<bool>& propagate_down,
 		vector<Blob<Dtype>*>* bottom) {
 
-	const Dtype alpha = Dtype(-1.) * top[0]->cpu_diff()[0] / (*bottom)[0]->num();
+	const Dtype alpha =  top[0]->cpu_diff()[0] / Dtype((*bottom)[0]->num());
 	if (propagate_down[0]) {
 		caffe_cpu_axpby(
 				(*bottom)[0]->count(),
