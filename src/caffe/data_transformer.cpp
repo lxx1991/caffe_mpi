@@ -19,7 +19,8 @@ template<typename Dtype>
 void DataTransformer<Dtype>::TransformSingle(const int batch_item_id,
                                        IplImage *img,
                                        const Dtype* mean,
-                                       Dtype* transformed_data) {
+                                       Dtype* transformed_data,
+                                       vector<int>& bbox) {
   const int crop_size = param_.crop_size();
   const bool mirror = param_.mirror();
   const Dtype scale = param_.scale();
@@ -42,7 +43,6 @@ void DataTransformer<Dtype>::TransformSingle(const int batch_item_id,
     h_off = h[4];
     w_off = w[4];
   }
-
 
   ////// -------------------!! for debug !! -------------------
   // IplImage *dest = cvCreateImage(cvSize(crop_size * 2, crop_size * 2),
@@ -68,7 +68,8 @@ void DataTransformer<Dtype>::TransformSingle(const int batch_item_id,
   // }
   // cvReleaseImage(&dest);
   ////// -------------------------------------------------------
-  if (mirror && Rand() % 2) {
+  bool is_mirror = mirror && Rand() % 2;
+  if (is_mirror) {
     // Copy mirrored version
     for (int c = 0; c < channels; c++) {
       for (int h = 0; h < crop_size; h++) {
@@ -82,6 +83,7 @@ void DataTransformer<Dtype>::TransformSingle(const int batch_item_id,
         }
       }
     }
+
   } else {
     // Normal copy
     for (int c = 0; c < channels; c++) {
@@ -98,13 +100,29 @@ void DataTransformer<Dtype>::TransformSingle(const int batch_item_id,
     }
   }
 
+  // change the bbox according to croping
+  if (bbox.size() > 0){
+	  // has bbox info
+	  for (int i = 0; i < bbox.size()/2; i++){
+
+		  bbox[2 * i] = min(crop_size, max(0, bbox[2 * i] - w_off));
+		  bbox[2 * i + 1] = min(crop_size, max(0, bbox[2 * i + 1] - h_off));
+	  }
+		if (is_mirror) {
+			// mirror the bbox horizontally
+			bbox[0] = crop_size - bbox[0] - 1;
+			bbox[2] = crop_size - bbox[2] - 1;
+		}
+  }
+
 }
 
 template<typename Dtype>
 void DataTransformer<Dtype>::TransformMultiple(const int batch_item_id,
                                        IplImage *img,
                                        const Dtype* mean,
-                                       Dtype* transformed_data) {
+                                       Dtype* transformed_data,
+                                       vector<int>& bbox) {
   const int crop_size = param_.crop_size();
   const bool mirror = param_.mirror();
   const Dtype scale = param_.scale();
@@ -131,7 +149,7 @@ void DataTransformer<Dtype>::TransformMultiple(const int batch_item_id,
                                     img->depth, img->nChannels);
 
   cvSetImageROI(img, cvRect(w_off, h_off, roi_w, roi_h));
-  cvResize(img, dest);
+  cvResize(img, dest); // crop and resize to crop_size * crop_size
   cvResetImageROI(img);
 
   //////--------------------!! for debug only !!-------------------
@@ -145,7 +163,9 @@ void DataTransformer<Dtype>::TransformMultiple(const int batch_item_id,
 
   unsigned char* data = (unsigned char *)dest->imageData;
   int step = dest->widthStep / sizeof(char);
-  if (mirror && Rand() % 2) {
+
+  bool is_mirror = mirror && Rand() % 2;
+  if (is_mirror) {
     // Copy mirrored version
     for (int c = 0; c < channels; c++) {
       for (int h = 0; h < crop_size; h++) {
@@ -175,17 +195,42 @@ void DataTransformer<Dtype>::TransformMultiple(const int batch_item_id,
     }
   }
   cvReleaseImage(&dest);
+
+  // change the bbox according to croping
+    if (bbox.size() > 0){
+  	  // has bbox info
+    	for (int i = 0; i < bbox.size()/2; i++){
+
+    		bbox[2 * i] = min(roi_w, max(0, bbox[2 * i] - w_off));
+    		bbox[2 * i + 1] = min(roi_h, max(0, bbox[2 * i + 1] - h_off));
+    	}
+		if (is_mirror) {
+			// mirror the bbox horizontally
+			bbox[0] = roi_w - bbox[0] - 1;
+			bbox[2] = roi_w - bbox[2] - 1;
+		}
+		// resize the bounding box according to the aspect ratio and crop_size
+		for (int i = 0; i < bbox.size() / 2; i++) {
+
+			bbox[2 * i] = (bbox[2 * i] * crop_size) / roi_w;
+			bbox[2 * i + 1] = (bbox[2 * i + 1] * crop_size) / roi_h;
+		}
+	}
+
 }
 
 template<typename Dtype>
 void DataTransformer<Dtype>::Transform(const int batch_item_id,
                                        IplImage *img,
                                        const Dtype* mean,
-                                       Dtype* transformed_data) {
+                                       Dtype* transformed_data,
+                                       vector<int>& bbox) {
   if (!param_.multiscale())
-    TransformSingle(batch_item_id, img, mean, transformed_data);
+    TransformSingle(batch_item_id, img, mean, transformed_data,
+    		bbox);
   else
-    TransformMultiple(batch_item_id, img, mean, transformed_data);
+    TransformMultiple(batch_item_id, img, mean, transformed_data,
+    		bbox);
 }
 
 template<typename Dtype>

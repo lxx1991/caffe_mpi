@@ -75,13 +75,21 @@ class DataTransformer {
   void Transform(const int batch_item_id, const Datum& datum,
                  const Dtype* mean, Dtype* transformed_data);
   void Transform(const int batch_item_id, IplImage *img,
-                 const Dtype* mean, Dtype* transformed_data);
+                 const Dtype* mean, Dtype* transformed_data,
+                 vector<int>& bbox);
  protected:
   virtual unsigned int Rand();
   void TransformSingle(const int batch_item_id, IplImage *img,
-               const Dtype* mean, Dtype* transformed_data);
+               const Dtype* mean, Dtype* transformed_data,
+               vector<int>& bbox);
   void TransformMultiple(const int batch_item_id, IplImage *img,
-               const Dtype* mean, Dtype* transformed_data);
+               const Dtype* mean, Dtype* transformed_data,
+               vector<int>& bbox);
+  void TransformMultiple(const int batch_item_id, IplImage *img,
+                 const Dtype* mean, Dtype* transformed_data){
+	  vector<int> dummy;
+	  Transform(batch_item_id, img, mean, transformed_data, dummy);
+  }
   // Tranformation parameters
   TransformationParameter param_;
 

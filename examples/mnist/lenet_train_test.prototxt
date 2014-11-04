@@ -4,6 +4,7 @@ layers {
   type: DATA
   top: "data"
   top: "label"
+  top: "mask_coord"
   data_param {
     source: "examples/mnist/mnist_train_lmdb"
     backend: LMDB
