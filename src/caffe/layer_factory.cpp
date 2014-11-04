@@ -259,12 +259,6 @@ Layer<Dtype>* GetLayer(const LayerParameter& param) {
     return new SplitLayer<Dtype>(param);
   case LayerParameter_LayerType_TANH:
     return GetTanHLayer<Dtype>(name, param);
-  case LayerParameter_LayerType_TRANSFORM_SOFTMAX_LOSS:
-    return new TransformSoftmaxWithLossLayer<Dtype>(param);
-  case LayerParameter_LayerType_SOFTMAX_LOSS_TREE:
-    return new SoftmaxWithLossTreeLayer<Dtype>(param);
-  case LayerParameter_LayerType_ACCURACY_TREE:
-    return new AccuracyTreeLayer<Dtype>(param);
   case LayerParameter_LayerType_WINDOW_DATA:
     return new WindowDataLayer<Dtype>(param);
   case LayerParameter_LayerType_NONE:
