@@ -201,7 +201,7 @@ message NetStateRule {
 // NOTE
 // Update the next available ID when you add a new LayerParameter field.
 //
-// LayerParameter next available ID: 42 (last added: label_transform_param)
+// LayerParameter next available ID: 45 (last added: tiled_convolution_param)
 message LayerParameter {
   repeated string bottom = 2; // the name of the bottom blobs
   repeated string top = 3; // the name of the top blobs
@@ -222,7 +222,7 @@ message LayerParameter {
   // line above the enum. Update the next available ID when you add a new
   // LayerType.
   //
-  // LayerType next available ID: 49 (last added: MAP_EGRESSION_LOSS)
+  // LayerType next available ID: 51 (last added: TILED_CONVOLUTION)
   enum LayerType {
     // "NONE" layer type is 0th enum element so that we don't cause confusion
     // by defaulting to an existent LayerType (instead, should usually error if
@@ -274,6 +274,8 @@ message LayerParameter {
     MULTI_LABEL_ACCURACY = 45;
     MULTI_LABEL_LOSS = 46;
     MAP_REGRESSION_LOSS = 48;
+    TILED_INNERPRODUCT = 49;
+    TILED_CONVOLUTION = 50;
   }
   optional LayerType type = 5; // the layer type from the enum above
 
@@ -331,6 +333,8 @@ message LayerParameter {
   optional TanHParameter tanh_param = 37;
   optional ThresholdParameter threshold_param = 25;
   optional WindowDataParameter window_data_param = 20;
+  optional TiledInnerProductParameter tiled_inner_product_param = 43;
+  optional TiledConvolutionParameter tiled_convolution_param = 44;
 
   // Parameters for data pre-processing.
   optional TransformationParameter transform_param = 36;
@@ -717,6 +721,30 @@ message WindowDataParameter {
   // square: the tightest square around the window is cropped
   optional string crop_mode = 11 [default = "warp"];
 }
+
+// Message that stores parameters used by TiledInnerProductLayer
+message TiledInnerProductParameter {
+   optional uint32 split_h = 1 [default = 1];
+   optional uint32 split_w = 2 [default = 1];
+   
+   optional uint32 overlap_h = 3 [default = 0];
+   optional uint32 overlap_w = 4 [default = 0];
+   
+}
+
+message TiledConvolutionParameter {
+  optional uint32 num_output = 1; // The number of outputs for the layer
+  optional bool bias_term = 2 [default = true]; // whether to have bias terms
+  optional uint32 pad = 3 [default = 0]; // The padding size
+  optional uint32 kernel_size = 4; // The kernel size
+  optional uint32 group = 5 [default = 1]; // The group size for group conv
+  optional uint32 stride = 6 [default = 1]; // The stride
+  optional FillerParameter weight_filler = 7; // The filler for the weight
+  optional FillerParameter bias_filler = 8; // The filler for the bias
+  optional int32 ntile_width = 72 [default = 1];
+  optional int32 ntile_height = 73 [default = 1];
+}
+
 
 // DEPRECATED: V0LayerParameter is the old way of specifying layer parameters
 // in Caffe.  We keep this message type around for legacy support.

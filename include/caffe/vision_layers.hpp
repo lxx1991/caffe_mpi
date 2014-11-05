@@ -350,6 +350,113 @@ class CuDNNPoolingLayer : public PoolingLayer<Dtype> {
 };
 #endif
 
+/*
+ * @brief A layer that split input feature map into subregions and connect them with a fc and then concatenate the output
+ *
+ */
+template <typename Dtype>
+class TiledInnerProductLayer :public Layer<Dtype>{
+public:
+	explicit TiledInnerProductLayer(const LayerParameter& param)
+	      : Layer<Dtype>(param) {}
+	  virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
+	      vector<Blob<Dtype>*>* top);
+	  virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
+	      vector<Blob<Dtype>*>* top);
+
+	  virtual inline LayerParameter_LayerType type() const {
+	    return LayerParameter_LayerType_TILED_INNERPRODUCT;
+	  }
+	  virtual inline int ExactNumBottomBlobs() const { return 1; }
+	  virtual inline int ExactNumTopBlobs() const { return 1; }
+
+	 protected:
+	  virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+	      vector<Blob<Dtype>*>* top);
+	  virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+	      vector<Blob<Dtype>*>* top);
+	  virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
+	      const vector<bool>& propagate_down, vector<Blob<Dtype>*>* bottom);
+	  virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
+	      const vector<bool>& propagate_down, vector<Blob<Dtype>*>* bottom);
+
+	  vector<shared_ptr<InnerProductLayer<Dtype> > > inner_product_layers_;
+	  shared_ptr<ConcatLayer<Dtype> > concat_layer_;
+
+	  vector<Blob<Dtype>* > internal_top_blobs_;
+	  vector<Blob<Dtype>* > internal_bottom_blobs_;
+
+	  //info about region splitting
+	  int split_h_, split_w_;
+	  int overlap_h_, overlap_w_;
+	  int region_num_;
+
+	  // internal ip layers info
+//	  int region_height_, region_width_;
+	  int ip_num_output_;
+//	  bool ip_bias_term_;
+
+	  //info for input-output
+	  int num_;
+	  int height_, width_;
+	  int num_output_;
+
+
+};
+
+/* TiledConvolutionLayer
+*/
+template <typename Dtype>
+class TiledConvolutionLayer : public Layer<Dtype> {
+ public:
+  explicit TiledConvolutionLayer(const LayerParameter& param)
+      : Layer<Dtype>(param) {}
+  virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
+      vector<Blob<Dtype>*>* top);
+  virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
+      vector<Blob<Dtype>*>* top);
+
+  virtual inline LayerParameter_LayerType type() const {
+    return LayerParameter_LayerType_TILED_CONVOLUTION;
+  }
+  virtual inline int MinBottomBlobs() const { return 1; }
+  virtual inline int MinTopBlobs() const { return 1; }
+  virtual inline bool EqualNumBottomTopBlobs() const { return true; }
+
+ protected:
+  virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+      vector<Blob<Dtype>*>* top);
+  virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+      vector<Blob<Dtype>*>* top);
+  virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, vector<Blob<Dtype>*>* bottom);
+  virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, vector<Blob<Dtype>*>* bottom);
+
+  int kernel_size_;
+  int stride_;
+  int num_;
+  int channels_;
+  int pad_;
+  int height_;
+  int width_;
+  int num_output_;
+  int height_out_, width_out_; //added by zhuzy
+  int group_;
+  Blob<Dtype> col_buffer_;
+  Blob<Dtype> out_buffer_;
+  //shared_ptr<SyncedMemory> bias_multiplier_;
+  Blob<Dtype> bias_multiplier_;
+  bool bias_term_;
+  int M_;
+  int K_;
+  int N_;
+  int NTILE_WIDTH_;
+  int NTILE_HEIGHT_;
+  int TILE_WIDTH_;
+  int TILE_HEIGHT_;
+};
+
 }  // namespace caffe
 
 #endif  // CAFFE_VISION_LAYERS_HPP_
