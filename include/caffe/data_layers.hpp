@@ -55,6 +55,8 @@ class BaseDataLayer : public Layer<Dtype> {
   int datum_width() const { return datum_width_; }
   int datum_size() const { return datum_size_; }
 
+
+
  protected:
   TransformationParameter transform_param_;
   DataTransformer<Dtype> data_transformer_;

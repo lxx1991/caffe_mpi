@@ -77,6 +77,7 @@ class DataTransformer {
   void Transform(const int batch_item_id, IplImage *img,
                  const Dtype* mean, Dtype* transformed_data,
                  vector<int>& bbox);
+  Caffe::Phase phase_;
  protected:
   virtual unsigned int Rand();
   void TransformSingle(const int batch_item_id, IplImage *img,
@@ -95,7 +96,7 @@ class DataTransformer {
 
 
   shared_ptr<Caffe::RNG> rng_;
-  Caffe::Phase phase_;
+
 };
 
 
