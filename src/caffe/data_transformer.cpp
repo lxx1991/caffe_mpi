@@ -24,6 +24,7 @@ void DataTransformer<Dtype>::TransformSingle(const int batch_item_id,
   const int crop_size = param_.crop_size();
   const bool mirror = param_.mirror();
   const Dtype scale = param_.scale();
+  const Dtype offset = param_.offset();
 
   int channels = img->nChannels;
   int width = img->width;
@@ -79,7 +80,7 @@ void DataTransformer<Dtype>::TransformSingle(const int batch_item_id,
           int data_index = (h + h_off) * step + (w + w_off) * channels + c;
           int mean_index = (c * crop_size + h) * crop_size + w;
           Dtype datum_element = static_cast<Dtype>(data[data_index]);
-          transformed_data[top_index] = (datum_element - mean[mean_index]) * scale;
+          transformed_data[top_index] = (datum_element - mean[mean_index] + offset) * scale;
         }
       }
     }
@@ -94,7 +95,7 @@ void DataTransformer<Dtype>::TransformSingle(const int batch_item_id,
           int data_index = (h + h_off) * step + (w + w_off) * channels + c;
           int mean_index = (c * crop_size + h) * crop_size + w;
           Dtype datum_element = static_cast<Dtype>(data[data_index]);
-          transformed_data[top_index] = (datum_element - mean[mean_index]) * scale;
+          transformed_data[top_index] = (datum_element - mean[mean_index] + offset) * scale;
         }
       }
     }
@@ -126,6 +127,7 @@ void DataTransformer<Dtype>::TransformMultiple(const int batch_item_id,
   const int crop_size = param_.crop_size();
   const bool mirror = param_.mirror();
   const Dtype scale = param_.scale();
+  const Dtype offset = param_.offset();
 
   int channels = img->nChannels;
   int width = img->width;
@@ -175,7 +177,7 @@ void DataTransformer<Dtype>::TransformMultiple(const int batch_item_id,
           int data_index = h * step + w * channels + c;
           int mean_index = (c * crop_size + h) * crop_size + w;
           Dtype datum_element = static_cast<Dtype>(data[data_index]);
-          transformed_data[top_index] = (datum_element - mean[mean_index]) * scale;
+          transformed_data[top_index] = (datum_element - mean[mean_index] + offset) * scale;
         }
       }
     }
@@ -189,7 +191,7 @@ void DataTransformer<Dtype>::TransformMultiple(const int batch_item_id,
           int data_index = h * step + w * channels + c;
           int mean_index = (c * crop_size + h) * crop_size + w;
           Dtype datum_element = static_cast<Dtype>(data[data_index]);
-          transformed_data[top_index] = (datum_element - mean[mean_index]) * scale;
+          transformed_data[top_index] = (datum_element - mean[mean_index] + offset) * scale;
         }
       }
     }
@@ -247,6 +249,7 @@ void DataTransformer<Dtype>::Transform(const int batch_item_id,
   const int crop_size = param_.crop_size();
   const bool mirror = param_.mirror();
   const Dtype scale = param_.scale();
+  const Dtype offset = param_.offset();
 
   if (mirror && crop_size == 0) {
     LOG(FATAL) << "Current implementation requires mirror and crop_size to be "
@@ -275,7 +278,7 @@ void DataTransformer<Dtype>::Transform(const int batch_item_id,
             Dtype datum_element =
                 static_cast<Dtype>(static_cast<uint8_t>(data[data_index]));
             transformed_data[top_index] =
-                (datum_element - mean[data_index]) * scale;
+                (datum_element - mean[data_index] + offset) * scale;
           }
         }
       }
@@ -290,7 +293,7 @@ void DataTransformer<Dtype>::Transform(const int batch_item_id,
             Dtype datum_element =
                 static_cast<Dtype>(static_cast<uint8_t>(data[data_index]));
             transformed_data[top_index] =
-                (datum_element - mean[data_index]) * scale;
+                (datum_element - mean[data_index] + offset) * scale;
           }
         }
       }
@@ -302,12 +305,12 @@ void DataTransformer<Dtype>::Transform(const int batch_item_id,
         Dtype datum_element =
             static_cast<Dtype>(static_cast<uint8_t>(data[j]));
         transformed_data[j + batch_item_id * size] =
-            (datum_element - mean[j]) * scale;
+            (datum_element - mean[j] + offset) * scale;
       }
     } else {
       for (int j = 0; j < size; ++j) {
         transformed_data[j + batch_item_id * size] =
-            (datum.float_data(j) - mean[j]) * scale;
+            (datum.float_data(j) - mean[j] + offset) * scale;
       }
     }
   }
