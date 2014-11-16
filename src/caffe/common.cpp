@@ -35,11 +35,6 @@ int64_t cluster_seedgen(void) {
 
 
 void GlobalInit(int* pargc, char*** pargv) {
-  // Google flags.
-  ::gflags::ParseCommandLineFlags(pargc, pargv, true);
-  // Google logging.
-  ::google::InitGoogleLogging(*(pargv)[0]);
-  ::google::InstallFailureSignalHandler();
 
 #ifdef USE_MPI
 
@@ -50,7 +45,18 @@ void GlobalInit(int* pargc, char*** pargv) {
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   Caffe::set_mpi_self_rank(rank);
   Caffe::set_mpi_all_rank(all_rank);
+
+  // Supress logging in worker processes
+  if (Caffe::mpi_self_rank()>0){
+  	FLAGS_minloglevel=5;
+  }
 #endif
+
+  // Google flags.
+  ::gflags::ParseCommandLineFlags(pargc, pargv, true);
+  // Google logging.
+  ::google::InitGoogleLogging(*(pargv)[0]);
+  ::google::InstallFailureSignalHandler();
 }
 
 #ifdef CPU_ONLY  // CPU-only Caffe.
