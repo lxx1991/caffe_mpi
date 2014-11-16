@@ -14,14 +14,24 @@
 #include "caffe/util/io.hpp"
 #include "caffe/vision_layers.hpp"
 
+#ifdef USE_MPI
+#include "mpi.h"
+#endif
+
 using namespace caffe;  // NOLINT(build/namespaces)
 
 template<typename Dtype>
 int feature_extraction_pipeline(int argc, char** argv);
 
 int main(int argc, char** argv) {
+#ifdef USE_MPI
+	MPI_Init(&argc, &argv);
+#endif
   return feature_extraction_pipeline<float>(argc, argv);
 //  return feature_extraction_pipeline<double>(argc, argv);
+#ifdef USE_MPI
+  MPI_Finalize();
+#endif
 }
 
 template<typename Dtype>

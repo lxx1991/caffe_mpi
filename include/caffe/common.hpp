@@ -15,6 +15,7 @@
 #include <utility>  // pair
 #include <vector>
 
+
 #include "caffe/util/device_alternate.hpp"
 
 // gflags 2.1 issue: namespace google was changed to gflags without warning.

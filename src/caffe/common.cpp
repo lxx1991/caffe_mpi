@@ -42,6 +42,9 @@ void GlobalInit(int* pargc, char*** pargv) {
   ::google::InstallFailureSignalHandler();
 
 #ifdef USE_MPI
+
+  DLOG(INFO)<<"Initializing mpi";
+  MPI_Init(pargc, pargv);
   int rank, all_rank;
   MPI_Comm_size(MPI_COMM_WORLD, &all_rank);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -117,6 +120,9 @@ Caffe::~Caffe() {
   if (curand_generator_) {
     CURAND_CHECK(curandDestroyGenerator(curand_generator_));
   }
+#ifdef USE_MPI
+	MPI_Finalize();
+#endif
 }
 
 void Caffe::set_random_seed(const unsigned int seed) {

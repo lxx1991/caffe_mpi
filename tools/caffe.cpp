@@ -93,10 +93,22 @@ int train() {
 
   // If the gpu flag is not provided, allow the mode and device to be set
   // in the solver prototxt.
+#ifndef USE_MPI
   if (FLAGS_gpu < 0
-      && solver_param.solver_mode() == caffe::SolverParameter_SolverMode_GPU) {
-    FLAGS_gpu = solver_param.device_id();
+      && solver_param.solver_mode() == caffe::SolverParameter_SolverMode_GPU
+      && solver_param.device_id_size()>0 ) {
+
+    FLAGS_gpu = solver_param.device_id(0);
   }
+#else
+  if (FLAGS_gpu < 0
+        && solver_param.solver_mode() == caffe::SolverParameter_SolverMode_GPU
+        ) {
+	  CHECK_EQ(Caffe::mpi_all_rank(), solver_param.device_id_size())
+			  << "incorrect length of device id list";
+	  FLAGS_gpu = solver_param.device_id(Caffe::mpi_self_rank());
+  }
+#endif
 
   // Set device id and mode
   if (FLAGS_gpu >= 0) {
@@ -272,9 +284,6 @@ RegisterBrewFunction(time);
 
 int main(int argc, char** argv) {
 
-#ifdef USE_MPI
-	MPI_Init(&argc, &argv);
-#endif
   // Print output to stderr (while still logging).
   FLAGS_alsologtostderr = 1;
   // Usage message.
@@ -286,32 +295,13 @@ int main(int argc, char** argv) {
       "  device_query    show GPU diagnostic information\n"
       "  time            benchmark model execution time");
   // Run tool or show usage.
-#ifdef USE_MPI
-  int my_rank;
-  MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
-  LOG(INFO) << "rank: " << my_rank;
-#endif
-
-
 
   caffe::GlobalInit(&argc, &argv);
 
-#ifdef USE_MPI
-//  FLAGS_gpu = my_rank;
-  switch (my_rank){
-  case 0: FLAGS_gpu=0;break;
-  case 1: FLAGS_gpu=2;break;
-  case 2: FLAGS_gpu=0;break;
-  case 3: FLAGS_gpu=2;break;
-  }
-  LOG(INFO)<<FLAGS_gpu;
-#endif
   if (argc == 2) {
     return GetBrewFunction(caffe::string(argv[1]))();
   } else {
     gflags::ShowUsageWithFlagsRestrict(argv[0], "tools/caffe");
   }
-#ifdef USE_MPI
-  MPI_Finalize();
-#endif
+
 }
