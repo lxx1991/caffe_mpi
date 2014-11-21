@@ -8,7 +8,7 @@ def get_value_coord(diction, value_idx=0):
     coord = []
     value = []
     for k in sorted(diction):
-        if len(diction[k])<= value_idx:
+        if value_idx >= len(diction[k]):
             continue
         coord.append(k)
         value.append(diction[k][value_idx])
@@ -39,7 +39,7 @@ def draw_loss(numbers, axe=None, training_loss_id=3, testing_loss_id=2):
     axe.text(0.5,0.85, 'Latest 5 Training Loss: {:}, {:}, {:}, {:}, {:}'.format(*training_loss_total_value[-5:]), transform=axe.transAxes)
     return axe, axe, training_loss_total_value[-1], testing_loss_total_value[-1]
 
-def draw_acc(numbers, axe=None, acc_id=0):
+def draw_acc(numbers, axe=None, acc_id=0, acc_5_id=None):
     """
     Draw testing accuracy curve
     :param numbers:
@@ -56,8 +56,16 @@ def draw_acc(numbers, axe=None, acc_id=0):
 
     axe.cla()
     axe.grid(True)
-    axe.text(0.5,.9, 'Latest Testing Accuracy: {:}'.format(testing_acc_value[-1]), transform=axe.transAxes)
-    axe.text(0.5,.8, 'Latest Testing Iteration: {:}'.format(testing_acc_iter[-1]), transform=axe.transAxes)
+    axe.text(0.3,.9, 'Latest Testing Accuracy: {:}'.format(testing_acc_value[-1]), transform=axe.transAxes)
+    axe.text(0.3,.7, 'Latest Testing Iteration: {:}'.format(testing_acc_iter[-1]), transform=axe.transAxes)
+    
+    if acc_5_id is not None:
+
+        testing_acc_5_iter, testing_acc_5_value = get_value_coord(testing_acc, int(acc_5_id))
+
+        axe.plot(testing_acc_5_iter, testing_acc_5_value)
+        axe.text(0.3,.8, 'Latest Testing Top-5 Accuracy: {:}'.format(testing_acc_5_value[-1]), transform=axe.transAxes)
+
     return axe.plot(testing_acc_iter, testing_acc_value), testing_acc_value[-1]
 
 def draw_both(numbers):

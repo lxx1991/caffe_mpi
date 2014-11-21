@@ -102,19 +102,19 @@ void DataTransformer<Dtype>::TransformSingle(const int batch_item_id,
   }
 
   // change the bbox according to croping
-//  if (bbox.size() > 0){
-//	  // has bbox info
-//	  for (int i = 0; i < bbox.size()/2; i++){
-//
-//		  bbox[2 * i] = min(crop_size, max(0, bbox[2 * i] - w_off));
-//		  bbox[2 * i + 1] = min(crop_size, max(0, bbox[2 * i + 1] - h_off));
-//	  }
-//		if (is_mirror) {
-//			// mirror the bbox horizontally
-//			bbox[0] = crop_size - bbox[0] - 1;
-//			bbox[2] = crop_size - bbox[2] - 1;
-//		}
-//  }
+  if (bbox.size() > 0){
+	  // has bbox info
+	  for (int i = 0; i < bbox.size()/2; i++){
+
+		  bbox[2 * i] = min(crop_size, max(0, bbox[2 * i] - w_off));
+		  bbox[2 * i + 1] = min(crop_size, max(0, bbox[2 * i + 1] - h_off));
+	  }
+		if (is_mirror) {
+			// mirror the bbox horizontally
+			bbox[0] = crop_size - bbox[0] - 1;
+			bbox[2] = crop_size - bbox[2] - 1;
+		}
+  }
 
 }
 

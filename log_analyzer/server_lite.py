@@ -32,6 +32,9 @@ parser.add_argument('--test_acc', dest='test_acc_id', type=int,
 parser.add_argument('--port', dest='port', type=int,
                     default=10000)
 
+parser.add_argument('--test_acc_5', dest='test_acc_5_id',
+                    default=None)
+
 args = parser.parse_args()
 
 
@@ -42,7 +45,7 @@ setup_msg = ' '.join(args.msg)
 
 
 class WebMonitor(object):
-    def __init__(self, log_files, fig, training_loss_id=3, testing_loss_id=2, testing_acc_id=0):
+    def __init__(self, log_files, fig, training_loss_id=3, testing_loss_id=2, testing_acc_id=0, testing_acc_5_id=None):
         """
         Initialize and record log list
         :param log_files:
@@ -54,6 +57,7 @@ class WebMonitor(object):
         self.training_loss_id=training_loss_id
         self.testing_loss_id = testing_loss_id
         self.testing_acc_id = testing_acc_id
+        self.testing_acc_5_id = testing_acc_5_id
 
     def show_value(self, fd=None):
         """
@@ -61,8 +65,9 @@ class WebMonitor(object):
         :return:
         """
         numbers = select_log_part(load_log(self.log_files),[('Testing','Testing', 6, 5), ('Training','loss', 6, 0)])
-        y0, y1, latest_train_loss, latest_test_loss = draw_loss(numbers, self.axes[0], self.training_loss_id, self.testing_loss_id)
-        y2, latest_test_loss = draw_acc(numbers, self.axes[1], self.testing_acc_id)
+        y0, y1, latest_train_loss, latest_test_loss = draw_loss(numbers, self.axes[0], self.training_loss_id,
+                                                                self.testing_loss_id)
+        y2, latest_test_loss = draw_acc(numbers, self.axes[1], self.testing_acc_id,  self.testing_acc_5_id)
         return self.fig
 
     def render(self):
@@ -75,7 +80,8 @@ class WebMonitor(object):
 @app.route('/get_image')
 def draw_curve():
     fig = Figure(figsize=(20,10))
-    monitor = WebMonitor(log_file_list, fig, training_loss_id=args.train_loss_id, testing_loss_id=args.test_loss_id, testing_acc_id=args.test_acc_id)
+    monitor = WebMonitor(log_file_list, fig, training_loss_id=args.train_loss_id, testing_loss_id=args.test_loss_id,
+                         testing_acc_id=args.test_acc_id, testing_acc_5_id=args.test_acc_5_id)
     render_fig = monitor.render()
     canvas = FigureCanvas(render_fig)
     import StringIO

@@ -13,7 +13,7 @@ layers {
     crop_size: 224
     mean_file: "data/ilsvrc12/imagenet_mean_crop.binaryproto"
     mirror: true
-    multiscale: true
+    multiscale: false
   }
   include: { phase: TRAIN }
 }
