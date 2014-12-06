@@ -59,7 +59,7 @@ The main requirements are `numpy` and `boost.python` (provided by boost). `panda
 
 You can install the dependencies with
 
-    pip install -r /path/to/caffe/python/requirements.txt
+    for req in $(cat requirements.txt); do sudo pip install $req; done
 
 but we highly recommend first installing the [Anaconda](https://store.continuum.io/cshop/anaconda/) Python distribution, which provides most of the necessary packages, as well as the `hdf5` library dependency.
 
@@ -182,7 +182,7 @@ For each of these formulas, `brew edit FORMULA`, and add the ENV definitions as 
 
 To edit the formulae in turn, run
 
-    for x in snappy leveldb protobuf gflags glog szip boost lmdb homebrew/science/opencv; do brew edit $x; done
+    for x in snappy leveldb protobuf gflags glog szip boost boost-python lmdb homebrew/science/opencv; do brew edit $x; done
 
 After this, run
 
