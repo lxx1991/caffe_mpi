@@ -773,6 +773,14 @@ message WindowDataParameter {
 message MapRegressionParameter {
   //Specify the beta in the loss function
   optional float beta = 1 [default = 1.0];
+
+  enum LossMode {
+    EUCLIDEAN = 0;
+    SOFTMAX = 1;
+    HINGE = 2;
+  }
+
+  optional LossMode loss_mode = 2 [default = EUCLIDEAN];
 }
 
 // DEPRECATED: use LayerParameter.

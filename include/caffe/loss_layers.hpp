@@ -798,6 +798,12 @@ protected:
                               const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
 
     Dtype beta_;
+
+    enum LossMode {EUCLIDEAN, SOFTMAX, HINGE};
+    LossMode loss_mode_;
+
+    Blob<Dtype> buffer_;
+
 };
 }  // namespace caffe
 
