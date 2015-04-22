@@ -214,6 +214,8 @@ void Net<Dtype>::Init(const NetParameter& in_param) {
   }
   GetLearningRateAndWeightDecay();
   debug_info_ = param.debug_info();
+  debug_info_interval_ = param.debug_info_interval();
+  show_debug_info_ = false;
   LOG(INFO) << "Network initialization done.";
   LOG(INFO) << "Memory required for data: " << memory_used_ * sizeof(Dtype);
 }
@@ -463,7 +465,7 @@ Dtype Net<Dtype>::ForwardFromTo(int start, int end) {
   CHECK_GE(start, 0);
   CHECK_LT(end, layers_.size());
   Dtype loss = 0;
-  if (debug_info_) {
+  if (show_debug_info_) {
     for (int i = 0; i < net_input_blobs_.size(); ++i) {
       InputDebugInfo(i);
     }
@@ -473,7 +475,7 @@ Dtype Net<Dtype>::ForwardFromTo(int start, int end) {
     layers_[i]->Reshape(bottom_vecs_[i], top_vecs_[i]);
     Dtype layer_loss = layers_[i]->Forward(bottom_vecs_[i], top_vecs_[i]);
     loss += layer_loss;
-    if (debug_info_) { ForwardDebugInfo(i); }
+    if (show_debug_info_) { ForwardDebugInfo(i); }
   }
   return loss;
 }
@@ -537,7 +539,7 @@ void Net<Dtype>::BackwardFromTo(int start, int end) {
     if (layer_need_backward_[i]) {
       layers_[i]->Backward(
           top_vecs_[i], bottom_need_backward_[i], bottom_vecs_[i]);
-      if (debug_info_) { BackwardDebugInfo(i); }
+      if (show_debug_info_) { BackwardDebugInfo(i); }
     }
   }
 }
@@ -660,7 +662,7 @@ void Net<Dtype>::BackwardTo(int end) {
 template <typename Dtype>
 void Net<Dtype>::Backward() {
   BackwardFromTo(layers_.size() - 1, 0);
-  if (debug_info_) {
+  if (show_debug_info_) {
     Dtype asum_data = 0, asum_diff = 0, sumsq_data = 0, sumsq_diff = 0;
     for (int i = 0; i < params_.size(); ++i) {
       if (param_owners_[i] >= 0) { continue; }
@@ -746,7 +748,7 @@ void Net<Dtype>::Update() {
   // accounted for in the current diff.)
   for (int i = 0; i < params_.size(); ++i) {
     if (param_owners_[i] < 0) { continue; }
-    if (debug_info_) { UpdateDebugInfo(i); }
+    if (show_debug_info_) { UpdateDebugInfo(i); }
     const int count = params_[i]->count();
     const Dtype* this_diff;
     Dtype* owner_diff;
@@ -772,7 +774,7 @@ void Net<Dtype>::Update() {
   // Now, update the owned parameters.
   for (int i = 0; i < params_.size(); ++i) {
     if (param_owners_[i] >= 0) { continue; }
-    if (debug_info_) { UpdateDebugInfo(i); }
+    if (show_debug_info_) { UpdateDebugInfo(i); }
     params_[i]->Update();
   }
 }

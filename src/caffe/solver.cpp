@@ -168,6 +168,9 @@ void Solver<Dtype>::Step(int iters) {
   Dtype smoothed_loss = 0;
 
   for (; iter_ < stop_iter; ++iter_) {
+
+    net_->checkDebugInfo(iter_); // check debug info display
+
     if (param_.test_interval() && iter_ % param_.test_interval() == 0
         && (iter_ > 0 || param_.test_initialization())) {
       TestAll();

@@ -45,12 +45,10 @@ namespace caffe {
         LossLayer<Dtype>::Reshape(bottom, top);
 
         //bottom blobs shape check
-        CHECK_EQ(bottom.size(), 2)<<"bottom must contain two maps";
-        CHECK_EQ(bottom[0]->shape().size(), bottom[0]->shape().size())
-                    <<"The two input maps should in the same shape";
-        for (int i = 0; i < bottom[0]->shape().size(); i++){
-            CHECK_EQ(bottom[0]->shape(i), bottom[1]->shape(i));
-        }
+        CHECK_EQ(bottom.size(), 2)
+            <<"bottom must contain two maps";
+        CHECK_EQ(bottom[0]->count(1), bottom[1]->count(1))
+            <<"two map must have same number of elements";
 
         switch (loss_mode_){
             case EUCLIDEAN:
@@ -60,12 +58,16 @@ namespace caffe {
                 buffer_.ReshapeLike(*bottom[0]);
                 break;
             case HINGE:
+                buffer_.ReshapeLike(*bottom[0]);
                 break;
         }
 
 
     }
 
+    /**
+     * Forward computations
+     */
     template <typename Dtype>
     Dtype computeEuclideanLoss(const Dtype* pred_data, Dtype* buffer_data, const Dtype* obj_data, int num, int dim){
         int count = num * dim;
@@ -98,6 +100,25 @@ namespace caffe {
     }
 
     template <typename Dtype>
+    Dtype computeHingeLoss(const Dtype* pred_data, Dtype* buffer_data, const Dtype* obj_data, int num, int dim){
+        const int count = num * dim;
+
+//        caffe_copy(count, pred_data, pred_data);
+//        for (int i = 0; i < num; ++i) {
+//            bottom_diff[i * dim + static_cast<int>(label[i])] *= -1;
+//        }
+//        for (int i = 0; i < num; ++i) {
+//            for (int j = 0; j < dim; ++j) {
+//                bottom_diff[i * dim + j] = std::max(
+//                        Dtype(0), 1 + bottom_diff[i * dim + j]);
+//            }
+//        }
+    }
+
+    /**
+     * Backward computations
+     */
+    template <typename Dtype>
     void computeEuclideanDiff(const Dtype* buffer_data, Dtype* diff, int num, int dim, Dtype loss_weight, Dtype sign){
         const Dtype alpha = sign * loss_weight / num;
         const int count = num * dim;
@@ -117,13 +138,17 @@ namespace caffe {
     }
 
     template <typename Dtype>
+    void computeHingeDiff(const Dtype* buffer_data, Dtype* diff, int num, int dim, Dtype loss_weight, Dtype sign){
+
+    }
+
+    template <typename Dtype>
     void MapRegressionLossLayer<Dtype>::Forward_cpu(vector<Blob<Dtype> *> const &bottom,
                                                     vector<Blob<Dtype> *> const &top) {
         const Dtype* pred_data = bottom[0]->cpu_data();
         const Dtype* obj_data = bottom[1]->cpu_data();
         Dtype* mutable_buffer_data = buffer_.mutable_cpu_data();
         int num = bottom[0]->shape(0);
-        int count = bottom[0]->count();
         int dim = bottom[0]->count(1);
 
         switch (loss_mode_){

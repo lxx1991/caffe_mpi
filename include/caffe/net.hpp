@@ -183,6 +183,15 @@ class Net {
   static bool StateMeetsRule(const NetState& state, const NetStateRule& rule,
       const string& layer_name);
 
+  //decide whether to show debug information based on the current iteration number
+  inline void checkDebugInfo(int iter){
+    if ((iter % debug_info_interval_ == 0) && (debug_info_)){
+      show_debug_info_ = true;
+    }else{
+      show_debug_info_ = false;
+    }
+  }
+
  protected:
   // Helpers for Init.
   /// @brief Append a new input or top blob to the net.
@@ -255,6 +264,8 @@ class Net {
   size_t memory_used_;
   /// Whether to compute and display debug info for the net.
   bool debug_info_;
+  bool show_debug_info_;
+  bool debug_info_interval_;
 
   DISABLE_COPY_AND_ASSIGN(Net);
 };
