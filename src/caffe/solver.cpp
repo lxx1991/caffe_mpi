@@ -154,7 +154,9 @@ void Solver<Dtype>::InitTestNets() {
     LOG(INFO)
         << "Creating test net (#" << i << ") specified by " << sources[i];
     test_nets_[i].reset(new Net<Dtype>(net_params[i]));
-    test_nets_[i]->set_debug_info(param_.debug_info());
+
+    //disable testing debug info
+    test_nets_[i]->set_debug_info(false);
   }
 }
 
@@ -169,15 +171,16 @@ void Solver<Dtype>::Step(int iters) {
 
   for (; iter_ < stop_iter; ++iter_) {
 
-    net_->checkDebugInfo(iter_); // check debug info display
-
     if (param_.test_interval() && iter_ % param_.test_interval() == 0
         && (iter_ > 0 || param_.test_initialization())) {
       TestAll();
     }
 
     const bool display = param_.display() && iter_ % param_.display() == 0;
-    net_->set_debug_info(display && param_.debug_info());
+    int debug_display = param_.debug_display();
+    bool debug_info = param_.debug_info();
+    bool show_debug = (iter_ % debug_display == 0)&&(debug_info);
+    net_->set_debug_info(show_debug);
     Dtype loss = net_->ForwardBackward(bottom_vec);
     if (losses.size() < average_loss) {
       losses.push_back(loss);

@@ -93,26 +93,28 @@ namespace caffe {
         //Compute sigmoid cross entropy loss in one run
         Dtype loss = 0;
         for (int i = 0; i < count; ++i) {
-            loss -= (obj_data[i] - 1)*pred_data[i] -
-                    log(1 + exp(-pred_data[i]));
+            loss -= (obj_data[i] - (pred_data[i] >= 0))*pred_data[i] -
+                    log(1 + exp(pred_data[i] - 2 * pred_data[i] * (pred_data[i] >= 0) ));
         }
-        return loss;
+        return loss / count;
     }
 
     template <typename Dtype>
-    Dtype computeHingeLoss(const Dtype* pred_data, Dtype* buffer_data, const Dtype* obj_data, int num, int dim){
+    Dtype computeHingeLoss(const Dtype* pred_data, Dtype* buffer_data, Dtype* diff_data, const Dtype* obj_data, int num, int dim, Dtype beta){
         const int count = num * dim;
 
-//        caffe_copy(count, pred_data, pred_data);
-//        for (int i = 0; i < num; ++i) {
-//            bottom_diff[i * dim + static_cast<int>(label[i])] *= -1;
-//        }
-//        for (int i = 0; i < num; ++i) {
-//            for (int j = 0; j < dim; ++j) {
-//                bottom_diff[i * dim + j] = std::max(
-//                        Dtype(0), 1 + bottom_diff[i * dim + j]);
-//            }
-//        }
+        caffe_sub(count, obj_data, pred_data, diff_data);
+        caffe_set(count, beta, buffer_data);
+        caffe_sub(count, buffer_data, obj_data, buffer_data);
+        caffe_cpu_sign(count, buffer_data, buffer_data);
+
+
+        for (int i = 0; i < count; ++i){
+            diff_data[i] = std::max(Dtype(0), -1 * buffer_data[i] * diff_data[i]);
+
+        }
+        Dtype loss = caffe_cpu_asum(count, diff_data) / count;
+        return loss;
     }
 
     /**
@@ -134,12 +136,15 @@ namespace caffe {
     void computeSoftmaxDiff(const Dtype* buffer_data, const Dtype* obj_data, Dtype* diff, int num, int dim, Dtype loss_weight){
         const int count = num * dim;
         caffe_sub(count, buffer_data, obj_data, diff);
-        caffe_scal(count, loss_weight / num, diff);
+        caffe_scal(count, loss_weight / count, diff);
     }
 
     template <typename Dtype>
-    void computeHingeDiff(const Dtype* buffer_data, Dtype* diff, int num, int dim, Dtype loss_weight, Dtype sign){
-
+    void computeHingeDiff(const Dtype* buffer_data, Dtype* diff_data, int num, int dim, Dtype loss_weight){
+        const int count = num * dim;
+        caffe_mul(count, buffer_data, diff_data, diff_data);
+        caffe_cpu_sign(count, diff_data, diff_data);
+        caffe_scal(count, loss_weight / count, diff_data);
     }
 
     template <typename Dtype>
@@ -148,6 +153,7 @@ namespace caffe {
         const Dtype* pred_data = bottom[0]->cpu_data();
         const Dtype* obj_data = bottom[1]->cpu_data();
         Dtype* mutable_buffer_data = buffer_.mutable_cpu_data();
+        Dtype* mutable_diff_data = bottom[0]->mutable_cpu_diff();
         int num = bottom[0]->shape(0);
         int dim = bottom[0]->count(1);
 
@@ -161,7 +167,7 @@ namespace caffe {
                 top[0]->mutable_cpu_data()[0] = computeSoftmaxLoss(pred_data, mutable_buffer_data, obj_data, num, dim);
                 break;
             case HINGE:
-                NOT_IMPLEMENTED;
+                top[0]->mutable_cpu_data()[0] = computeHingeLoss(pred_data, mutable_buffer_data, mutable_diff_data, obj_data, num, dim, beta_);
                 break;
         }
 
@@ -193,13 +199,13 @@ namespace caffe {
                             const Dtype* obj_data = bottom[1]->cpu_data();
                             computeSoftmaxDiff(buffer_data, obj_data, diff_data, num, dim, loss_weight);
                         }else{
-                            LOG(FATAL) << this->type()
+                            LOG(INFO) << this->type()
                             << " Softmax loss cannot backpropagate to label inputs.";
                         }
                         break;
                     }
                     case HINGE: {
-                        NOT_IMPLEMENTED;
+                        computeHingeDiff(buffer_data, diff_data, num, dim, loss_weight);
                         break;
                     }
                 }
