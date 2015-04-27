@@ -426,6 +426,7 @@ void SGDSolver<Dtype>::PreSolve() {
   update_.clear();
   temp_.clear();
   for (int i = 0; i < net_params.size(); ++i) {
+    LOG(INFO) << i;
     const vector<int>& shape = net_params[i]->shape();
     history_.push_back(shared_ptr<Blob<Dtype> >(new Blob<Dtype>(shape)));
     update_.push_back(shared_ptr<Blob<Dtype> >(new Blob<Dtype>(shape)));
