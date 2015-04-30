@@ -125,7 +125,7 @@ namespace caffe {
         caffe_sub(count, obj_data, pred_data, diff_data);
         caffe_set(count, beta, buffer_data);
         caffe_sub(count, buffer_data, obj_data, buffer_data);
-        caffe_cpu_partial_sign(count, buffer_data, buffer_data, Dtype(-1), Dtype(-1)*alpha);
+        caffe_cpu_partial_sign(count, buffer_data, buffer_data, Dtype(1), Dtype(-1)*alpha);
 
 
         for (int i = 0; i < count; ++i){
@@ -162,7 +162,7 @@ namespace caffe {
     void computeHingeDiff(const Dtype* buffer_data, Dtype* diff_data, int num, int dim, Dtype loss_weight, Dtype alpha){
         const int count = num * dim;
         caffe_mul(count, buffer_data, diff_data, diff_data);
-        caffe_cpu_partial_sign(count, diff_data, diff_data, Dtype(-1), Dtype(-1) * alpha);
+        caffe_cpu_partial_sign(count, diff_data, diff_data, Dtype(1), Dtype(-1) * alpha);
         caffe_scal(count, loss_weight / count, diff_data);
     }
 
