@@ -19,11 +19,30 @@ namespace caffe {
         return 1. / (1. + exp(-x));
     }
 
+  template<typename Dtype>
+  inline int8_t caffe_partial_sign(Dtype val, Dtype pos_val, Dtype neg_val) {
+      int flag = (Dtype(0) < val) - (val < Dtype(0));
+      Dtype rst;
+      rst = (flag == 1)?pos_val:flag;
+      rst = (rst==-1)?neg_val:rst;
+      return rst;
+  }
+
+  template <typename Dtype>
+  void caffe_cpu_partial_sign(const int count, Dtype* x, Dtype* y, Dtype pos_val, Dtype neg_val){
+      for (int i = 0; i < count; ++i){
+          y[i] = caffe_partial_sign(x[i], pos_val, neg_val);
+      }
+  }
+  template void caffe_cpu_partial_sign<float>(const int, float*, float*, float, float);
+  template void caffe_cpu_partial_sign<double>(const int, double*, double*, double, double);
+
     template<typename Dtype>
     void MapRegressionLossLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
                                                    const vector<Blob<Dtype>*>& top) {
         LossLayer<Dtype>::LayerSetUp(bottom, top);
         beta_ = this->layer_param_.map_regression_param().beta();
+        alpha_ = this->layer_param_.map_regression_param().alpha();
 
         switch (this->layer_param_.map_regression_param().loss_mode()){
             case MapRegressionParameter_LossMode_SOFTMAX:
@@ -100,13 +119,13 @@ namespace caffe {
     }
 
     template <typename Dtype>
-    Dtype computeHingeLoss(const Dtype* pred_data, Dtype* buffer_data, Dtype* diff_data, const Dtype* obj_data, int num, int dim, Dtype beta){
+    Dtype computeHingeLoss(const Dtype* pred_data, Dtype* buffer_data, Dtype* diff_data, const Dtype* obj_data, int num, int dim, Dtype alpha, Dtype beta){
         const int count = num * dim;
 
         caffe_sub(count, obj_data, pred_data, diff_data);
         caffe_set(count, beta, buffer_data);
         caffe_sub(count, buffer_data, obj_data, buffer_data);
-        caffe_cpu_sign(count, buffer_data, buffer_data);
+        caffe_cpu_partial_sign(count, buffer_data, buffer_data, Dtype(-1), Dtype(-1)*alpha);
 
 
         for (int i = 0; i < count; ++i){
@@ -140,14 +159,17 @@ namespace caffe {
     }
 
     template <typename Dtype>
-    void computeHingeDiff(const Dtype* buffer_data, Dtype* diff_data, int num, int dim, Dtype loss_weight){
+    void computeHingeDiff(const Dtype* buffer_data, Dtype* diff_data, int num, int dim, Dtype loss_weight, Dtype alpha){
         const int count = num * dim;
         caffe_mul(count, buffer_data, diff_data, diff_data);
-        caffe_cpu_sign(count, diff_data, diff_data);
+        caffe_cpu_partial_sign(count, diff_data, diff_data, Dtype(-1), Dtype(-1) * alpha);
         caffe_scal(count, loss_weight / count, diff_data);
     }
 
-    template <typename Dtype>
+
+
+
+  template <typename Dtype>
     void MapRegressionLossLayer<Dtype>::Forward_cpu(vector<Blob<Dtype> *> const &bottom,
                                                     vector<Blob<Dtype> *> const &top) {
         const Dtype* pred_data = bottom[0]->cpu_data();
@@ -167,7 +189,7 @@ namespace caffe {
                 top[0]->mutable_cpu_data()[0] = computeSoftmaxLoss(pred_data, mutable_buffer_data, obj_data, num, dim);
                 break;
             case HINGE:
-                top[0]->mutable_cpu_data()[0] = computeHingeLoss(pred_data, mutable_buffer_data, mutable_diff_data, obj_data, num, dim, beta_);
+                top[0]->mutable_cpu_data()[0] = computeHingeLoss(pred_data, mutable_buffer_data, mutable_diff_data, obj_data, num, dim, alpha_, beta_);
                 break;
         }
 
@@ -205,7 +227,7 @@ namespace caffe {
                         break;
                     }
                     case HINGE: {
-                        computeHingeDiff(buffer_data, diff_data, num, dim, loss_weight);
+                        computeHingeDiff(buffer_data, diff_data, num, dim, loss_weight, alpha_);
                         break;
                     }
                 }

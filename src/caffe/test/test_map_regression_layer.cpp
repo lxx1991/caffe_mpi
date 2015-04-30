@@ -103,6 +103,7 @@ class MapRegressionLossLayerTest : public MultiDeviceTest<TypeParam> {
     LayerParameter layer_param;
     layer_param.mutable_map_regression_param()->set_loss_mode(MapRegressionParameter_LossMode_HINGE);
     layer_param.mutable_map_regression_param()->set_beta(0.3);
+    layer_param.mutable_map_regression_param()->set_alpha(10);
     MapRegressionLossLayer<Dtype> layer_weight_1(layer_param);
     layer_weight_1.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
     const Dtype loss_weight_1 =
@@ -177,6 +178,7 @@ TYPED_TEST(MapRegressionLossLayerTest, TestHingeGradient) {
     layer_param.add_loss_weight(kLossWeight);
     layer_param.mutable_map_regression_param()->set_loss_mode(MapRegressionParameter_LossMode_HINGE);
     layer_param.mutable_map_regression_param()->set_beta(0.3);
+    layer_param.mutable_map_regression_param()->set_alpha(10);
     MapRegressionLossLayer<Dtype> layer(layer_param);
     layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
     GradientChecker<Dtype> checker(1e-2, 1e-2, 1701);

@@ -49,6 +49,7 @@ void readTextBBoxDB(vector<vector<int> > &db, std::ifstream &infile){
 template <typename Dtype>
 inline void buildBBoxMap(int map_ch, int map_width, int map_height,
                   vector<int>& bbox_info, Dtype* data){
+  CHECK_EQ(9, bbox_info.size())<<"Input must have 9 number per line";
   int map_start_x = std::min((int)(float(bbox_info[5])/bbox_info[1] * map_width), map_width - 1);
   int map_start_y = std::min((int)(float(bbox_info[6])/bbox_info[2] * map_height), map_height - 1);
   int map_end_x = std::min((int)(float(bbox_info[7])/bbox_info[1] * map_width), map_width - 1);

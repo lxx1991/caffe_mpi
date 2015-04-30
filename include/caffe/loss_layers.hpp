@@ -797,6 +797,7 @@ protected:
     virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
                               const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
 
+    Dtype alpha_;
     Dtype beta_;
 
     enum LossMode {EUCLIDEAN, SOFTMAX, HINGE};
