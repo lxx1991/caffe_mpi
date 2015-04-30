@@ -325,6 +325,57 @@ class WindowDataLayer : public BasePrefetchingDataLayer<Dtype> {
   vector<std::pair<std::string, Datum > > image_database_cache_;
 };
 
+
+/**
+* @brief Provide data based on map bbox/segmentation
+*
+* This layer will take in a input bbox dataset and generate bbox map.
+* For current implementation every input should be in follwing schema
+* \code{.unparsed}
+* image_index image_width image_height  bbox_channel_h bbox_channel_w bbox_start_x bbox_start_y bbox_end_x bbox_end_y
+* \endcode
+*/
+template <typename Dtype>
+class MapDataLayer : public BasePrefetchingDataLayer<Dtype> {
+public:
+  explicit MapDataLayer(const LayerParameter& param)
+      : BasePrefetchingDataLayer<Dtype>(param) {}
+  virtual ~MapDataLayer();
+  virtual void DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
+                              const vector<Blob<Dtype>*>& top);
+
+  virtual inline const char* type() const { return "MapData"; }
+  virtual inline int ExactNumBottomBlobs() const { return 0; }
+  virtual inline int ExactNumTopBlobs() const { return 1; }
+
+protected:
+
+  /**
+   * A random generator for future use
+   */
+  virtual unsigned int PrefetchRand();
+
+  /**
+   * Generate map data in a prefetching manner
+   */
+  virtual void InternalThreadEntry();
+
+  shared_ptr<Caffe::RNG> prefetch_rng_;
+
+  int map_ch_;
+  int map_width_;
+  int map_height_;
+
+  vector< vector<int> > text_file_database_;
+  vector< vector<int> >::iterator text_file_cursor_;
+
+  enum DataBase{
+    TEXT_FILE, HDD_DB
+  };
+  DataBase db_;
+
+};
+
 }  // namespace caffe
 
 #endif  // CAFFE_DATA_LAYERS_HPP_

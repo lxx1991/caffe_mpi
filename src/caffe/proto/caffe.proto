@@ -260,7 +260,7 @@ message ParamSpec {
 // NOTE
 // Update the next available ID when you add a new LayerParameter field.
 //
-// LayerParameter next available layer-specific ID: 133 (last added: map_regression_param)
+// LayerParameter next available layer-specific ID: 134 (last added: map_data_param)
 message LayerParameter {
   optional string name = 1; // the layer name
   optional string type = 2; // the layer type
@@ -334,6 +334,7 @@ message LayerParameter {
   optional ThresholdParameter threshold_param = 128;
   optional WindowDataParameter window_data_param = 129;
   optional MapRegressionParameter map_regression_param = 132;
+  optional MapDataParameter map_data_param = 133;
 }
 
 // Message that stores parameters used to apply transformation
@@ -980,4 +981,22 @@ message PReLUParameter {
   optional FillerParameter filler = 1;
   // Whether or not slope paramters are shared across channels.
   optional bool channel_shared = 2 [default = false];
+}
+
+//Message that generate bounding box map based on coordinates
+message MapDataParameter {
+ //specify the output map size
+ optional int32 map_size = 1 [default = 5];
+
+ //specify the height and width if we want to use rectangular map.
+ optional int32 map_size_w = 2 [default = 0];
+ optional int32 map_size_h = 3 [default = 0];
+
+ //specify the channel number of the map
+ optional int32 map_channels = 4 [default = 1];
+
+ optional string source_file = 5 [default = ""];
+ optional string db = 6 [default = ""];
+
+ optional int32 batch_size = 7 [default = 0];
 }
