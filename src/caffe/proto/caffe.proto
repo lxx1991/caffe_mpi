@@ -974,7 +974,7 @@ message PReLUParameter {
 // Message that stores parameters used by MapRegressionLossLayer
 message MapRegressionParameter {
   //Specify the beta in the loss function
-  optional float beta = 1 [default = 1.0];
+  optional float beta = 1 [default = 0.5];
 
   //specify the weight of positive elements
   optional float alpha = 3 [default = 1.0];
