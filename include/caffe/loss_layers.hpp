@@ -773,39 +773,45 @@ class SoftmaxWithLossLayer : public LossLayer<Dtype> {
 template <typename Dtype>
 class MapRegressionLossLayer : public LossLayer<Dtype>{
 public:
-   /**
-   *
-   */
-    explicit MapRegressionLossLayer(const LayerParameter& param)
-            : LossLayer<Dtype>(param), beta_(0) {}
-    virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
-                            const vector<Blob<Dtype>*>& top);
-    virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
-                         const vector<Blob<Dtype>*>& top);
+ /**
+ *
+ */
+  explicit MapRegressionLossLayer(const LayerParameter& param)
+          : LossLayer<Dtype>(param), beta_(0) {}
+  virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
+                          const vector<Blob<Dtype>*>& top);
+  virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
+                       const vector<Blob<Dtype>*>& top);
 
-    virtual inline const char* type() const { return "MapRegressionLoss"; }
-    virtual inline int ExactNumBottomBlobs() const { return 2; }
-    virtual inline int ExactNumTopBlobs() const { return 1; }
+  virtual inline const char* type() const { return "MapRegressionLoss"; }
+  virtual inline int ExactNumBottomBlobs() const { return 2; }
+  virtual inline int ExactNumTopBlobs() const { return 1; }
 
 protected:
 
-    virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
-                             const vector<Blob<Dtype>*>& top);
+  virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+                           const vector<Blob<Dtype>*>& top);
 
 
-    /// @brief Not implemented -- AccuracyLayer cannot be used as a loss.
-    virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
-                              const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+  /// @brief Not implemented -- AccuracyLayer cannot be used as a loss.
+  virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
+                            const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
 
-    Dtype alpha_;
-    Dtype beta_;
+  Dtype alpha_;
+  Dtype beta_;
 
-    enum LossMode {EUCLIDEAN, SOFTMAX, HINGE};
-    LossMode loss_mode_;
+  Dtype tau_plus_;
+  Dtype tau_minus_;
 
-    Blob<Dtype> buffer_;
+  Dtype epsilon_;
+
+  enum LossMode {EUCLIDEAN, SOFTMAX, HINGE};
+  LossMode loss_mode_;
+
+  Blob<Dtype> buffer_;
 
 };
+
 }  // namespace caffe
 
 #endif  // CAFFE_LOSS_LAYERS_HPP_

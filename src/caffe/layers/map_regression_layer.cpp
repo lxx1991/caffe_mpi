@@ -44,6 +44,11 @@ namespace caffe {
     beta_ = this->layer_param_.map_regression_param().beta();
     alpha_ = this->layer_param_.map_regression_param().alpha();
 
+    tau_plus_ = this->layer_param_.map_regression_param().tau_plus();
+    tau_minus_ = this->layer_param_.map_regression_param().tau_minus();
+
+    epsilon_ = this->layer_param_.map_regression_param().epsilon();
+
     switch (this->layer_param_.map_regression_param().loss_mode()){
         case MapRegressionParameter_LossMode_SOFTMAX:
             loss_mode_ = SOFTMAX;
@@ -116,7 +121,9 @@ namespace caffe {
   }
 
   template <typename Dtype>
-  Dtype computeHingeLoss(const Dtype* pred_data, Dtype* buffer_data, Dtype* diff_data, const Dtype* obj_data, int num, int dim, Dtype alpha, Dtype beta){
+  Dtype computeHingeLoss(const Dtype* pred_data, Dtype* buffer_data, Dtype* diff_data, const Dtype* obj_data,
+                         int num, int dim,
+                         Dtype alpha, Dtype beta, Dtype tau_plus, Dtype tau_minus, Dtype epsilon){
     const int count = num * dim;
 
     caffe_sub(count, obj_data, pred_data, diff_data);
@@ -156,7 +163,9 @@ namespace caffe {
   }
 
   template <typename Dtype>
-  void computeHingeDiff(const Dtype* buffer_data, Dtype* diff_data, int num, int dim, Dtype loss_weight, Dtype alpha){
+  void computeHingeDiff(const Dtype* buffer_data, Dtype* diff_data,
+                        int num, int dim, Dtype loss_weight,
+                        Dtype alpha, Dtype beta, Dtype tau_plus, Dtype tau_minus, Dtype epsilon){
     const int count = num * dim;
     caffe_mul(count, buffer_data, diff_data, diff_data);
     caffe_cpu_partial_sign(count, diff_data, diff_data, Dtype(1), Dtype(-1) * alpha);
@@ -184,7 +193,9 @@ namespace caffe {
         top[0]->mutable_cpu_data()[0] = computeSoftmaxLoss(pred_data, mutable_buffer_data, obj_data, num, dim);
         break;
       case HINGE:
-        top[0]->mutable_cpu_data()[0] = computeHingeLoss(pred_data, mutable_buffer_data, mutable_diff_data, obj_data, num, dim, alpha_, beta_);
+        top[0]->mutable_cpu_data()[0] = computeHingeLoss(pred_data, mutable_buffer_data, mutable_diff_data, obj_data,
+                                                         num, dim,
+                                                         alpha_, beta_, tau_plus_, tau_minus_, epsilon_);
         break;
     }
   }
@@ -220,7 +231,9 @@ namespace caffe {
             break;
           }
           case HINGE: {
-            computeHingeDiff(buffer_data, diff_data, num, dim, loss_weight, alpha_);
+            computeHingeDiff(buffer_data, diff_data,
+                             num, dim, loss_weight,
+                             alpha_, beta_, tau_plus_, tau_minus_, epsilon_);
             break;
           }
         }

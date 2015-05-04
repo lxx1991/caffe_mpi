@@ -977,7 +977,7 @@ message MapRegressionParameter {
   optional float beta = 1 [default = 0.5];
 
   //specify the weight of positive elements
-  optional float alpha = 3 [default = 1.0];
+  optional float alpha = 2 [default = 1.0];
 
   enum LossMode {
     EUCLIDEAN = 0;
@@ -985,7 +985,14 @@ message MapRegressionParameter {
     HINGE = 2;
   }
 
-  optional LossMode loss_mode = 2 [default = EUCLIDEAN];
+  optional LossMode loss_mode = 3 [default = EUCLIDEAN];
+
+  //specify the $tau$ paramter in the loss function
+  optional float tau_plus = 4 [default = 0.5];
+  optional float tau_minus = 5 [default = 0.1];
+
+  //specify the smoothing term paramter
+  optional float epsilon = 6 [default = 0.1];
 }
 
 //Message that generate bounding box map based on coordinates
@@ -1000,8 +1007,38 @@ message MapDataParameter {
  //specify the channel number of the map
  optional int32 map_channels = 4 [default = 1];
 
+ //bbox text file name, used in text_file data mode
  optional string source_file = 5 [default = ""];
+
+ //bbox lmdb name, used in LMDB data mode
  optional string db = 6 [default = ""];
 
+ //batch size of the bbox map
  optional int32 batch_size = 7 [default = 0];
+
+ //map type in the generation.
+ //AREA means the the bbox will cover all pixels surrounded by the bounding box
+ //CENTER means the center of the bounding box will lighten,
+ //  and it's designed to cooperate with relief to balance the bounding box size problem.
+ enum MapMode {
+   AREA = 0;
+   CENTER = 1;
+ }
+
+
+ //Smoothing type
+ //GAUSSIAN refers to a gaussian smoothing throughout all channels (like operate in a 4D tensor)
+ //GAUSSIAN_IN_CHANNEL refers to simple gaussian smoothing in one map channel (like in general image processing)
+ enum SmoothType {
+   NO_SMOOTH = 0;
+   GAUSSIAN = 1;
+   GAUSSIAN_IN_CHANNEL = 2;
+ }
+
+ //specify type of the generated map
+ optional MapMode map_mode = 8 [default = AREA];
+ optional SmoothType smooth_type = 9 [default = NO_SMOOTH];
+
+ //sigma parameter for gaussian smoothing
+ optional float sigma = 10 [default = 1];
 }

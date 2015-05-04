@@ -366,6 +366,8 @@ protected:
   int map_width_;
   int map_height_;
 
+  Dtype sigma_;
+
   vector< vector<int> > text_file_database_;
   vector< vector<int> >::iterator text_file_cursor_;
 

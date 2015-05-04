@@ -50,15 +50,15 @@ template <typename Dtype>
 inline void buildBBoxMap(int map_ch, int map_width, int map_height,
                   vector<int>& bbox_info, Dtype* data){
   CHECK_EQ(9, bbox_info.size())<<"Input must have 9 number per line";
-  int map_start_x = std::min((int)(float(bbox_info[5])/bbox_info[1] * map_width), map_width - 1);
-  int map_start_y = std::min((int)(float(bbox_info[6])/bbox_info[2] * map_height), map_height - 1);
-  int map_end_x = std::min((int)(float(bbox_info[7])/bbox_info[1] * map_width), map_width - 1);
-  int map_end_y= std::min((int)(float(bbox_info[8])/bbox_info[2] * map_height), map_height -1);
+  int map_start_x = std::min((int)(float(bbox_info[5] - 1)/bbox_info[1] * map_width), map_width);
+  int map_start_y = std::min((int)(float(bbox_info[6] - 1)/bbox_info[2] * map_height), map_height);
+  int map_end_x = std::min((int)(float(bbox_info[7] - 1)/bbox_info[1] * map_width), map_width);
+  int map_end_y= std::min((int)(float(bbox_info[8] -1)/bbox_info[2] * map_height), map_height);
   int map_working_channel = bbox_info[3] * (int)sqrt(map_ch) + bbox_info[4];
 
   Dtype* start_ptr = data + map_working_channel * (map_width * map_height);
-  for(int y = map_start_y; y <= map_end_y; ++y){
-    for(int x = map_start_x; x <= map_end_x; ++x){
+  for(int y = map_start_y; y < map_end_y; ++y){
+    for(int x = map_start_x; x < map_end_x; ++x){
       start_ptr[y * map_width + x] = 1;
     }
   }
@@ -106,12 +106,14 @@ void MapDataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
   }
   map_ch_ = this->layer_param_.map_data_param().map_channels();
 
+  sigma_ = this->layer_param_.map_data_param().sigma();
+
   if (this->layer_param_.map_data_param().has_source_file()){
     db_ = TEXT_FILE;
   }else if (this->layer_param_.map_data_param().has_db()){
     db_ = HDD_DB;
   }else{
-    LOG(ERROR)<<"Not database found, use either `source file` or `db` to specify a "
+    LOG(ERROR)<<"No database found, use either `source file` or `db` to specify a "
         <<"data source";
   }
 
