@@ -126,13 +126,10 @@ namespace caffe {
                          Dtype alpha, Dtype beta, Dtype tau_plus, Dtype tau_minus, Dtype epsilon){
     const int count = num * dim;
 
-    caffe_sub(count, obj_data, pred_data, diff_data);
-    caffe_set(count, beta, buffer_data);
-    caffe_sub(count, buffer_data, obj_data, buffer_data);
-    caffe_cpu_partial_sign(count, buffer_data, buffer_data, Dtype(1), Dtype(-1)*alpha);
-
     for (int i = 0; i < count; ++i){
-        diff_data[i] = std::max(Dtype(0), -1 * buffer_data[i] * diff_data[i]);
+      buffer_data[i] = alpha * (obj_data[i]>tau_plus) - (obj_data[i]<tau_minus);
+      Dtype ls = (buffer_data[i] > 0) * alpha * (Dtype(1) - pred_data[i]) + (buffer_data[i] < 0) * pred_data[i];
+      diff_data[i] = std::max(Dtype(0), ls);
     }
 
     Dtype loss = caffe_cpu_asum(count, diff_data) / count;
@@ -166,9 +163,9 @@ namespace caffe {
                         int num, int dim, Dtype loss_weight,
                         Dtype alpha, Dtype beta, Dtype tau_plus, Dtype tau_minus, Dtype epsilon){
     const int count = num * dim;
+    caffe_cpu_sign(count, diff_data, diff_data);
     caffe_mul(count, buffer_data, diff_data, diff_data);
-    caffe_cpu_partial_sign(count, diff_data, diff_data, Dtype(1), Dtype(-1) * alpha);
-    caffe_scal(count, loss_weight / count, diff_data);
+    caffe_scal(count, Dtype(-1) * loss_weight / count, diff_data);
   }
 
 

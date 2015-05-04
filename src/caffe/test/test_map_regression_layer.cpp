@@ -30,10 +30,12 @@ class MapRegressionLossLayerTest : public MultiDeviceTest<TypeParam> {
     filler_param.set_min(0);
     UniformFiller<Dtype> target_filler(filler_param);
     filler_param.set_max(2);
+    filler_param.set_min(-2);
     UniformFiller<Dtype> pred_filler(filler_param);
-    target_filler.Fill(this->blob_bottom_data_);
+
+    pred_filler.Fill(this->blob_bottom_data_);
     blob_bottom_vec_.push_back(blob_bottom_data_);
-    pred_filler.Fill(this->blob_bottom_label_);
+    target_filler.Fill(this->blob_bottom_label_);
     blob_bottom_vec_.push_back(blob_bottom_label_);
     blob_top_vec_.push_back(blob_top_loss_);
   }
@@ -178,7 +180,9 @@ TYPED_TEST(MapRegressionLossLayerTest, TestHingeGradient) {
     layer_param.add_loss_weight(kLossWeight);
     layer_param.mutable_map_regression_param()->set_loss_mode(MapRegressionParameter_LossMode_HINGE);
     layer_param.mutable_map_regression_param()->set_beta(0.3);
-    layer_param.mutable_map_regression_param()->set_alpha(10);
+    layer_param.mutable_map_regression_param()->set_alpha(4);
+    layer_param.mutable_map_regression_param()->set_tau_plus(0.5);
+    layer_param.mutable_map_regression_param()->set_tau_minus(0.4);
     MapRegressionLossLayer<Dtype> layer(layer_param);
     layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
     GradientChecker<Dtype> checker(1e-2, 1e-2, 1701);
