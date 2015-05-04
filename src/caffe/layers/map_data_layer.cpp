@@ -134,11 +134,14 @@ void smoothImage<float>(int map_ch,int map_width, int map_height,
                         float* data){
   int channel_step = map_height * map_width;
   int ksize = 2 * kernel_radius + 1;
+  int range = kernel_radius * kernel_radius;
   //build filter kernel
   cv::Mat smoothing_kernel(ksize, ksize, CV_32F);
   for (int x = 0; x <= kernel_radius; ++x){
     for (int y = 0; y <= kernel_radius; ++y){
-      float v = std::max(0., std::exp(-0.5 * (std::pow(x - kernel_radius, 2) + std::pow(y - kernel_radius, 2)) / std::pow(sigma, 2)));
+      float distsqr = std::pow(x - kernel_radius, 2) + std::pow(y - kernel_radius, 2);
+
+      float v = (distsqr <= range)?std::max(0., std::exp(-0.5 * distsqr / std::pow(sigma, 2))):float(0.);
       smoothing_kernel.at<float>(y, x) = v;
       smoothing_kernel.at<float>(ksize - 1 - y, ksize - 1 - x) = v;
       smoothing_kernel.at<float>(ksize - 1 - y, x) = v;
@@ -146,10 +149,12 @@ void smoothImage<float>(int map_ch,int map_width, int map_height,
     }
   }
 
+  DLOG(INFO)<<" kernel "<<smoothing_kernel<<std::endl;
+
   //do channel-wise convolution
   for (int ch = 0; ch < map_ch; ch++){
     cv::Mat m(map_height, map_width, CV_32F, data + ch * channel_step);
-    cv::filter2D(m, m, CV_32F, smoothing_kernel);
+    cv::filter2D(m, m, CV_32F, smoothing_kernel, cvPoint(-1, -1), 0, cv::BORDER_CONSTANT);
   }
 }
 
@@ -159,12 +164,15 @@ void smoothImage<double>(int map_ch, int map_width, int map_height,
                          double* data){
   int channel_step = map_height * map_width;
   int ksize = 2 * kernel_radius + 1;
+  int range = kernel_radius * kernel_radius;
 
   //build filter kernel
   cv::Mat smoothing_kernel(ksize, ksize, CV_64F);
   for (int x = 0; x <= kernel_radius; ++x){
     for (int y = 0; y <= kernel_radius; ++y){
-      double v = std::max(0., std::exp(-0.5 * (std::pow(x - kernel_radius, 2) + std::pow(y - kernel_radius, 2)) / std::pow(sigma, 2)));
+      double distsqr = std::pow(x - kernel_radius, 2) + std::pow(y - kernel_radius, 2);
+
+      double v = (distsqr <= range)?std::max(0., std::exp(-0.5 * distsqr / std::pow(sigma, 2))):float(0.);
       smoothing_kernel.at<double>(y, x) = v;
       smoothing_kernel.at<double>(ksize - 1 - y, ksize - 1 - x) = v;
       smoothing_kernel.at<double>(ksize - 1 - y, x) = v;
@@ -175,7 +183,7 @@ void smoothImage<double>(int map_ch, int map_width, int map_height,
   //do channel-wise convolution
   for (int ch = 0; ch < map_ch; ch++){
     cv::Mat m(map_height, map_width, CV_64F, data + ch * channel_step);
-    cv::filter2D(m, m, CV_64F, smoothing_kernel);
+    cv::filter2D(m, m, CV_64F, smoothing_kernel, cvPoint(-1, -1), 0, cv::BORDER_CONSTANT);
   }
 }
 

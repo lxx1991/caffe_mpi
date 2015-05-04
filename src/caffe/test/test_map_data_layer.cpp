@@ -140,10 +140,10 @@ protected:
 
     for (int iter = 0; iter < 10; ++iter) {
       layer.Forward(blob_bottom_vec_, blob_top_vec_);
-      EXPECT_NEAR(blob_top_data_->cpu_data()[ind(2, 7, 1)], std::exp(-1), 1e-3);
-      EXPECT_NEAR(blob_top_data_->cpu_data()[ind(2, 7, 3)], std::exp(-1), 1e-3);
-      EXPECT_NEAR(blob_top_data_->cpu_data()[ind(2, 6, 2)], std::exp(-1), 1e-3);
-      EXPECT_NEAR(blob_top_data_->cpu_data()[ind(2, 8, 2)], std::exp(-1), 1e-3);
+      EXPECT_NEAR(blob_top_data_->cpu_data()[ind(2, 6, 1)], std::exp(-1), 1e-3);
+      EXPECT_NEAR(blob_top_data_->cpu_data()[ind(2, 8, 1)], std::exp(-1), 1e-3);
+      EXPECT_NEAR(blob_top_data_->cpu_data()[ind(2, 6, 3)], std::exp(-1), 1e-3);
+      EXPECT_NEAR(blob_top_data_->cpu_data()[ind(2, 8, 3)], std::exp(-1), 1e-3);
     }
   }
 
