@@ -138,7 +138,7 @@ void smoothImage<float>(int map_ch,int map_width, int map_height,
   cv::Mat smoothing_kernel(ksize, ksize, CV_32F);
   for (int x = 0; x <= kernel_radius; ++x){
     for (int y = 0; y <= kernel_radius; ++y){
-      float v = std::max(0., std::exp(-1 * (std::pow(x - kernel_radius, 2) + std::pow(y - kernel_radius, 2)) / std::pow(sigma, 2)));
+      float v = std::max(0., std::exp(-0.5 * (std::pow(x - kernel_radius, 2) + std::pow(y - kernel_radius, 2)) / std::pow(sigma, 2)));
       smoothing_kernel.at<float>(y, x) = v;
       smoothing_kernel.at<float>(ksize - 1 - y, ksize - 1 - x) = v;
       smoothing_kernel.at<float>(ksize - 1 - y, x) = v;
@@ -164,7 +164,7 @@ void smoothImage<double>(int map_ch, int map_width, int map_height,
   cv::Mat smoothing_kernel(ksize, ksize, CV_64F);
   for (int x = 0; x <= kernel_radius; ++x){
     for (int y = 0; y <= kernel_radius; ++y){
-      double v = std::max(0., std::exp(-1 * (std::pow(x - kernel_radius, 2) + std::pow(y - kernel_radius, 2)) / std::pow(sigma, 2)));
+      double v = std::max(0., std::exp(-0.5 * (std::pow(x - kernel_radius, 2) + std::pow(y - kernel_radius, 2)) / std::pow(sigma, 2)));
       smoothing_kernel.at<double>(y, x) = v;
       smoothing_kernel.at<double>(ksize - 1 - y, ksize - 1 - x) = v;
       smoothing_kernel.at<double>(ksize - 1 - y, x) = v;
