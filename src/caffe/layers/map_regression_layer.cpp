@@ -64,7 +64,7 @@ namespace caffe {
 
   template<typename Dtype>
   void MapRegressionLossLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
-                                          const vector<Blob<Dtype>*>& top){
+                                              const vector<Blob<Dtype>*>& top){
     LossLayer<Dtype>::Reshape(bottom, top);
 
     //bottom blobs shape check
@@ -133,7 +133,6 @@ namespace caffe {
 
     for (int i = 0; i < count; ++i){
         diff_data[i] = std::max(Dtype(0), -1 * buffer_data[i] * diff_data[i]);
-
     }
 
     Dtype loss = caffe_cpu_asum(count, diff_data) / count;
