@@ -189,7 +189,7 @@ void smoothImage<double>(int map_ch, int map_width, int map_height,
 *    this will smooth the map only inside each channel, just like general image smoothing.
 */
 template <typename Dtype>
-inline void smoothBBoxMap(int map_ch, int map_width, int map_height,
+inline void smoothBBoxMap(int map_ch, int map_width, int map_height, Dtype sigma,
                          vector<int>& bbox_info, Dtype* data, MapDataParameter_SmoothType mode) {
   switch (mode) {
     case MapDataParameter_SmoothType_NO_SMOOTH: {
@@ -200,7 +200,7 @@ inline void smoothBBoxMap(int map_ch, int map_width, int map_height,
       break;
     };
     case MapDataParameter_SmoothType_GAUSSIAN_IN_CHANNEL:{
-      smoothImage<Dtype>(map_ch, map_width, map_height, (map_width + map_height)/4, 1, data);
+      smoothImage<Dtype>(map_ch, map_width, map_height, (map_width + map_height)/4, sigma, data);
 
       break;
     };
@@ -301,7 +301,7 @@ void MapDataLayer<Dtype>::InternalThreadEntry() {
         buildBBoxMap<Dtype>(map_ch_, map_width_, map_height_, *text_file_cursor_, item_data,
                             this->layer_param_.map_data_param().map_mode());
         //TODO: add smoothing operation
-        smoothBBoxMap<Dtype>(map_ch_, map_width_, map_height_, *text_file_cursor_, item_data,
+        smoothBBoxMap<Dtype>(map_ch_, map_width_, map_height_, sigma_, *text_file_cursor_, item_data,
                       this->layer_param_.map_data_param().smooth_type());
         //go to the next item and rewind if reaches the end
         text_file_cursor_++;
