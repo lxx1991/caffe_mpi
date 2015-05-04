@@ -200,7 +200,7 @@ inline void smoothBBoxMap(int map_ch, int map_width, int map_height,
       break;
     };
     case MapDataParameter_SmoothType_GAUSSIAN_IN_CHANNEL:{
-      smoothImage<Dtype>(map_ch, map_width, map_height, (map_width + map_height)/6, 1, data);
+      smoothImage<Dtype>(map_ch, map_width, map_height, (map_width + map_height)/4, 1, data);
 
       break;
     };
