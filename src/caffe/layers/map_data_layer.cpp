@@ -187,6 +187,39 @@ void smoothImage<double>(int map_ch, int map_width, int map_height,
   }
 }
 
+template <typename Dtype>
+void smoothTensor(int map_ch, int map_width, int map_height,
+                 vector<int>& bbox_info, Dtype sigma,
+                 Dtype* data){
+  int channel_step = map_height * map_width;
+  int pos_channel = bbox_info[4];
+  int pos_x = Dtype((bbox_info[5] + bbox_info[7])/2)/bbox_info[1] * map_width;
+  int pos_y = Dtype((bbox_info[6] + bbox_info[8])/2)/bbox_info[2] * map_height;
+
+  for (int ch = 0; ch < map_ch; ++ch){
+    for (int y = 0; y < map_height; ++y){
+      for (int x = 0; x < map_width; ++x){
+        Dtype distance = std::pow(2*(ch - pos_channel), 2) + std::pow(y - pos_y, 2) + std::pow(x - pos_x, 2);
+        Dtype v = std::exp(Dtype(-0.5) * distance / std::pow(sigma, 2));
+        data[ch * channel_step + y * map_width + x] = (v>1e-5)?v: Dtype(0);
+      }
+    }
+  }
+
+  //debug dump
+    std::ofstream of("/media/ssd/dump.txt", std::ofstream::out);
+  for (int ch = 0; ch < map_ch; ++ch){
+    for ( int y = 0; y < map_height; ++y){
+      for(int x = 0; x < map_width; ++x){
+        of<<data[(ch * map_height + y)*map_width + x]<<" ";
+      }
+      of<<std::endl;
+    }
+    of <<std::endl;
+  }
+}
+
+
 /*!
 * Smooth the bounding box map according to given smoothing operation.
 * For current implementation we support following smoothing types:
@@ -205,6 +238,7 @@ inline void smoothBBoxMap(int map_ch, int map_width, int map_height, Dtype sigma
       break;
     }
     case MapDataParameter_SmoothType_GAUSSIAN: {
+      smoothTensor<Dtype>(map_ch, map_width, map_height, bbox_info, sigma, data);
       break;
     };
     case MapDataParameter_SmoothType_GAUSSIAN_IN_CHANNEL:{
