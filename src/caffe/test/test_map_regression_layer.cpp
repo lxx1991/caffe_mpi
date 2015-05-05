@@ -185,7 +185,7 @@ TYPED_TEST(MapRegressionLossLayerTest, TestHingeGradient) {
     layer_param.mutable_map_regression_param()->set_tau_minus(0.4);
     MapRegressionLossLayer<Dtype> layer(layer_param);
     layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
-    GradientChecker<Dtype> checker(1e-2, 1e-2, 1701);
+    GradientChecker<Dtype> checker(1e-2, 1e-3, 1701);
     checker.CheckGradientExhaustive(&layer, this->blob_bottom_vec_,
                                     this->blob_top_vec_, 0);
 }

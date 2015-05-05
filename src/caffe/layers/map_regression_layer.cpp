@@ -127,8 +127,8 @@ namespace caffe {
     const int count = num * dim;
 
     for (int i = 0; i < count; ++i){
-      buffer_data[i] = alpha * (obj_data[i]>tau_plus) - (obj_data[i]<tau_minus);
-      Dtype ls = (buffer_data[i] > 0) * alpha * (Dtype(1) - pred_data[i]) + (buffer_data[i] < 0) * pred_data[i];
+      buffer_data[i] = obj_data[i] * alpha * (obj_data[i]>tau_plus) - (obj_data[i]<tau_minus);
+      Dtype ls = (buffer_data[i] > 0) * alpha * obj_data[i] * (Dtype(1) - pred_data[i]) + (buffer_data[i] < 0) * pred_data[i];
       diff_data[i] = std::max(Dtype(0), ls);
     }
 
