@@ -50,6 +50,8 @@ inline void buildAreaMap(int map_ch, int map_width, int map_height, vector<int>&
   int map_end_y = std::min((int) (Dtype(bbox_info[8] - 1) / bbox_info[2] * map_height), map_height);
   int map_working_channel = bbox_info[3] * (int) sqrt(map_ch) + bbox_info[4];
 
+  CHECK_LT(map_working_channel, map_ch)<<"channel index must lest than number of channel in the map";
+
   Dtype *start_ptr = data + map_working_channel * (map_width * map_height);
   for (int y = map_start_y; y < map_end_y; ++y) {
     for (int x = map_start_x; x < map_end_x; ++x) {
@@ -84,6 +86,8 @@ inline void buildCenterMap(int map_ch, int map_width, int map_height, vector<int
   int bbox_center_x = Dtype((bbox_info[5] + bbox_info[7])/2)/bbox_info[1] * map_width;
   int bbox_center_y = Dtype((bbox_info[6] + bbox_info[8])/2)/bbox_info[2] * map_height;
   int map_working_channel = bbox_info[3] * (int) sqrt(map_ch) + bbox_info[4];
+
+  CHECK_LT(map_working_channel, map_ch)<<"channel index must lest than number of channel in the map";
 
   data[(map_working_channel*map_height + bbox_center_y)*map_width + bbox_center_x] = 1;
 }
