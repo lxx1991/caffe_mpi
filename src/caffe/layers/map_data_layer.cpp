@@ -89,7 +89,7 @@ inline void buildCenterMap(int map_ch, int map_width, int map_height, vector<int
 
   CHECK_LT(map_working_channel, map_ch)<<"channel index must lest than number of channel in the map";
 
-  data[(map_working_channel*map_height + bbox_center_y)*map_width + bbox_center_x] = 1;
+  data[(map_working_channel*map_height + bbox_center_y)*map_width + bbox_center_x] = ((bbox_center_x > 0) &&(bbox_center_y > 0))?1:0;
 }
 
 /*!
@@ -200,6 +200,9 @@ void smoothTensor(int map_ch, int map_width, int map_height,
   int pos_x = Dtype((bbox_info[5] + bbox_info[7])/2)/bbox_info[1] * map_width;
   int pos_y = Dtype((bbox_info[6] + bbox_info[8])/2)/bbox_info[2] * map_height;
 
+  if ((pos_x == 0) && (pos_y == 0)){
+    return;
+  }
   for (int ch = 0; ch < map_ch; ++ch){
     for (int y = 0; y < map_height; ++y){
       for (int x = 0; x < map_width; ++x){

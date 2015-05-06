@@ -164,7 +164,7 @@ namespace caffe {
                         Dtype alpha, Dtype beta, Dtype tau_plus, Dtype tau_minus, Dtype epsilon){
     const int count = num * dim;
     caffe_cpu_sign(count, diff_data, diff_data);
-    caffe_mul(count, buffer_data, diff_data, diff_data);
+    caffe_mul(count, buffer_dagtta, diff_data, diff_data);
     caffe_scal(count, Dtype(-1) * loss_weight / count, diff_data);
   }
 
