@@ -8,4 +8,4 @@ LOG_DIR=`~/anaconda/bin/python examples/jdet/build_solver.py $NET $DEVICE_ID $TE
 echo Log path $LOG_DIR
 GOOGLE_LOG_DIR=$LOG_DIR ./build/tools/caffe train \
     --solver=models/jdet/solver_$NET.prototxt  \
-    --weights=/media/ssd/caffe_bvlc/models/jdet/pretrained/clarify/origin_clarify.caffemodel
+    --weights=models/jdet/pretrained/clarify/origin_clarify.caffemodel
