@@ -16,7 +16,7 @@ else:
   testing = False
 
 solver_temp = 'models/jdet/solver.prototxt.example'
-base_path = '/media/datadisk_c/snapshots/jdet/'
+base_path = '/media/DATA/snapshots/jdet/'
 
 starting_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
