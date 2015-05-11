@@ -807,6 +807,8 @@ message WindowTSDFDataParameter {
   optional bool cache_images = 12 [default = false];
   // append root_folder to locate images
   optional string root_folder = 13 [default = ""];
+  // classification only with positive data
+  optional bool classification = 14 [default = false];
 }
 
 // DEPRECATED: use LayerParameter.

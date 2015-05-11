@@ -149,7 +149,7 @@ void WindowTSDFDataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bott
       // add window to foreground list or background list
       if (overlap >= fg_threshold) {
         int label = window[WindowTSDFDataLayer::LABEL];
-        CHECK_GT(label, 0);
+        //CHECK_GT(label, 0);
         fg_windows_.push_back(window);
         label_hist.insert(std::make_pair(label, 0));
         label_hist[label]++;
@@ -241,6 +241,7 @@ void WindowTSDFDataLayer<Dtype>::InternalThreadEntry() {
       this->layer_param_.window_tsdf_data_param().fg_fraction();
 
   const string& crop_mode = this->layer_param_.window_tsdf_data_param().crop_mode();
+  const bool classification = this->layer_param_.window_tsdf_data_param().classification();
   bool use_square = (crop_mode == "square") ? true : false;
 
   // zero out batch
@@ -257,12 +258,15 @@ void WindowTSDFDataLayer<Dtype>::InternalThreadEntry() {
       // sample a window
       timer.Start();
       const unsigned int rand_index = PrefetchRand();
-      /*vector<float> window = (is_fg) ?
+      vector<float> window;
+      if (classification) {
+        window = fg_windows_[rand_index % fg_windows_.size()];
+      } else {
+        window = (is_fg) ?
           fg_windows_[rand_index % fg_windows_.size()] :
           bg_windows_[rand_index % bg_windows_.size()];
-      */
-      vector<float> window = fg_windows_[rand_index % fg_windows_.size()];
-      //vector<float> window = fg_windows_[0];
+
+      }
 
       bool do_mirror = mirror && PrefetchRand() % 2;
 

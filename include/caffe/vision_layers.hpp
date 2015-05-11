@@ -80,8 +80,8 @@ class BaseConvolutionLayer : public Layer<Dtype> {
   vector<int> output_shape_;
 
   int num_spatial_axes_;
-  int bottom_dim_;
-  int top_dim_;
+  size_t bottom_dim_;
+  size_t top_dim_;
 
   int channel_axis_;
   int num_;
@@ -459,8 +459,8 @@ class PoolingLayer : public Layer<Dtype> {
   Blob<int> output_shape_;
 
   int num_spatial_axes_;
-  int bottom_dim_;
-  int top_dim_;
+  size_t bottom_dim_;
+  size_t top_dim_;
 
   int channel_axis_;
   int num_;

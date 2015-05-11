@@ -36,7 +36,7 @@ void DropoutLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
   const Dtype* bottom_data = bottom[0]->cpu_data();
   Dtype* top_data = top[0]->mutable_cpu_data();
   unsigned int* mask = rand_vec_.mutable_cpu_data();
-  const int count = bottom[0]->count();
+  const size_t count = bottom[0]->count();
   if (this->phase_ == TRAIN) {
     // Create random numbers
     caffe_rng_bernoulli(count, 1. - threshold_, mask);
@@ -57,7 +57,7 @@ void DropoutLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
     Dtype* bottom_diff = bottom[0]->mutable_cpu_diff();
     if (this->phase_ == TRAIN) {
       const unsigned int* mask = rand_vec_.cpu_data();
-      const int count = bottom[0]->count();
+      const size_t count = bottom[0]->count();
       for (int i = 0; i < count; ++i) {
         bottom_diff[i] = top_diff[i] * mask[i] * scale_;
       }
