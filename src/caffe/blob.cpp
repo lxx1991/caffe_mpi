@@ -486,6 +486,7 @@ void Blob<Dtype>::scale_diff(Dtype scale_factor) {
 
 template <typename Dtype>
 bool Blob<Dtype>::ShapeEquals(const BlobProto& other) {
+  /*
   if (other.has_num() || other.has_channels() ||
       other.has_height() || other.has_width()) {
     // Using deprecated 4D Blob dimensions --
@@ -500,6 +501,7 @@ bool Blob<Dtype>::ShapeEquals(const BlobProto& other) {
            LegacyShape(-2) == other.height() &&
            LegacyShape(-1) == other.width();
   }
+  */
   vector<int> other_shape(other.shape().dim_size());
   for (int i = 0; i < other.shape().dim_size(); ++i) {
     other_shape[i] = other.shape().dim(i);

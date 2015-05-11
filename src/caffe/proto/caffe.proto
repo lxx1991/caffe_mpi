@@ -261,7 +261,7 @@ message ParamSpec {
 // NOTE
 // Update the next available ID when you add a new LayerParameter field.
 //
-// LayerParameter next available layer-specific ID: 131 (last added: python_param)
+// LayerParameter next available layer-specific ID: 132 (last added: window_tsdf_data_param)
 message LayerParameter {
   optional string name = 1; // the layer name
   optional string type = 2; // the layer type
@@ -333,6 +333,7 @@ message LayerParameter {
   optional TanHParameter tanh_param = 127;
   optional ThresholdParameter threshold_param = 128;
   optional WindowDataParameter window_data_param = 129;
+  optional WindowTSDFDataParameter window_tsdf_data_param = 131;
 }
 
 // Message that stores parameters used to apply transformation
@@ -742,6 +743,40 @@ message ThresholdParameter {
 
 // Message that stores parameters used by WindowDataLayer
 message WindowDataParameter {
+  // Specify the data source.
+  optional string source = 1;
+  // For data pre-processing, we can do simple scaling and subtracting the
+  // data mean, if provided. Note that the mean subtraction is always carried
+  // out before scaling.
+  optional float scale = 2 [default = 1];
+  optional string mean_file = 3;
+  // Specify the batch size.
+  optional uint32 batch_size = 4;
+  // Specify if we would like to randomly crop an image.
+  optional uint32 crop_size = 5 [default = 0];
+  // Specify if we want to randomly mirror data.
+  optional bool mirror = 6 [default = false];
+  // Foreground (object) overlap threshold
+  optional float fg_threshold = 7 [default = 0.5];
+  // Background (non-object) overlap threshold
+  optional float bg_threshold = 8 [default = 0.5];
+  // Fraction of batch that should be foreground objects
+  optional float fg_fraction = 9 [default = 0.25];
+  // Amount of contextual padding to add around a window
+  // (used only by the window_data_layer)
+  optional uint32 context_pad = 10 [default = 0];
+  // Mode for cropping out a detection window
+  // warp: cropped window is warped to a fixed size and aspect ratio
+  // square: the tightest square around the window is cropped
+  optional string crop_mode = 11 [default = "warp"];
+  // cache_images: will load all images in memory for faster access
+  optional bool cache_images = 12 [default = false];
+  // append root_folder to locate images
+  optional string root_folder = 13 [default = ""];
+}
+
+// Message that stores parameters used by WindowTSDFDataLayer
+message WindowTSDFDataParameter {
   // Specify the data source.
   optional string source = 1;
   // For data pre-processing, we can do simple scaling and subtracting the

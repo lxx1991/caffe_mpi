@@ -323,6 +323,54 @@ class WindowDataLayer : public BasePrefetchingDataLayer<Dtype> {
   vector<std::pair<std::string, Datum > > image_database_cache_;
 };
 
+/**
+ * @brief Provides data to the Net from windows of images files, specified
+ *        by a window data file.
+ *
+ * TODO(dox): thorough documentation for Forward and proto params.
+ */
+template <typename Dtype>
+class WindowTSDFDataLayer : public BasePrefetchingDataLayer<Dtype> {
+ public:
+  explicit WindowTSDFDataLayer(const LayerParameter& param)
+      : BasePrefetchingDataLayer<Dtype>(param) {}
+  virtual ~WindowTSDFDataLayer();
+  virtual void DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+
+  virtual inline const char* type() const { return "WindowTSDFData"; }
+  virtual inline int ExactNumBottomBlobs() const { return 0; }
+  virtual inline int ExactNumTopBlobs() const { return 2; }
+
+ protected:
+  virtual unsigned int PrefetchRand();
+  virtual void InternalThreadEntry();
+  void depth2tsdf_GPU(const int tsdf_size,
+      const int im_h, const int im_w);
+  void depth2tsdf_CPU(const int tsdf_size,
+      const int im_h, const int im_w);
+
+  shared_ptr<Caffe::RNG> prefetch_rng_;
+  vector<std::pair<std::string, vector<int> > > image_database_;
+  enum WindowField { IMAGE_INDEX, LABEL, OVERLAP, B1, B2, B3, B4, B5, B6,
+      B7, B8, B9, C1, C2, C3, O1, O2, O3, NUM };
+  vector<vector<float> > fg_windows_;
+  vector<vector<float> > bg_windows_;
+  vector<vector<Dtype> > K_;
+  vector<vector<Dtype> > R_;
+  Blob<Dtype> data_mean_;
+  Blob<Dtype> tsdf_;
+  Blob<Dtype> depth_;
+  Blob<Dtype> the_K_;
+  Blob<Dtype> the_R_;
+  Blob<Dtype> the_window_;
+  vector<Dtype> mean_values_;
+  bool has_mean_file_;
+  bool has_mean_values_;
+  bool cache_images_;
+  vector<std::pair<std::string, Datum > > image_database_cache_;
+};
+
 }  // namespace caffe
 
 #endif  // CAFFE_DATA_LAYERS_HPP_

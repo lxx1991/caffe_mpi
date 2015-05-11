@@ -128,7 +128,7 @@ class Blob {
     }
     return axis_index;
   }
-
+  /*
   /// @brief Deprecated legacy shape accessor num: use shape(0) instead.
   inline int num() const { return LegacyShape(0); }
   /// @brief Deprecated legacy shape accessor channels: use shape(1) instead.
@@ -137,6 +137,16 @@ class Blob {
   inline int height() const { return LegacyShape(2); }
   /// @brief Deprecated legacy shape accessor width: use shape(3) instead.
   inline int width() const { return LegacyShape(3); }
+  */
+  /// @brief Deprecated legacy shape accessor num: use shape(0) instead.
+  inline int num() const { return shape(0); }
+  /// @brief Deprecated legacy shape accessor channels: use shape(1) instead.
+  inline int channels() const { return shape(1); }
+  /// @brief Deprecated legacy shape accessor height: use shape(2) instead.
+  inline int height() const { return shape(2); }
+  /// @brief Deprecated legacy shape accessor width: use shape(3) instead.
+  inline int width() const { return shape(3); }
+
   inline int LegacyShape(int index) const {
     CHECK_LE(num_axes(), 4)
         << "Cannot use legacy accessors on Blobs with > 4 axes.";
