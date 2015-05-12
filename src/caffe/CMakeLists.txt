@@ -18,7 +18,7 @@ if(HAVE_CUDA)
 endif()
 
 
-add_library(caffe ${srcs} layers/map_regression_layer.cpp layers/map_data_layer.cpp)
+add_library(caffe ${srcs} layers/map_regression_layer.cpp layers/map_data_layer.cpp layers/map_accuracy_layer.cpp)
 target_link_libraries(caffe proto ${Caffe_LINKER_LIBS})
 caffe_default_properties(caffe)
 

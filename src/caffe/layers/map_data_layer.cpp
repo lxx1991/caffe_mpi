@@ -214,16 +214,16 @@ void smoothTensor(int map_ch, int map_width, int map_height,
   }
 
   //debug dump
-    std::ofstream of("/media/ssd/dump.txt", std::ofstream::out);
-  for (int ch = 0; ch < map_ch; ++ch){
-    for ( int y = 0; y < map_height; ++y){
-      for(int x = 0; x < map_width; ++x){
-        of<<data[(ch * map_height + y)*map_width + x]<<" ";
-      }
-      of<<std::endl;
-    }
-    of <<std::endl;
-  }
+//    std::ofstream of("/media/ssd/dump.txt", std::ofstream::out);
+//  for (int ch = 0; ch < map_ch; ++ch){
+//    for ( int y = 0; y < map_height; ++y){
+//      for(int x = 0; x < map_width; ++x){
+//        of<<data[(ch * map_height + y)*map_width + x]<<" ";
+//      }
+//      of<<std::endl;
+//    }
+//    of <<std::endl;
+//  }
 }
 
 
