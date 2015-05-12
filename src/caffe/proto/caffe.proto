@@ -381,6 +381,8 @@ message AccuracyParameter {
 
   // If specified, ignore instances with the given label.
   optional int32 ignore_label = 3;
+
+  optional float thresh = 4 [default=0];
 }
 
 // Message that stores parameters used by ArgMaxLayer

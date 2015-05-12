@@ -13,7 +13,7 @@ namespace caffe {
 template <typename Dtype>
 void MapAccuracyLayer<Dtype>::LayerSetUp(
   const vector<Blob<Dtype>*>& bottom, const vector<Blob<Dtype>*>& top) {
-  threshold_ = 0.5;
+  threshold_ =this->layer_param_.accuracy_param().thresh();
 }
 
 template <typename Dtype>
