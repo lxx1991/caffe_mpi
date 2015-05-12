@@ -265,7 +265,6 @@ void WindowTSDFDataLayer<Dtype>::InternalThreadEntry() {
         window = (is_fg) ?
           fg_windows_[rand_index % fg_windows_.size()] :
           bg_windows_[rand_index % bg_windows_.size()];
-
       }
 
       bool do_mirror = mirror && PrefetchRand() % 2;
@@ -493,8 +492,8 @@ void WindowTSDFDataLayer<Dtype>::depth2tsdf_CPU(
       continue;
     }
     tsdf_data[index] = mu;
-    Dtype tdx = (Dtype(ix) - K_data[2]) * depth / K_data[0];
-    Dtype tdz =  - (Dtype(iy) - K_data[5]) * depth / K_data[4];
+    Dtype tdx = (Dtype(ix + 1) - K_data[2]) * depth / K_data[0];
+    Dtype tdz =  - (Dtype(iy + 1) - K_data[5]) * depth / K_data[4];
     Dtype tdy = depth;
     Dtype dx = R_data[0] * tdx + R_data[1] * tdy + R_data[2] * tdz;
     Dtype dy = R_data[3] * tdx + R_data[4] * tdy + R_data[5] * tdz;

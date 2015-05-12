@@ -44,8 +44,8 @@ __global__ void depth2tsdf_depth(const int nthreads,
     }
     tsdf_data[index] = mu;
     // project the depth point to 3d
-    Dtype tdx = (Dtype(ix) - K_data[2]) * depth / K_data[0];
-    Dtype tdz =  - (Dtype(iy) - K_data[5]) * depth / K_data[4];
+    Dtype tdx = (Dtype(ix + 1) - K_data[2]) * depth / K_data[0];
+    Dtype tdz =  - (Dtype(iy + 1) - K_data[5]) * depth / K_data[4];
     Dtype tdy = depth;
     Dtype dx = R_data[0] * tdx + R_data[1] * tdy + R_data[2] * tdz;
     Dtype dy = R_data[3] * tdx + R_data[4] * tdy + R_data[5] * tdz;
