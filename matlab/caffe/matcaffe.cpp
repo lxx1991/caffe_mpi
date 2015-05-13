@@ -89,9 +89,12 @@ static mxArray* do_forward(const mxArray* const bottom) {
   for (unsigned int i = 0; i < output_blobs.size(); ++i) {
     // internally data is stored as (width, height, channels, num)
     // where width is the fastest dimension
-    mwSize dims[4] = {output_blobs[i]->width(), output_blobs[i]->height(),
-      output_blobs[i]->channels(), output_blobs[i]->num()};
-    mxArray* mx_blob =  mxCreateNumericArray(4, dims, mxSINGLE_CLASS, mxREAL);
+    unsigned int axes = output_blobs[i]->num_axes();
+    mwSize* dims = new mwSize[axes];
+    for (unsigned int d = 0; d < axes; ++d) {
+      dims[d] = output_blobs[i]->shape(axes-1-d);
+    }
+    mxArray* mx_blob =  mxCreateNumericArray(axes, dims, mxSINGLE_CLASS, mxREAL);
     mxSetCell(mx_out, i, mx_blob);
     float* data_ptr = reinterpret_cast<float*>(mxGetPr(mx_blob));
     switch (Caffe::mode()) {
@@ -143,9 +146,12 @@ static mxArray* do_backward(const mxArray* const top_diff) {
   for (unsigned int i = 0; i < input_blobs.size(); ++i) {
     // internally data is stored as (width, height, channels, num)
     // where width is the fastest dimension
-    mwSize dims[4] = {input_blobs[i]->width(), input_blobs[i]->height(),
-      input_blobs[i]->channels(), input_blobs[i]->num()};
-    mxArray* mx_blob =  mxCreateNumericArray(4, dims, mxSINGLE_CLASS, mxREAL);
+    unsigned int axes = input_blobs[i]->num_axes();
+    mwSize* dims = new mwSize[axes];
+    for (unsigned int d = 0; d < axes; ++d) {
+      dims[d] = input_blobs[i]->shape(axes-1-d);
+    }
+    mxArray* mx_blob =  mxCreateNumericArray(axes, dims, mxSINGLE_CLASS, mxREAL);
     mxSetCell(mx_out, i, mx_blob);
     float* data_ptr = reinterpret_cast<float*>(mxGetPr(mx_blob));
     switch (Caffe::mode()) {
@@ -190,7 +196,6 @@ static mxArray* do_get_weights() {
     const char* fnames[2] = {"weights", "layer_names"};
     mx_layers = mxCreateStructArray(2, dims, 2, fnames);
   }
-
   // Step 3: copy weights into output
   {
     string prev_layer_name = "";
@@ -215,11 +220,14 @@ static mxArray* do_get_weights() {
       for (unsigned int j = 0; j < layer_blobs.size(); ++j) {
         // internally data is stored as (width, height, channels, num)
         // where width is the fastest dimension
-        mwSize dims[4] = {layer_blobs[j]->width(), layer_blobs[j]->height(),
-            layer_blobs[j]->channels(), layer_blobs[j]->num()};
+        unsigned int axes = layer_blobs[j]->num_axes();
+        mwSize* dims = new mwSize[axes];
+        for (unsigned int d = 0; d < axes; ++d) {
+          dims[d] = layer_blobs[j]->shape(axes-1-d);
+        }
 
         mxArray* mx_weights =
-          mxCreateNumericArray(4, dims, mxSINGLE_CLASS, mxREAL);
+          mxCreateNumericArray(axes, dims, mxSINGLE_CLASS, mxREAL);
         mxSetCell(mx_layer_cells, j, mx_weights);
         float* weights_ptr = reinterpret_cast<float*>(mxGetPr(mx_weights));
 
