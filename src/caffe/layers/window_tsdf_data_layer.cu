@@ -14,14 +14,16 @@ __global__ void depth2tsdf_depth(const int nthreads,
   const Dtype* R_data, const Dtype* window_data, const int tsdf_size,
   const int im_h, const int im_w, Dtype* tsdf_data) {
   CUDA_KERNEL_LOOP(index, nthreads) {
+    int volume_size = tsdf_size * tsdf_size * tsdf_size;
     Dtype x = Dtype(index % tsdf_size);
     Dtype y = Dtype((index / tsdf_size) % tsdf_size);   
     Dtype z = Dtype((index / tsdf_size / tsdf_size) % tsdf_size);
     Dtype delta_x = (window_data[3] - window_data[0]) / Dtype(tsdf_size);  
     Dtype delta_y = (window_data[4] - window_data[1]) / Dtype(tsdf_size);  
     Dtype delta_z = (window_data[5] - window_data[2]) / Dtype(tsdf_size);  
-    Dtype mu = 2.0 * max(max(delta_x, delta_y), delta_z);
-    tsdf_data[index] = -mu;
+    tsdf_data[index] = - 2.0 * delta_x;
+    tsdf_data[index + volume_size] = - 2.0 * delta_y;
+    tsdf_data[index + 2 * volume_size] = - 2.0 * delta_z;
     
     x = window_data[0] + (x + 0.5) * delta_x;
     y = window_data[1] + (y + 0.5) * delta_y;
@@ -34,15 +36,21 @@ __global__ void depth2tsdf_depth(const int nthreads,
     int ix = round(xx * K_data[0] / zz + K_data[2]) - 1;
     int iy = round(yy * K_data[4] / zz + K_data[5]) - 1;
     if (ix < 0 || ix >= im_w || iy < 0 || iy >= im_h || zz < 0.0001) {
-      tsdf_data[index] = -1.0;
+      tsdf_data[index] = - 2.0 * delta_x;
+      tsdf_data[index + volume_size] = - 2.0 * delta_y;
+      tsdf_data[index + 2 * volume_size] = - 2.0 * delta_z;
       return;
     }
     Dtype depth = depth_data[iy * im_w + ix];
     if (depth < 0.0001) {
-      tsdf_data[index] = -1.0;
+      tsdf_data[index] = - 2.0 * delta_x;
+      tsdf_data[index + volume_size] = - 2.0 * delta_y;
+      tsdf_data[index + 2 * volume_size] = - 2.0 * delta_z;
       return;
     }
-    tsdf_data[index] = mu;
+    tsdf_data[index] = 2.0 * delta_x;
+    tsdf_data[index + volume_size] = 2.0 * delta_y;
+    tsdf_data[index + 2 * volume_size] = 2.0 * delta_z;
     // project the depth point to 3d
     Dtype tdx = (Dtype(ix + 1) - K_data[2]) * depth / K_data[0];
     Dtype tdz =  - (Dtype(iy + 1) - K_data[5]) * depth / K_data[4];
@@ -52,23 +60,31 @@ __global__ void depth2tsdf_depth(const int nthreads,
     Dtype dz = R_data[6] * tdx + R_data[7] * tdy + R_data[8] * tdz;
     
     // distance
-    Dtype dist = (x - dx) * (x - dx) + (y - dy) * (y - dy) +
-        (z - dz) * (z - dz);
-    dist = sqrt(dist);
+    Dtype tsdf_x = abs(x - dx);
+    Dtype tsdf_y = abs(y - dy);
+    Dtype tsdf_z = abs(z - dz);
     if (zz > depth) {
-     dist = - dist;
+      tsdf_x = - tsdf_x;
+      tsdf_y = - tsdf_y;
+      tsdf_z = - tsdf_z;
     }
-    dist = dist / mu;
-    dist = max(dist, -1.0);
-    dist = min(dist, 1.0);
-    tsdf_data[index] = dist;
+    tsdf_x = max(tsdf_x, - 2.0 * delta_x);
+    tsdf_y = max(tsdf_y, - 2.0 * delta_y);
+    tsdf_z = max(tsdf_z, - 2.0 * delta_z);
+    tsdf_x = min(tsdf_x, 2.0 * delta_x);
+    tsdf_y = min(tsdf_y, 2.0 * delta_y);
+    tsdf_z = min(tsdf_z, 2.0 * delta_z);
+
+    tsdf_data[index] = tsdf_x;
+    tsdf_data[index + volume_size] = tsdf_y;
+    tsdf_data[index + 2 * volume_size] = tsdf_z;
   }
 }
 
 template <typename Dtype>
 void WindowTSDFDataLayer<Dtype>::depth2tsdf_GPU(
     const int tsdf_size, const int im_h, const int im_w) {
-  const int count = tsdf_.count();
+  const int count = tsdf_size * tsdf_size * tsdf_size;
   const Dtype* depth_data = depth_.gpu_data();
   const Dtype* K_data = the_K_.gpu_data();
   const Dtype* R_data = the_R_.gpu_data();

@@ -190,7 +190,7 @@ void WindowTSDFDataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bott
   CHECK_GT(tsdf_size, 0);
   const int batch_size = this->layer_param_.window_tsdf_data_param().batch_size();
   vector<int> data_shape(5);
-  data_shape[0] = batch_size; data_shape[1] = 1;
+  data_shape[0] = batch_size; data_shape[1] = 3;
   data_shape[2] = tsdf_size; data_shape[3] = tsdf_size; data_shape[4] = tsdf_size; 
   top[0]->Reshape(data_shape);
   this->prefetch_data_.Reshape(data_shape);
@@ -202,8 +202,8 @@ void WindowTSDFDataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bott
   top[1]->Reshape(label_shape);
   this->prefetch_label_.Reshape(label_shape);
 
-  vector<int> tsdf_shape(3);
-  tsdf_shape[0] = tsdf_size; tsdf_shape[1] = tsdf_size; tsdf_shape[2] = tsdf_size;
+  vector<int> tsdf_shape(4);
+  tsdf_shape[0] = 3; tsdf_shape[1] = tsdf_size; tsdf_shape[2] = tsdf_size; tsdf_shape[3] = tsdf_size;
   tsdf_.Reshape(tsdf_shape);
   vector<int> matrix_shape(1, 9);
   the_R_.Reshape(matrix_shape);
@@ -289,7 +289,6 @@ void WindowTSDFDataLayer<Dtype>::InternalThreadEntry() {
       }
       read_time += timer.MicroSeconds();
       timer.Start();
-      const int channels = cv_img.channels();
 
       // crop the bb3d to camera view
       Dtype b1 = window[WindowTSDFDataLayer<Dtype>::B1];
@@ -406,7 +405,7 @@ void WindowTSDFDataLayer<Dtype>::InternalThreadEntry() {
       depth2tsdf_GPU(tsdf_size, cv_img.rows, cv_img.cols);
       // copy to top
       const Dtype* tsdf_data = tsdf_.cpu_data();
-      const int datum_size = channels * tsdf_size * tsdf_size * tsdf_size;
+      const int datum_size = tsdf_.count();
       caffe_axpy(datum_size, scale, tsdf_data, top_data + item_id * datum_size);
 
       trans_time += timer.MicroSeconds();
@@ -458,7 +457,7 @@ void WindowTSDFDataLayer<Dtype>::InternalThreadEntry() {
 template<typename Dtype>
 void WindowTSDFDataLayer<Dtype>::depth2tsdf_CPU(
     const int tsdf_size, const int im_h, const int im_w) {
-  const int count = tsdf_.count();
+  const int count = tsdf_size * tsdf_size * tsdf_size; 
   const Dtype* depth_data = depth_.cpu_data();
   const Dtype* K_data = the_K_.cpu_data();
   const Dtype* R_data = the_R_.cpu_data();
@@ -471,7 +470,10 @@ void WindowTSDFDataLayer<Dtype>::depth2tsdf_CPU(
     Dtype delta_x = (window_data[3] - window_data[0]) / Dtype(tsdf_size);
     Dtype delta_y = (window_data[4] - window_data[1]) / Dtype(tsdf_size);
     Dtype delta_z = (window_data[5] - window_data[2]) / Dtype(tsdf_size);
-    Dtype mu = 2. * std::max(std::max(delta_x, delta_y), delta_z);
+    tsdf_data[index] = - 2.0 * delta_x;
+    tsdf_data[index + count] = - 2.0 * delta_y;
+    tsdf_data[index + 2 * count] = - 2.0 * delta_z;
+
     x = window_data[0] + (x + 0.5) * delta_x;
     y = window_data[1] + (y + 0.5) * delta_y;
     z = window_data[2] + (z + 0.5) * delta_z;
@@ -483,15 +485,21 @@ void WindowTSDFDataLayer<Dtype>::depth2tsdf_CPU(
     int ix = round(xx * K_data[0] / zz + K_data[2]) - 1;
     int iy = round(yy * K_data[4] / zz + K_data[5]) - 1;
     if (ix < 0 || ix >= im_w || iy < 0 || iy >= im_h || zz < 0.00001) {
-      tsdf_data[index] = -1;
+      tsdf_data[index] = - 2.0 * delta_x;
+      tsdf_data[index + count] = - 2.0 * delta_y;
+      tsdf_data[index + 2 * count] = - 2.0 * delta_z;
       continue;
     }
     Dtype depth = depth_data[iy * im_w + ix];
     if (depth < 0.00001) {
-      tsdf_data[index] = -1;
+      tsdf_data[index] = - 2.0 * delta_x;
+      tsdf_data[index + count] = - 2.0 * delta_y;
+      tsdf_data[index + 2 * count] = - 2.0 * delta_z;
       continue;
     }
-    tsdf_data[index] = mu;
+    tsdf_data[index] = 2.0 * delta_x;
+    tsdf_data[index + count] = 2.0 * delta_y;
+    tsdf_data[index + 2 * count] = 2.0 * delta_z;
     Dtype tdx = (Dtype(ix + 1) - K_data[2]) * depth / K_data[0];
     Dtype tdz =  - (Dtype(iy + 1) - K_data[5]) * depth / K_data[4];
     Dtype tdy = depth;
@@ -499,15 +507,20 @@ void WindowTSDFDataLayer<Dtype>::depth2tsdf_CPU(
     Dtype dy = R_data[3] * tdx + R_data[4] * tdy + R_data[5] * tdz;
     Dtype dz = R_data[6] * tdx + R_data[7] * tdy + R_data[8] * tdz;
     // distance
-    Dtype dist = (x - dx) * (x - dx) + (y - dy) * (y - dy) +
-      (z - dz) * (z - dz);
-    dist = std::sqrt(dist);
-    if (zz > depth)
-      dist = - dist;
-    dist = dist / mu;
-    dist = std::max(dist, Dtype(-1));
-    dist = std::min(dist, Dtype(1));
-    tsdf_data[index] = dist;
+    tsdf_data[index] = std::fabs(x - dx);
+    tsdf_data[index + count] = std::fabs(y - dy);
+    tsdf_data[index + 2 * count] = std::fabs(z - dz);
+    if (zz > depth) {
+      tsdf_data[index] = - tsdf_data[index];
+      tsdf_data[index + count] = - tsdf_data[index + count];
+      tsdf_data[index + 2 * count] = - tsdf_data[index + 2 * count];
+    }
+    tsdf_data[index] = std::max(tsdf_data[index], - 2 * delta_x);
+    tsdf_data[index + count] = std::max(tsdf_data[index + count], - 2 * delta_y);
+    tsdf_data[index + 2 * count] = std::max(tsdf_data[index + 2 * count], - 2 * delta_z);
+    tsdf_data[index] = std::min(tsdf_data[index], 2 * delta_x);
+    tsdf_data[index + count] = std::min(tsdf_data[index + count], 2 * delta_y);
+    tsdf_data[index + 2 * count] = std::min(tsdf_data[index + 2 * count], 2 * delta_z);
   }
 }
 
