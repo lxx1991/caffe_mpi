@@ -260,7 +260,7 @@ message ParamSpec {
 // NOTE
 // Update the next available ID when you add a new LayerParameter field.
 //
-// LayerParameter next available layer-specific ID: 134 (last added: map_data_param)
+// LayerParameter next available layer-specific ID: 135 (last added: sparse_data_param)
 message LayerParameter {
   optional string name = 1; // the layer name
   optional string type = 2; // the layer type
@@ -335,6 +335,7 @@ message LayerParameter {
   optional WindowDataParameter window_data_param = 129;
   optional MapRegressionParameter map_regression_param = 132;
   optional MapDataParameter map_data_param = 133;
+  optional SparseDataParameter sparse_data_param = 134;
 }
 
 // Message that stores parameters used to apply transformation
@@ -1043,4 +1044,30 @@ message MapDataParameter {
 
  //sigma parameter for gaussian smoothing
  optional float sigma = 10 [default = 1];
+}
+
+//Message for recording sparse matrix
+message SparseDataParameter{
+
+ //the source file recording the sparse matrix
+ optional string source_file = 1 [default=""];
+
+ optional int32 mat_height = 2 [default=1];
+ optional int32 mat_width = 3 [default=1];
+ optional int32 mat_channels = 4 [default=1];
+
+ enum EncodingType {
+
+   //position encoding for non-zero elements,
+   //if any dimension is 1, the position on that dimension need not to be listed
+   //The data will look like "id c h w value" or "id c value"
+   POS=0;
+
+   //run length encoding
+   RLE=1;
+ }
+
+ optional EncodingType encode_type = 5 [default=POS];
+
+ optional int32 batch_size = 6 [default = 1];
 }
