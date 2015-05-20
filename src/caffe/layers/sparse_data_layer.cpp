@@ -33,7 +33,7 @@ void SparseDataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
   CHECK_GE(this->layer_param_.sparse_data_param().mat_height(), 0) << "height must be larger than 0";
   CHECK_GE(this->layer_param_.sparse_data_param().mat_width(), 0) << "width must be larger than 0";
 
-  ch_ = this->layer_param_.sparse_data_param().batch_size();
+  ch_ = this->layer_param_.sparse_data_param().mat_channels();
   width_ = this->layer_param_.sparse_data_param().mat_width();
   height_ = this->layer_param_.sparse_data_param().mat_height();
   batch_size_ = this->layer_param_.sparse_data_param().batch_size();
@@ -49,7 +49,6 @@ void SparseDataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
 
   //load the input file
 
-  int batch_size = this->layer_param_.map_data_param().batch_size();
   top[0]->Reshape(batch_size_, ch_, height_, width_);
   this->prefetch_data_.Reshape(batch_size_, ch_, height_, width_);
 }
@@ -75,7 +74,7 @@ void decodePOSEncoding(string& content, Dtype* data, int ch, int width, int heig
     Dtype num = atof(it->c_str());
     numbers.push_back(num);
   }
-  CHECK_EQ(numbers.size() % (pos_len + 1), 0)<<"Incorrect number of integers in line: "<<content;
+  CHECK_EQ((numbers.size()) % (pos_len), 0)<<"Incorrect number of integers in line: "<<content;
   const int n_pos = numbers.size() / (pos_len + 1);
   int idx = 0;
   for (int i = 0; i < n_pos; ++i){
@@ -89,6 +88,8 @@ void decodePOSEncoding(string& content, Dtype* data, int ch, int width, int heig
 
     //set value to the matrix
     data[(c * height + h) * width + w] = value;
+    
+   // LOG(INFO)<<c<<" "<<h<<" "<<w;
   }
 }
 
@@ -99,13 +100,12 @@ void SparseDataLayer<Dtype>::InternalThreadEntry() {
 
   Dtype* top_data = this->prefetch_data_.mutable_cpu_data();
 
-  const int batch_size = this->layer_param_.map_data_param().batch_size();
-
   caffe_set(this->prefetch_data_.count(), Dtype(0), top_data);
 
   string buffer;
-  for (int item_id = 0; item_id < batch_size; ++item_id){
+  for (int item_id = 0; item_id < batch_size_; ++item_id){
     std::getline(mfs_, buffer);
+    mfs_.peek();
     //Do decoding
     switch (this->layer_param().sparse_data_param().encode_type()){
       case SparseDataParameter_EncodingType_POS:{
