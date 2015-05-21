@@ -11,23 +11,30 @@ namespace caffe {
 template <typename Dtype>
 __global__ void depth2tsdf_depth(const int nthreads,
   const Dtype* depth_data, const Dtype* K_data,
-  const Dtype* R_data, const Dtype* window_data, const int tsdf_size,
+  const Dtype* R_data, const Dtype* bb3d_data, const int tsdf_size,
   const int im_h, const int im_w, Dtype* tsdf_data) {
   CUDA_KERNEL_LOOP(index, nthreads) {
     int volume_size = tsdf_size * tsdf_size * tsdf_size;
     Dtype x = Dtype(index % tsdf_size);
     Dtype y = Dtype((index / tsdf_size) % tsdf_size);   
     Dtype z = Dtype((index / tsdf_size / tsdf_size) % tsdf_size);
-    Dtype delta_x = (window_data[3] - window_data[0]) / Dtype(tsdf_size);  
-    Dtype delta_y = (window_data[4] - window_data[1]) / Dtype(tsdf_size);  
-    Dtype delta_z = (window_data[5] - window_data[2]) / Dtype(tsdf_size);  
+    Dtype delta_x = 2 * bb3d_data[12] / Dtype(tsdf_size);  
+    Dtype delta_y = 2 * bb3d_data[13] / Dtype(tsdf_size);  
+    Dtype delta_z = 2 * bb3d_data[14] / Dtype(tsdf_size);  
     tsdf_data[index] = - 2.0 * delta_x;
     tsdf_data[index + volume_size] = - 2.0 * delta_y;
     tsdf_data[index + 2 * volume_size] = - 2.0 * delta_z;
     
-    x = window_data[0] + (x + 0.5) * delta_x;
-    y = window_data[1] + (y + 0.5) * delta_y;
-    z = window_data[2] + (z + 0.5) * delta_z;
+    Dtype temp_x = - bb3d_data[12] + (x + 0.5) * delta_x;
+    Dtype temp_y = - bb3d_data[13] + (y + 0.5) * delta_y;
+    Dtype temp_z = - bb3d_data[14] + (z + 0.5) * delta_z;
+    // project to world coordinate
+    x = temp_x * bb3d_data[0] + temp_y * bb3d_data[3] + temp_z * bb3d_data[6]
+        + bb3d_data[9];
+    y = temp_x * bb3d_data[1] + temp_y * bb3d_data[4] + temp_z * bb3d_data[7]
+        + bb3d_data[10];
+    z = temp_x * bb3d_data[2] + temp_y * bb3d_data[5] + temp_z * bb3d_data[8]
+        + bb3d_data[11];
     // project to image plane
     // swap y, z and -y
     Dtype xx = R_data[0] * x + R_data[3] * y + R_data[6] * z;
@@ -88,10 +95,10 @@ void WindowTSDFDataLayer<Dtype>::depth2tsdf_GPU(
   const Dtype* depth_data = depth_.gpu_data();
   const Dtype* K_data = the_K_.gpu_data();
   const Dtype* R_data = the_R_.gpu_data();
-  const Dtype* window_data = the_window_.gpu_data();
+  const Dtype* bb3d_data = the_bb3d_.gpu_data();
   Dtype* tsdf_data = tsdf_.mutable_gpu_data();
   depth2tsdf_depth<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
-      count, depth_data, K_data, R_data, window_data,
+      count, depth_data, K_data, R_data, bb3d_data,
       tsdf_size, im_h, im_w, tsdf_data);
   CUDA_POST_KERNEL_CHECK;
 }

@@ -363,7 +363,7 @@ class WindowTSDFDataLayer : public BasePrefetchingDataLayer<Dtype> {
   Blob<Dtype> depth_;
   Blob<Dtype> the_K_;
   Blob<Dtype> the_R_;
-  Blob<Dtype> the_window_;
+  Blob<Dtype> the_bb3d_;
   vector<Dtype> mean_values_;
   bool has_mean_file_;
   bool has_mean_values_;

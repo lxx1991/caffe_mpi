@@ -6,8 +6,7 @@
 #include <string>
 #include <utility>
 #include <vector>
-
-#include "opencv2/core/core.hpp"
+#include "opencv2/core/core.hpp" 
 #include "opencv2/highgui/highgui.hpp"
 #include "opencv2/imgproc/imgproc.hpp"
 
@@ -208,8 +207,8 @@ void WindowTSDFDataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bott
   vector<int> matrix_shape(1, 9);
   the_R_.Reshape(matrix_shape);
   the_K_.Reshape(matrix_shape);
-  vector<int> window_shape(1, 9);
-  the_window_.Reshape(window_shape);
+  vector<int> bb3d_shape(1, 15);
+  the_bb3d_.Reshape(bb3d_shape);
 }
 
 template <typename Dtype>
@@ -291,55 +290,72 @@ void WindowTSDFDataLayer<Dtype>::InternalThreadEntry() {
       timer.Start();
 
       // crop the bb3d to camera view
-      Dtype b1 = window[WindowTSDFDataLayer<Dtype>::B1];
-      Dtype b2 = window[WindowTSDFDataLayer<Dtype>::B2];
-      Dtype b3 = window[WindowTSDFDataLayer<Dtype>::B3];
-      Dtype b4 = window[WindowTSDFDataLayer<Dtype>::B4];
-      Dtype b5 = window[WindowTSDFDataLayer<Dtype>::B5];
-      Dtype b6 = window[WindowTSDFDataLayer<Dtype>::B6];
-      Dtype b7 = window[WindowTSDFDataLayer<Dtype>::B7];
-      Dtype b8 = window[WindowTSDFDataLayer<Dtype>::B8];
-      Dtype b9 = window[WindowTSDFDataLayer<Dtype>::B9];
-      Dtype c1 = window[WindowTSDFDataLayer<Dtype>::C1];
-      Dtype c2 = window[WindowTSDFDataLayer<Dtype>::C2];
-      Dtype c3 = window[WindowTSDFDataLayer<Dtype>::C3];
-      Dtype o1 = window[WindowTSDFDataLayer<Dtype>::O1];
-      Dtype o2 = window[WindowTSDFDataLayer<Dtype>::O2];
-      Dtype o3 = window[WindowTSDFDataLayer<Dtype>::O3];
-      Dtype no1 = std::fabs(o1);
-      Dtype no2 = std::fabs(o2);
-      Dtype no3 = std::fabs(o3);
-      no1 = std::max(no1, std::fabs(+ b1 * o1 - b2 * o2 + b3 * o3));
-      no1 = std::max(no1, std::fabs(- b1 * o1 + b2 * o2 + b3 * o3));
-      no1 = std::max(no1, std::fabs(- b1 * o1 - b2 * o2 + b3 * o3));
-      no1 = std::max(no1, std::fabs(+ b1 * o1 + b2 * o2 - b3 * o3));
-      no1 = std::max(no1, std::fabs(+ b1 * o1 - b2 * o2 - b3 * o3));
-      no1 = std::max(no1, std::fabs(- b1 * o1 + b2 * o2 - b3 * o3));
-      no1 = std::max(no1, std::fabs(- b1 * o1 - b2 * o2 - b3 * o3));
-
-      no2 = std::max(no2, std::fabs(+ b4 * o1 - b5 * o2 + b6 * o3));
-      no2 = std::max(no2, std::fabs(- b4 * o1 + b5 * o2 + b6 * o3));
-      no2 = std::max(no2, std::fabs(- b4 * o1 - b5 * o2 + b6 * o3));
-      no2 = std::max(no2, std::fabs(+ b4 * o1 + b5 * o2 - b6 * o3));
-      no2 = std::max(no2, std::fabs(+ b4 * o1 - b5 * o2 - b6 * o3));
-      no2 = std::max(no2, std::fabs(- b4 * o1 + b5 * o2 - b6 * o3));
-      no2 = std::max(no2, std::fabs(- b4 * o1 - b5 * o2 - b6 * o3));
-      
-      no3 = std::max(no3, std::fabs(+ b7 * o1 - b8 * o2 + b9 * o3));
-      no3 = std::max(no3, std::fabs(- b7 * o1 + b8 * o2 + b9 * o3));
-      no3 = std::max(no3, std::fabs(- b7 * o1 - b8 * o2 + b9 * o3));
-      no3 = std::max(no3, std::fabs(+ b7 * o1 + b8 * o2 - b9 * o3));
-      no3 = std::max(no3, std::fabs(+ b7 * o1 - b8 * o2 - b9 * o3));
-      no3 = std::max(no3, std::fabs(- b7 * o1 + b8 * o2 - b9 * o3));
-      no3 = std::max(no3, std::fabs(- b7 * o1 - b8 * o2 - b9 * o3));
-
-      Dtype x1, y1, z1, x2, y2, z2;
-      x1 = c1 - no1;
-      y1 = c2 - no2;
-      z1 = c3 - no3;
-      x2 = c1 + no1;
-      y2 = c2 + no2;
-      z2 = c3 + no3;
+      Dtype* bb3d_data = the_bb3d_.mutable_cpu_data();
+      bb3d_data[9] = window[WindowTSDFDataLayer<Dtype>::C1];
+      bb3d_data[10] = window[WindowTSDFDataLayer<Dtype>::C2];
+      bb3d_data[11] = window[WindowTSDFDataLayer<Dtype>::C3];
+      int orientation = PrefetchRand() % 4 + 1;
+      switch (orientation) {
+        case 1:
+            bb3d_data[0] = window[WindowTSDFDataLayer<Dtype>::B1];
+            bb3d_data[1] = window[WindowTSDFDataLayer<Dtype>::B2];
+            bb3d_data[2] = window[WindowTSDFDataLayer<Dtype>::B3];
+            bb3d_data[3] = window[WindowTSDFDataLayer<Dtype>::B4];
+            bb3d_data[4] = window[WindowTSDFDataLayer<Dtype>::B5];
+            bb3d_data[5] = window[WindowTSDFDataLayer<Dtype>::B6];
+            bb3d_data[6] = window[WindowTSDFDataLayer<Dtype>::B7];
+            bb3d_data[7] = window[WindowTSDFDataLayer<Dtype>::B8];
+            bb3d_data[8] = window[WindowTSDFDataLayer<Dtype>::B9];
+            bb3d_data[12] = window[WindowTSDFDataLayer<Dtype>::O1];
+            bb3d_data[13] = window[WindowTSDFDataLayer<Dtype>::O2];
+            bb3d_data[14] = window[WindowTSDFDataLayer<Dtype>::O3];
+            break;
+        case 2:
+            bb3d_data[0] = - window[WindowTSDFDataLayer<Dtype>::B4];
+            bb3d_data[1] = - window[WindowTSDFDataLayer<Dtype>::B5];
+            bb3d_data[2] = - window[WindowTSDFDataLayer<Dtype>::B6];
+            bb3d_data[3] = window[WindowTSDFDataLayer<Dtype>::B1];
+            bb3d_data[4] = window[WindowTSDFDataLayer<Dtype>::B2];
+            bb3d_data[5] = window[WindowTSDFDataLayer<Dtype>::B3];
+            bb3d_data[6] = window[WindowTSDFDataLayer<Dtype>::B7];
+            bb3d_data[7] = window[WindowTSDFDataLayer<Dtype>::B8];
+            bb3d_data[8] = window[WindowTSDFDataLayer<Dtype>::B9];
+            bb3d_data[12] = window[WindowTSDFDataLayer<Dtype>::O2];
+            bb3d_data[13] = window[WindowTSDFDataLayer<Dtype>::O1];
+            bb3d_data[14] = window[WindowTSDFDataLayer<Dtype>::O3];
+            break;
+        case 3:
+            bb3d_data[0] = - window[WindowTSDFDataLayer<Dtype>::B1];
+            bb3d_data[1] = - window[WindowTSDFDataLayer<Dtype>::B2];
+            bb3d_data[2] = - window[WindowTSDFDataLayer<Dtype>::B3];
+            bb3d_data[3] = - window[WindowTSDFDataLayer<Dtype>::B4];
+            bb3d_data[4] = - window[WindowTSDFDataLayer<Dtype>::B5];
+            bb3d_data[5] = - window[WindowTSDFDataLayer<Dtype>::B6];
+            bb3d_data[6] = window[WindowTSDFDataLayer<Dtype>::B7];
+            bb3d_data[7] = window[WindowTSDFDataLayer<Dtype>::B8];
+            bb3d_data[8] = window[WindowTSDFDataLayer<Dtype>::B9];
+            bb3d_data[12] = window[WindowTSDFDataLayer<Dtype>::O1];
+            bb3d_data[13] = window[WindowTSDFDataLayer<Dtype>::O2];
+            bb3d_data[14] = window[WindowTSDFDataLayer<Dtype>::O3];
+            break;
+        case 4:
+            bb3d_data[0] = window[WindowTSDFDataLayer<Dtype>::B4];
+            bb3d_data[1] = window[WindowTSDFDataLayer<Dtype>::B5];
+            bb3d_data[2] = window[WindowTSDFDataLayer<Dtype>::B6];
+            bb3d_data[3] = - window[WindowTSDFDataLayer<Dtype>::B1];
+            bb3d_data[4] = - window[WindowTSDFDataLayer<Dtype>::B2];
+            bb3d_data[5] = - window[WindowTSDFDataLayer<Dtype>::B3];
+            bb3d_data[6] = window[WindowTSDFDataLayer<Dtype>::B7];
+            bb3d_data[7] = window[WindowTSDFDataLayer<Dtype>::B8];
+            bb3d_data[8] = window[WindowTSDFDataLayer<Dtype>::B9];
+            bb3d_data[12] = window[WindowTSDFDataLayer<Dtype>::O2];
+            bb3d_data[13] = window[WindowTSDFDataLayer<Dtype>::O1];
+            bb3d_data[14] = window[WindowTSDFDataLayer<Dtype>::O3];
+            break;
+        default:
+            LOG(FATAL) << "TSDF can only embed in 4 possible directions "
+                       << orientation << " should be 1,2,3,4";
+      }
 
       if (context_pad > 0 || use_square) {
         // scale factor by which to expand the original region
@@ -349,12 +365,9 @@ void WindowTSDFDataLayer<Dtype>::InternalThreadEntry() {
             static_cast<Dtype>(tsdf_size - 2*context_pad);
 
         // compute the expanded region
-        Dtype half_height = static_cast<Dtype>(y2-y1)/2.0;
-        Dtype half_width = static_cast<Dtype>(x2-x1)/2.0;
-        Dtype half_depth = static_cast<Dtype>(z2-z1)/2.0;
-        Dtype center_x = c1;
-        Dtype center_y = c2;
-        Dtype center_z = c3;
+        Dtype half_width = bb3d_data[12];
+        Dtype half_height = bb3d_data[13];
+        Dtype half_depth = bb3d_data[14];
         if (use_square) {
           if (half_height > half_width) {
             half_width = half_height;
@@ -368,12 +381,9 @@ void WindowTSDFDataLayer<Dtype>::InternalThreadEntry() {
             half_depth = half_height;
           }
         }
-        x1 = center_x - half_width*context_scale;
-        x2 = center_x + half_width*context_scale;
-        y1 = center_y - half_height*context_scale;
-        y2 = center_y + half_height*context_scale;
-        z1 = center_z - half_depth*context_scale;
-        z2 = center_z + half_depth*context_scale;
+        bb3d_data[12] = half_width * context_scale;
+        bb3d_data[13] = half_height * context_scale;
+        bb3d_data[14] = half_depth * context_scale;
       }
       // horizontal flip at random
       if (do_mirror) {
@@ -398,9 +408,6 @@ void WindowTSDFDataLayer<Dtype>::InternalThreadEntry() {
       for (int i = 0; i < 9; ++i) {
         K_data[i] = K[i];
       } 
-      Dtype* window_data = the_window_.mutable_cpu_data();
-      window_data[0] = x1; window_data[1] = y1; window_data[2] = z1;
-      window_data[3] = x2; window_data[4] = y2; window_data[5] = z2;
       // depth to tsdf
       depth2tsdf_GPU(tsdf_size, cv_img.rows, cv_img.cols);
       // copy to top
@@ -461,22 +468,29 @@ void WindowTSDFDataLayer<Dtype>::depth2tsdf_CPU(
   const Dtype* depth_data = depth_.cpu_data();
   const Dtype* K_data = the_K_.cpu_data();
   const Dtype* R_data = the_R_.cpu_data();
-  const Dtype* window_data = the_window_.cpu_data();
+  const Dtype* bb3d_data = the_bb3d_.cpu_data();
   Dtype* tsdf_data = tsdf_.mutable_cpu_data();
   for (int index = 0; index < count; ++index) {
     Dtype x = Dtype(index % tsdf_size);
     Dtype y = Dtype((index / tsdf_size) % tsdf_size);
     Dtype z = Dtype((index / tsdf_size / tsdf_size) % tsdf_size);
-    Dtype delta_x = (window_data[3] - window_data[0]) / Dtype(tsdf_size);
-    Dtype delta_y = (window_data[4] - window_data[1]) / Dtype(tsdf_size);
-    Dtype delta_z = (window_data[5] - window_data[2]) / Dtype(tsdf_size);
+    Dtype delta_x = 2 * bb3d_data[12] / Dtype(tsdf_size);
+    Dtype delta_y = 2 * bb3d_data[13] / Dtype(tsdf_size);
+    Dtype delta_z = 2 * bb3d_data[14] / Dtype(tsdf_size);
     tsdf_data[index] = - 2.0 * delta_x;
     tsdf_data[index + count] = - 2.0 * delta_y;
     tsdf_data[index + 2 * count] = - 2.0 * delta_z;
 
-    x = window_data[0] + (x + 0.5) * delta_x;
-    y = window_data[1] + (y + 0.5) * delta_y;
-    z = window_data[2] + (z + 0.5) * delta_z;
+    Dtype temp_x = - bb3d_data[12] + (x + 0.5) * delta_x;
+    Dtype temp_y = - bb3d_data[13] + (y + 0.5) * delta_y;
+    Dtype temp_z = - bb3d_data[14] + (z + 0.5) * delta_z;
+    // project to world coordinate
+    x = temp_x * bb3d_data[0] + temp_y * bb3d_data[3] + temp_z * bb3d_data[6]
+        + bb3d_data[9];
+    y = temp_x * bb3d_data[1] + temp_y * bb3d_data[4] + temp_z * bb3d_data[7]
+        + bb3d_data[10];
+    z = temp_x * bb3d_data[2] + temp_y * bb3d_data[5] + temp_z * bb3d_data[8]
+        + bb3d_data[11];
     // project to image plane
     // swap y, z and -y
     Dtype xx = R_data[0] * x + R_data[3] * y + R_data[6] * z;
