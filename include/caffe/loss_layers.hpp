@@ -803,7 +803,7 @@ protected:
 
   Dtype epsilon_;
 
-  enum LossMode {EUCLIDEAN, SOFTMAX, HINGE};
+  enum LossMode {EUCLIDEAN, SOFTMAX, HINGE, INFOGAIN};
   LossMode loss_mode_;
 
   Blob<Dtype> buffer_;

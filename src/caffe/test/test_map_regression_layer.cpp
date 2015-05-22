@@ -126,6 +126,36 @@ class MapRegressionLossLayerTest : public MultiDeviceTest<TypeParam> {
     EXPECT_GE(loss_weight_1, kNonTrivialAbsThresh);
   }
 
+  void TestInfoGainForward(){
+    LayerParameter layer_param;
+    layer_param.mutable_map_regression_param()->set_loss_mode(MapRegressionParameter_LossMode_INFOGAIN);
+    MapRegressionLossLayer<Dtype> layer_weight_1(layer_param);
+
+    // fill the values
+    FillerParameter filler_param;
+    PositiveUnitballFiller<Dtype> filler(filler_param);
+    filler.Fill(this->blob_bottom_data_);
+    filler.Fill(this->blob_bottom_label_);
+
+    layer_weight_1.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
+    const Dtype loss_weight_1 =
+        layer_weight_1.Forward(this->blob_bottom_vec_, this->blob_top_vec_);
+
+    // Get the loss again with a different objective weight; check that it is
+    // scaled appropriately.
+    const Dtype kLossWeight = 3.7;
+    layer_param.add_loss_weight(kLossWeight);
+    MapRegressionLossLayer<Dtype> layer_weight_2(layer_param);
+    layer_weight_2.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
+    const Dtype loss_weight_2 =
+        layer_weight_2.Forward(this->blob_bottom_vec_, this->blob_top_vec_);
+    const Dtype kErrorMargin = 1e-5;
+    EXPECT_NEAR(loss_weight_1 * kLossWeight, loss_weight_2, kErrorMargin);
+    // Make sure the loss is non-trivial.
+    const Dtype kNonTrivialAbsThresh = 1e-1;
+    EXPECT_GE(loss_weight_1, kNonTrivialAbsThresh);
+  }
+
 
   Blob<Dtype>* const blob_bottom_data_;
   Blob<Dtype>* const blob_bottom_label_;
@@ -148,7 +178,12 @@ TYPED_TEST(MapRegressionLossLayerTest, TestHingeForward) {
     this->TestHingeForward();
 }
 
-TYPED_TEST(MapRegressionLossLayerTest, TestGradient) {
+TYPED_TEST(MapRegressionLossLayerTest, TestInfoGainForward) {
+  this->TestInfoGainForward();
+}
+
+
+  TYPED_TEST(MapRegressionLossLayerTest, TestGradient) {
   typedef typename TypeParam::Dtype Dtype;
   LayerParameter layer_param;
   const Dtype kLossWeight = 3.7;
@@ -188,5 +223,25 @@ TYPED_TEST(MapRegressionLossLayerTest, TestHingeGradient) {
     GradientChecker<Dtype> checker(1e-2, 1e-3, 1701);
     checker.CheckGradientExhaustive(&layer, this->blob_bottom_vec_,
                                     this->blob_top_vec_, 0);
+}
+
+TYPED_TEST(MapRegressionLossLayerTest, TestInfoGainGradient) {
+  typedef typename TypeParam::Dtype Dtype;
+
+  // fill the values
+  FillerParameter filler_param;
+  PositiveUnitballFiller<Dtype> filler(filler_param);
+  filler.Fill(this->blob_bottom_data_);
+  filler.Fill(this->blob_bottom_label_);
+
+  LayerParameter layer_param;
+  const Dtype kLossWeight = 3.7;
+  layer_param.add_loss_weight(kLossWeight);
+  layer_param.mutable_map_regression_param()->set_loss_mode(MapRegressionParameter_LossMode_INFOGAIN);
+  MapRegressionLossLayer<Dtype> layer(layer_param);
+  layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
+  GradientChecker<Dtype> checker(1e-4, 1e-2, 1701, 1, 0.01);
+  checker.CheckGradientExhaustive(&layer, this->blob_bottom_vec_,
+                                  this->blob_top_vec_, 0);
 }
 }  // namespace caffe
