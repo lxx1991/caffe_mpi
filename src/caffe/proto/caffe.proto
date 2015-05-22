@@ -1142,4 +1142,6 @@ message SparseDataParameter{
  optional EncodingType encode_type = 5 [default=POS];
 
  optional int32 batch_size = 6 [default = 1];
+
+ optional bool probability = 7 [default = false];
 }

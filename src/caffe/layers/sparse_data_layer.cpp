@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 #include <opencv2/imgproc/imgproc.hpp>
+#include <caffe/loss_layers.hpp>
 
 #include "caffe/common.hpp"
 #include "caffe/data_layers.hpp"
@@ -62,7 +63,7 @@ unsigned int SparseDataLayer<Dtype>::PrefetchRand() {
 
 
 template <typename Dtype>
-void decodePOSEncoding(string& content, Dtype* data, int ch, int width, int height){
+void decodePOSEncoding(string& content, Dtype* data, int ch, int width, int height, bool is_prob){
   const int pos_len = 4 - (ch == 1) - (width == 1) - (height == 1);
 
   boost::tokenizer<> tok(content);
@@ -77,6 +78,7 @@ void decodePOSEncoding(string& content, Dtype* data, int ch, int width, int heig
   CHECK_EQ((numbers.size()) % (pos_len), 0)<<"Incorrect number of integers in line: "<<content;
   const int n_pos = numbers.size() / (pos_len + 1);
   int idx = 0;
+  Dtype sum = 0;
   for (int i = 0; i < n_pos; ++i){
     //check for non-singular dimensions
     int c  = (ch == 1)?0:numbers[idx++];
@@ -88,8 +90,15 @@ void decodePOSEncoding(string& content, Dtype* data, int ch, int width, int heig
 
     //set value to the matrix
     data[(c * height + h) * width + w] = value;
-    
-   // LOG(INFO)<<c<<" "<<h<<" "<<w;
+    sum += value;
+  }
+
+  //normalize the vector to distribution (sum = 1) if requested.
+  if (is_prob){
+    int dim = ch * width * height;
+    for (int i = 0; i < dim; ++i){
+      data[i] /= std::max(sum, Dtype(kLOG_THRESHOLD));
+    }
   }
 }
 
@@ -109,7 +118,8 @@ void SparseDataLayer<Dtype>::InternalThreadEntry() {
     //Do decoding
     switch (this->layer_param().sparse_data_param().encode_type()){
       case SparseDataParameter_EncodingType_POS:{
-        decodePOSEncoding(buffer, top_data + this->prefetch_data_.offset(item_id), ch_, width_, height_);
+        decodePOSEncoding(buffer, top_data + this->prefetch_data_.offset(item_id), ch_,
+                          width_, height_, this->layer_param_.sparse_data_param().probability());
         break;
       };
       case SparseDataParameter_EncodingType_RLE:
