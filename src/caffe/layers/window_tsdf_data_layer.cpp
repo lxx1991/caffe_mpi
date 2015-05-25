@@ -294,7 +294,22 @@ void WindowTSDFDataLayer<Dtype>::InternalThreadEntry() {
       bb3d_data[9] = window[WindowTSDFDataLayer<Dtype>::C1];
       bb3d_data[10] = window[WindowTSDFDataLayer<Dtype>::C2];
       bb3d_data[11] = window[WindowTSDFDataLayer<Dtype>::C3];
-      int orientation = PrefetchRand() % 4 + 1;
+      int orientation = PrefetchRand() % 2;
+      if (orientation == 0) {
+        // decide by B1
+        if (window[WindowTSDFDataLayer<Dtype>::B1] >= 0) {
+            orientation = 1;
+        } else {
+            orientation = 3;
+        }
+      } else {
+        // decide by B4
+        if (window[WindowTSDFDataLayer<Dtype>::B4] >= 0) {
+            orientation = 4;
+        } else {
+            orientation = 2;
+        }
+      }
       switch (orientation) {
         case 1:
             bb3d_data[0] = window[WindowTSDFDataLayer<Dtype>::B1];
