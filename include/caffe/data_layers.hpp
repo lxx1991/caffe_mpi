@@ -364,6 +364,7 @@ protected:
   int map_height_;
 
   Dtype sigma_;
+  bool bg_channel_;
 
   vector< vector<int> > text_file_database_;
   vector< vector<int> >::iterator text_file_cursor_;

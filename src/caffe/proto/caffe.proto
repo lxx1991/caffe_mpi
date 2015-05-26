@@ -1116,6 +1116,9 @@ message MapDataParameter {
 
  //sigma parameter for gaussian smoothing
  optional float sigma = 10 [default = 1];
+
+ //whether to put on background layer
+ optional bool background_channel = 11 [default = false];
 }
 
 //Message for recording sparse matrix
