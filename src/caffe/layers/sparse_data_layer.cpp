@@ -76,7 +76,7 @@ void decodePOSEncoding(string& content, Dtype* data, int ch, int width, int heig
     numbers.push_back(num);
   }
   CHECK_EQ((numbers.size()) % (pos_len), 0)<<"Incorrect number of integers in line: "<<content;
-  const int n_pos = numbers.size() / (pos_len + 1);
+  const int n_pos = numbers.size() / (pos_len);
   int idx = 0;
   Dtype sum = 0;
   for (int i = 0; i < n_pos; ++i){
