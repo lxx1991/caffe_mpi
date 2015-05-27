@@ -34,6 +34,28 @@ DataTransformer<Dtype>::DataTransformer(const TransformationParameter& param,
   }
 }
 
+/** @build fixed crop offsets for random selection
+ */
+void fillFixOffset(int datum_height, int datum_width, int crop_height, int crop_width,
+                   vector<pair<int , int> > offsets){
+  int height_off = (datum_height - crop_height)/2;
+  int width_off = (datum_width - crop_width)/2;
+
+  offsets.clear();
+  offsets.push_back(pair<int, int>(height_off, width_off));
+  offsets.push_back(pair<int, int>(-height_off, width_off));
+  offsets.push_back(pair<int, int>(height_off, -width_off));
+  offsets.push_back(pair<int, int>(-height_off, -width_off));
+  offsets.push_back(pair<int, int>(0, 0));
+
+  //fill the other non-corner crops
+  offsets.push_back(pair<int, int>(height_off, 0));
+  offsets.push_back(pair<int, int>(-height_off, 0));
+  offsets.push_back(pair<int, int>(0, -width_off));
+  offsets.push_back(pair<int, int>(0, -width_off));
+}
+
+
 template<typename Dtype>
 void DataTransformer<Dtype>::Transform(const Datum& datum,
                                        Dtype* transformed_data) {
@@ -48,10 +70,12 @@ void DataTransformer<Dtype>::Transform(const Datum& datum,
   const bool has_mean_file = param_.has_mean_file();
   const bool has_uint8 = data.size() > 0;
   const bool has_mean_values = mean_values_.size() > 0;
+  vector<pair<int, int> > offset_pairs;
 
   CHECK_GT(datum_channels, 0);
   CHECK_GE(datum_height, crop_size);
   CHECK_GE(datum_width, crop_size);
+
 
   Dtype* mean = NULL;
   if (has_mean_file) {
@@ -81,8 +105,16 @@ void DataTransformer<Dtype>::Transform(const Datum& datum,
     width = crop_size;
     // We only do random crop when we do training.
     if (phase_ == TRAIN) {
-      h_off = Rand(datum_height - crop_size + 1);
-      w_off = Rand(datum_width - crop_size + 1);
+      if (param_.fix_crop()){
+        fillFixOffset(datum_height, datum_width, crop_size, crop_size, offset_pairs);
+        int sel = Rand(offset_pairs.size());
+        h_off = offset_pairs[sel].first;
+        w_off = offset_pairs[sel].second;
+      }else{
+        h_off = Rand(datum_height - crop_size + 1);
+        w_off = Rand(datum_width - crop_size + 1);
+      }
+
     } else {
       h_off = (datum_height - crop_size) / 2;
       w_off = (datum_width - crop_size) / 2;
@@ -218,6 +250,8 @@ void DataTransformer<Dtype>::Transform(const cv::Mat& cv_img,
   const bool has_mean_file = param_.has_mean_file();
   const bool has_mean_values = mean_values_.size() > 0;
 
+  vector<pair<int, int> > offset_pairs;
+
   CHECK_GT(img_channels, 0);
   CHECK_GE(img_height, crop_size);
   CHECK_GE(img_width, crop_size);
@@ -248,8 +282,15 @@ void DataTransformer<Dtype>::Transform(const cv::Mat& cv_img,
     CHECK_EQ(crop_size, width);
     // We only do random crop when we do training.
     if (phase_ == TRAIN) {
-      h_off = Rand(img_height - crop_size + 1);
-      w_off = Rand(img_width - crop_size + 1);
+      if (param_.fix_crop()){
+        fillFixOffset(img_height, img_width, crop_size, crop_size, offset_pairs);
+        int sel = Rand(offset_pairs.size());
+        h_off = offset_pairs[sel].first;
+        w_off = offset_pairs[sel].second;
+      }else {
+        h_off = Rand(img_height - crop_size + 1);
+        w_off = Rand(img_width - crop_size + 1);
+      }
     } else {
       h_off = (img_height - crop_size) / 2;
       w_off = (img_width - crop_size) / 2;
