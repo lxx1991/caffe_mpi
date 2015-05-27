@@ -42,7 +42,9 @@ void readTextBBoxDB(vector<vector<int> > &db, std::ifstream &infile){
 
 /**build the map using AREA mode, meaning all pixel surrounded by the bounxing box will be put to 1*/
 template <typename Dtype>
-inline void buildAreaMap(int map_ch, int map_width, int map_height, vector<int>& bbox_info, Dtype* data){
+inline void buildAreaMap(int map_ch, int map_width, int map_height,
+                         vector<int>& bbox_info, Dtype* data,
+                         bool bg_channel){
   CHECK_EQ(9, bbox_info.size()) << "Input must have 9 number per line";
   int map_start_x = std::min((int) (Dtype(bbox_info[5] - 1) / bbox_info[1] * map_width), map_width);
   int map_start_y = std::min((int) (Dtype(bbox_info[6] - 1) / bbox_info[2] * map_height), map_height);
@@ -53,9 +55,15 @@ inline void buildAreaMap(int map_ch, int map_width, int map_height, vector<int>&
   CHECK_LT(map_working_channel, map_ch)<<"channel index must lest than number of channel in the map";
 
   Dtype *start_ptr = data + map_working_channel * (map_width * map_height);
-  for (int y = map_start_y; y < map_end_y; ++y) {
-    for (int x = map_start_x; x < map_end_x; ++x) {
-      start_ptr[y * map_width + x] = 1;
+  Dtype *bg_channel_ptr = data + (map_ch - 1) * (map_width * map_height);
+
+  for (int y = 0; y < map_height; ++y){
+    for (int x = 0; x < map_width; ++x){
+      Dtype* working_ptr = (( y < map_end_y)
+                     && ( y >= map_start_y)
+                     && ( x >= map_start_x)
+                     && ( x < map_end_x))?start_ptr:bg_channel_ptr;
+      working_ptr[ y * map_width + x ] = 1;
     }
   }
 
@@ -101,10 +109,11 @@ inline void buildCenterMap(int map_ch, int map_width, int map_height, vector<int
 */
 template <typename Dtype>
 inline void buildBBoxMap(int map_ch, int map_width, int map_height,
-                  vector<int>& bbox_info, Dtype* data, MapDataParameter_MapMode mode){
+                  vector<int>& bbox_info, Dtype* data, MapDataParameter_MapMode mode, bool bg_channel){
   switch (mode) {
     case MapDataParameter_MapMode_AREA: {
-      buildAreaMap(map_ch, map_width, map_height, bbox_info, data);
+      buildAreaMap(map_ch, map_width, map_height, bbox_info, data,
+                   bg_channel);
       break;
     }
     case MapDataParameter_MapMode_CENTER: {
@@ -289,7 +298,12 @@ void MapDataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
     //Using a square map
     map_width_ = map_height_ = this->layer_param_.map_data_param().map_size();
   }
+
+  bg_channel_ = this->layer_param_.map_data_param().background_channel();
+
   map_ch_ = this->layer_param_.map_data_param().map_channels();
+
+  if (bg_channel_) ++map_ch_;
 
   sigma_ = this->layer_param_.map_data_param().sigma();
 
@@ -348,7 +362,7 @@ void MapDataLayer<Dtype>::InternalThreadEntry() {
       case (TEXT_FILE): {
         Dtype *item_data = top_data + this->prefetch_data_.offset(item_id);
         buildBBoxMap<Dtype>(map_ch_, map_width_, map_height_, *text_file_cursor_, item_data,
-                            this->layer_param_.map_data_param().map_mode());
+                            this->layer_param_.map_data_param().map_mode(), bg_channel_);
         //TODO: add smoothing operation
         smoothBBoxMap<Dtype>(map_ch_, map_width_, map_height_, sigma_, *text_file_cursor_, item_data,
                       this->layer_param_.map_data_param().smooth_type());

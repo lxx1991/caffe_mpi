@@ -14,7 +14,6 @@
 #include "caffe/filler.hpp"
 #include "caffe/internal_thread.hpp"
 #include "caffe/layer.hpp"
-#include "caffe/net.hpp"
 #include "caffe/proto/caffe.pb.h"
 #include "caffe/util/db.hpp"
 
@@ -29,7 +28,6 @@ template <typename Dtype>
 class BaseDataLayer : public Layer<Dtype> {
  public:
   explicit BaseDataLayer(const LayerParameter& param);
-  virtual ~BaseDataLayer() {}
   // LayerSetUp: implements common data layer setup functionality, and calls
   // DataLayerSetUp to do special data layer setup for individual layer types.
   // This method may not be overridden except by the BasePrefetchingDataLayer.
@@ -58,7 +56,6 @@ class BasePrefetchingDataLayer :
  public:
   explicit BasePrefetchingDataLayer(const LayerParameter& param)
       : BaseDataLayer<Dtype>(param) {}
-  virtual ~BasePrefetchingDataLayer() {}
   // LayerSetUp: implements common data layer setup functionality, and calls
   // DataLayerSetUp to do special data layer setup for individual layer types.
   // This method may not be overridden.
@@ -367,6 +364,7 @@ protected:
   int map_height_;
 
   Dtype sigma_;
+  bool bg_channel_;
 
   vector< vector<int> > text_file_database_;
   vector< vector<int> >::iterator text_file_cursor_;
@@ -375,6 +373,60 @@ protected:
     TEXT_FILE, HDD_DB
   };
   DataBase db_;
+
+};
+
+
+/**
+* @brief Provide data based on sparse matrix encoding
+*
+* This layer will take in a input file with a sparse 3D matrix encode in each line
+*
+* Currently only position encoding is supported
+* The line will look like
+* \code{.unparsed}
+* image_id c h w value c h w value
+* \endcode
+* If some dimension is singular (like channel == 1), this dimension shouldn't be listed in the line. In this case
+* \code{.unparsed}
+* image_id h w value h w value
+* \endcode
+*
+* RLE will be added in future.
+*/
+template <typename Dtype>
+class SparseDataLayer : public BasePrefetchingDataLayer<Dtype> {
+public:
+  explicit SparseDataLayer(const LayerParameter& param)
+      : BasePrefetchingDataLayer<Dtype>(param) {}
+  virtual ~SparseDataLayer();
+  virtual void DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
+                              const vector<Blob<Dtype>*>& top);
+
+  virtual inline const char* type() const { return "SparseData"; }
+  virtual inline int ExactNumBottomBlobs() const { return 0; }
+  virtual inline int ExactNumTopBlobs() const { return 1; }
+
+protected:
+
+  /**
+   * A random generator for future use
+   */
+  virtual unsigned int PrefetchRand();
+
+  /**
+   * Generate map data in a prefetching manner
+   */
+  virtual void InternalThreadEntry();
+
+  shared_ptr<Caffe::RNG> prefetch_rng_;
+
+  int ch_;
+  int width_;
+  int height_;
+  int batch_size_;
+
+  std::ifstream mfs_;
 
 };
 

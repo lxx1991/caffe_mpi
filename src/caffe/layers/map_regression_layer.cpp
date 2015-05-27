@@ -59,6 +59,9 @@ namespace caffe {
         case MapRegressionParameter_LossMode_HINGE:
             loss_mode_ = HINGE;
             break;
+        case MapRegressionParameter_LossMode_INFOGAIN:
+            loss_mode_ = INFOGAIN;
+            break;
     }
   }
 
@@ -83,6 +86,10 @@ namespace caffe {
         case HINGE:
             buffer_.ReshapeLike(*bottom[0]);
             break;
+        case INFOGAIN:
+            buffer_.ReshapeLike(*bottom[0]);
+            break;
+
     }
   }
 
@@ -134,7 +141,24 @@ namespace caffe {
 
     Dtype loss = caffe_cpu_asum(count, diff_data) / count;
     return loss;
-}
+  }
+
+  template <typename Dtype>
+  Dtype computeInfoGainLoss(const Dtype* pred_data, Dtype* mutable_buffer_data, Dtype* mutable_diff_data, const Dtype* obj_data,
+                            int num, int dim, int sp_dim=1){
+    const int count = num * dim;
+
+    Dtype loss = 0;
+    for (int i = 0; i <count; ++i){
+      Dtype prob = std::max(pred_data[i], Dtype(kLOG_THRESHOLD));
+      Dtype gt = obj_data[i];
+      loss -= gt * log(prob);
+      mutable_buffer_data[i] = 1 / prob;
+      mutable_diff_data[i] = gt;
+    }
+
+    return loss / (num * sp_dim);
+  }
 
   /**
    * Backward computations
@@ -168,6 +192,16 @@ namespace caffe {
     caffe_scal(count, Dtype(-1) * loss_weight / count, diff_data);
   }
 
+  template <typename Dtype>
+  void computeInfoGainDiff(const Dtype* buffer_data, Dtype* diff, int num, int dim, int sp_size, Dtype loss_weight){
+    const int count = num * dim;
+    Dtype scale = -loss_weight / (num * sp_size);
+    for (int i = 0; i < count; ++i){
+      diff[i] *= (scale * buffer_data[i]);
+    }
+    //caffe_scal(count, scale, diff);
+    //caffe_mul(count, buffer_data, diff, diff);
+  }
 
 
 
@@ -180,6 +214,7 @@ namespace caffe {
     Dtype* mutable_diff_data = bottom[0]->mutable_cpu_diff();
     int num = bottom[0]->shape(0);
     int dim = bottom[0]->count(1);
+    int sp_size = bottom[0]->count(2);
 
     switch (loss_mode_){
       case EUCLIDEAN:
@@ -192,6 +227,10 @@ namespace caffe {
         top[0]->mutable_cpu_data()[0] = computeHingeLoss(pred_data, mutable_buffer_data, mutable_diff_data, obj_data,
                                                          num, dim,
                                                          alpha_, beta_, tau_plus_, tau_minus_, epsilon_);
+        break;
+      case INFOGAIN:
+        top[0]->mutable_cpu_data()[0] = computeInfoGainLoss(pred_data, mutable_buffer_data, mutable_diff_data, obj_data,
+                                                            num, dim, sp_size);
         break;
     }
   }
@@ -209,6 +248,7 @@ namespace caffe {
 
         int num = bottom[i]->shape(0);
         int dim = bottom[i]->count(1);
+        int sp_size = bottom[i]->count(2);
 
         switch (loss_mode_){
           case EUCLIDEAN: {
@@ -232,6 +272,10 @@ namespace caffe {
                              alpha_, beta_, tau_plus_, tau_minus_, epsilon_);
             break;
           }
+          case INFOGAIN:{
+            computeInfoGainDiff(buffer_data, diff_data, num, dim, sp_size, loss_weight);
+            break;
+          };
         }
       }
     }

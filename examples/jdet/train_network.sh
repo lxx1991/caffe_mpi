@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-NET=clarify
+NET=clarify_coco
 DEVICE_ID=${1:-0}  
 TESTING=$2
 
