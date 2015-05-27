@@ -37,7 +37,7 @@ DataTransformer<Dtype>::DataTransformer(const TransformationParameter& param,
 /** @build fixed crop offsets for random selection
  */
 void fillFixOffset(int datum_height, int datum_width, int crop_height, int crop_width,
-                   vector<pair<int , int> > offsets){
+                   vector<pair<int , int> >& offsets){
   int height_off = (datum_height - crop_height)/2;
   int width_off = (datum_width - crop_width)/2;
 
