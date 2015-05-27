@@ -3,20 +3,24 @@ import os
 import shutil
 sys.path.append('python/caffe/proto/')
 
-from caffe_pb2 import SolverParameter
+from caffe_pb2 import SolverParameter, NetParameter
 from datetime import date, datetime
 from google.protobuf import text_format
 
 net_name = sys.argv[1]
 device_id = sys.argv[2]
+base_path = sys.argv[3]
 
-if len(sys.argv) == 4:
-  testing = True if sys.argv[3] == 'y' else False
-else:
-  testing = False
+testing = False
 
 solver_temp = 'models/jdet/solver.prototxt.example'
-base_path = '/media/datadisk_c/snapshots/jdet/'
+#base_path = '/media/datadisk_c/snapshots/jdet/'
+db_path_file = 'examples/jdet/db_paths.yaml'
+
+import yaml
+db_path = yaml.load(open(db_path_file));
+train_db_path = db_path['train_imagenet']
+val_db_path = db_path['val_imagenet']
 
 starting_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
@@ -43,12 +47,25 @@ solver.net = proto_name
 solver.device_id = int(device_id)
 solver.snapshot_prefix = snapshot_path
 
+#modify network file to point to the local database
+net_proto = NetParameter()
+text_format.Merge(open(proto_name).read(), net_proto)
+
+for i in range(len(net_proto.layer)):
+  if net_proto.layer[i].name == 'data':
+    if net_proto.layer[i].include[0].phase == 0: #train
+      net_proto.layer[i].data_param.source = train_db_path
+    else:
+      net_proto.layer[i].data_param.source = val_db_path # val
+
 if testing:
   solver.snapshot = 0
 
+open(solver_name, 'w').write(text_format.MessageToString(solver))
+open(proto_name, 'w').write(text_format.MessageToString(net_proto))
+
 #output the solver
 if not testing:
-  open(solver_name, 'w').write(text_format.MessageToString(solver))
   shutil.copy(proto_name, os.path.join(snapshot_dir, '{}_proto_{}.prototxt'.format(net_name, starting_time)))
   shutil.copy(solver_name, os.path.join(snapshot_dir, '{}_solver_{}.prototxt'.format(net_name, starting_time)))
 else:
