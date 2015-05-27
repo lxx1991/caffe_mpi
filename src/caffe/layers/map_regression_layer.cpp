@@ -272,7 +272,6 @@ namespace caffe {
           }
           case INFOGAIN:{
             computeInfoGainDiff(buffer_data, diff_data, num, dim, sp_size, loss_weight);
-            std::cout<<"Diff"<<bottom[i]->asum_diff()/bottom[i]->count();
             break;
           };
         }
