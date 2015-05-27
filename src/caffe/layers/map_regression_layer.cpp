@@ -151,7 +151,7 @@ namespace caffe {
     Dtype loss = 0;
     for (int i = 0; i <count; ++i){
       Dtype prob = std::max(pred_data[i], Dtype(kLOG_THRESHOLD));
-      Dtype gt = std::max(obj_data[i], Dtype(kLOG_THRESHOLD));
+      Dtype gt = obj_data[i];
       loss -= gt * log(prob);
       mutable_buffer_data[i] = prob;
       mutable_diff_data[i] = gt;
