@@ -42,17 +42,17 @@ void fillFixOffset(int datum_height, int datum_width, int crop_height, int crop_
   int width_off = (datum_width - crop_width)/2;
 
   offsets.clear();
-  offsets.push_back(pair<int, int>(height_off, width_off));
-  offsets.push_back(pair<int, int>(-height_off, width_off));
-  offsets.push_back(pair<int, int>(height_off, -width_off));
-  offsets.push_back(pair<int, int>(-height_off, -width_off));
-  offsets.push_back(pair<int, int>(0, 0));
+  offsets.push_back(pair<int, int>(0, 0)); //upper left
+  offsets.push_back(pair<int, int>(0, 2 * width_off)); //upper right
+  offsets.push_back(pair<int, int>(2 * height_off, 0)); //lower left
+  offsets.push_back(pair<int, int>(2 * height_off, 2 *width_off)); //lower right
+  offsets.push_back(pair<int, int>(height_off, width_off)); //center
 
   //fill the other non-corner crops
-  offsets.push_back(pair<int, int>(height_off, 0));
-  offsets.push_back(pair<int, int>(-height_off, 0));
-  offsets.push_back(pair<int, int>(0, -width_off));
-  offsets.push_back(pair<int, int>(0, -width_off));
+  offsets.push_back(pair<int, int>(0, width_off)); //upper mid
+  offsets.push_back(pair<int, int>(height_off, 0)); //mid left
+  offsets.push_back(pair<int, int>(height_off, 2 * width_off)); //mid right
+  offsets.push_back(pair<int, int>(2 * height_off, width_off)); //lower mid
 }
 
 
