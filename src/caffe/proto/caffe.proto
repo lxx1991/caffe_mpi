@@ -361,6 +361,10 @@ message TransformationParameter {
   // or can be repeated the same number of times as channels
   // (would subtract them from the corresponding channel)
   repeated float mean_value = 5;
+
+  //if set to true,
+  //instead use a fixed position cropping (center, left-up, left-down, right-up, right-down)
+  optional bool fix_crop = 6 [default = false];
 }
 
 // Message that stores parameters shared by loss layers

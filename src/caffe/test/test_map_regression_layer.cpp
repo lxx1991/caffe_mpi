@@ -21,8 +21,8 @@ class MapRegressionLossLayerTest : public MultiDeviceTest<TypeParam> {
 
  protected:
     MapRegressionLossLayerTest()
-      : blob_bottom_data_(new Blob<Dtype>(10, 5, 1, 1)),
-        blob_bottom_label_(new Blob<Dtype>(10, 5, 1, 1)),
+      : blob_bottom_data_(new Blob<Dtype>(10, 5, 2, 2)),
+        blob_bottom_label_(new Blob<Dtype>(10, 5, 2, 2)),
         blob_top_loss_(new Blob<Dtype>()) {
     // fill the values
     FillerParameter filler_param;

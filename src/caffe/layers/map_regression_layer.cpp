@@ -199,8 +199,6 @@ namespace caffe {
     for (int i = 0; i < count; ++i){
       diff[i] *= (scale * buffer_data[i]);
     }
-    //caffe_scal(count, scale, diff);
-    //caffe_mul(count, buffer_data, diff, diff);
   }
 
 
@@ -274,6 +272,7 @@ namespace caffe {
           }
           case INFOGAIN:{
             computeInfoGainDiff(buffer_data, diff_data, num, dim, sp_size, loss_weight);
+            std::cout<<"Diff"<<bottom[i]->asum_diff()/bottom[i]->count();
             break;
           };
         }
