@@ -1123,6 +1123,9 @@ message MapDataParameter {
 
  //whether to put on background layer
  optional bool background_channel = 11 [default = false];
+
+ //whether normalize the pixel-wise values into a probability
+ optional bool probability = 12 [default=false];
 }
 
 //Message for recording sparse matrix

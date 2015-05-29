@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 #include <opencv2/imgproc/imgproc.hpp>
+#include <caffe/loss_layers.hpp>
 
 #include "caffe/common.hpp"
 #include "caffe/data_layers.hpp"
@@ -24,7 +25,6 @@ namespace caffe {
 void readTextBBoxDB(vector<vector<int> > &db, std::ifstream &infile){
   string line;
   vector<string> tokens;
-  int line_length = 9;
   while (std::getline(infile, line)){
     boost::tokenizer<> tok(line);
     vector<int> line_numbers;
@@ -34,8 +34,8 @@ void readTextBBoxDB(vector<vector<int> > &db, std::ifstream &infile){
       line_numbers.push_back(num);
     }
 
+    CHECK_EQ(0, (line_numbers.size() - 3) % 6)<<"line length must be 8*n + 1";
     //make sure that every line has a same number of integers
-    CHECK_EQ(line_numbers.size(), line_length) << "input must has "<<line_length<<" items per row!";
     db.push_back(line_numbers);
   }
 }
@@ -44,28 +44,58 @@ void readTextBBoxDB(vector<vector<int> > &db, std::ifstream &infile){
 template <typename Dtype>
 inline void buildAreaMap(int map_ch, int map_width, int map_height,
                          vector<int>& bbox_info, Dtype* data,
-                         bool bg_channel){
-  CHECK_EQ(9, bbox_info.size()) << "Input must have 9 number per line";
-  int map_start_x = std::min((int) (Dtype(bbox_info[5] - 1) / bbox_info[1] * map_width), map_width);
-  int map_start_y = std::min((int) (Dtype(bbox_info[6] - 1) / bbox_info[2] * map_height), map_height);
-  int map_end_x = std::min((int) (Dtype(bbox_info[7] - 1) / bbox_info[1] * map_width), map_width);
-  int map_end_y = std::min((int) (Dtype(bbox_info[8] - 1) / bbox_info[2] * map_height), map_height);
-  int map_working_channel = bbox_info[3] * (int) sqrt(map_ch) + bbox_info[4];
+                         bool bg_channel, bool prob){
+  int n_box = (bbox_info.size() - 3) / 6;
+  int image_width = bbox_info[1];
+  int image_height = bbox_info[2];
+  caffe_set(map_width*map_height*map_ch, Dtype(0), data);
+  for (int b = 0; b < n_box; ++b) {
+    int box_head = 3 + 6 * b;
+    int map_start_x = std::min((int) (Dtype(bbox_info[box_head + 2] - 1) / image_width * map_width), map_width);
+    int map_start_y = std::min((int) (Dtype(bbox_info[box_head + 3] - 1) / image_height * map_height), map_height);
+    int map_end_x = std::min((int) (Dtype(bbox_info[box_head + 4] - 1) / image_width * map_width), map_width);
+    int map_end_y = std::min((int) (Dtype(bbox_info[box_head + 5] - 1) / image_width * map_height), map_height);
+    int map_working_channel = bbox_info[box_head] * (int) sqrt(map_ch) + bbox_info[box_head + 1];
 
-  CHECK_LT(map_working_channel, map_ch)<<"channel index must lest than number of channel in the map";
+    CHECK_LT(map_working_channel, map_ch) << "channel index must be less than number of channel in the map";
 
-  Dtype *start_ptr = data + map_working_channel * (map_width * map_height);
-  Dtype *bg_channel_ptr = data + (map_ch - 1) * (map_width * map_height);
+    Dtype *start_ptr = data + map_working_channel * (map_width * map_height);
 
-  for (int y = 0; y < map_height; ++y){
-    for (int x = 0; x < map_width; ++x){
-      Dtype* working_ptr = (( y < map_end_y)
-                     && ( y >= map_start_y)
-                     && ( x >= map_start_x)
-                     && ( x < map_end_x))?start_ptr:bg_channel_ptr;
-      working_ptr[ y * map_width + x ] = 1;
+    for (int y = map_start_y; y < map_end_y; ++y){
+      for (int x = map_start_x; x < map_end_x; ++x){
+        start_ptr[y * map_width + x] =1;
+      }
+    }
+
+  }
+
+  //assing background label to bg pixels
+  if (bg_channel) {
+    Dtype *bg_channel_ptr = data + (map_ch - 1) * (map_width * map_height);
+    int channel_offset = map_width * map_height;
+    for (int y = 0; y < map_height; ++y) {
+      for (int x = 0; x < map_width; ++x) {
+        int offset = y * map_width + x;
+        Dtype sum = 0;
+        for (int c = 0; c < map_ch-1; ++c) sum += data[offset + channel_offset * c];
+        if (sum == 0) bg_channel_ptr[offset] += 1; //modified to reflect multiple bounding boxes
+      }
     }
   }
+
+  if(prob){
+    int channel_offset = map_width * map_height;
+    for (int y = 0; y < map_height; ++y){
+      for (int x = 0; x < map_width; ++x){
+        int offset = y * map_width + x;
+        Dtype sum = 0;
+        for (int c = 0; c < map_ch-1; ++c) sum += data[offset + channel_offset * c];
+        sum = std::max(Dtype(kLOG_THRESHOLD), sum);
+        for (int c = 0; c <map_ch; ++c) data[offset + channel_offset * c]/= sum;
+      }
+    }
+  }
+
 
 //  //debug dump
 //  std::ofstream of("/media/ssd/dump.txt", std::ofstream::out);
@@ -109,11 +139,12 @@ inline void buildCenterMap(int map_ch, int map_width, int map_height, vector<int
 */
 template <typename Dtype>
 inline void buildBBoxMap(int map_ch, int map_width, int map_height,
-                  vector<int>& bbox_info, Dtype* data, MapDataParameter_MapMode mode, bool bg_channel){
+                  vector<int>& bbox_info, Dtype* data, MapDataParameter_MapMode mode,
+                         bool bg_channel, bool prob){
   switch (mode) {
     case MapDataParameter_MapMode_AREA: {
       buildAreaMap(map_ch, map_width, map_height, bbox_info, data,
-                   bg_channel);
+                   bg_channel, prob);
       break;
     }
     case MapDataParameter_MapMode_CENTER: {
@@ -362,8 +393,9 @@ void MapDataLayer<Dtype>::InternalThreadEntry() {
       case (TEXT_FILE): {
         Dtype *item_data = top_data + this->prefetch_data_.offset(item_id);
         buildBBoxMap<Dtype>(map_ch_, map_width_, map_height_, *text_file_cursor_, item_data,
-                            this->layer_param_.map_data_param().map_mode(), bg_channel_);
-        //TODO: add smoothing operation
+                            this->layer_param_.map_data_param().map_mode(),
+                            bg_channel_, this->layer_param_.map_data_param().probability());
+        //perform smoothing operation
         smoothBBoxMap<Dtype>(map_ch_, map_width_, map_height_, sigma_, *text_file_cursor_, item_data,
                       this->layer_param_.map_data_param().smooth_type());
         //go to the next item and rewind if reaches the end

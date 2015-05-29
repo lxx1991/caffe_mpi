@@ -45,6 +45,13 @@ protected:
     outfile.close();
   }
 
+  void PrepareMultiple() {
+    std::ofstream outfile(source_file->c_str(), std::ofstream::out);
+    outfile << "0 256 256 0 1 0 128 128 256 0 2 0 128 128 256 0 3 0 128 128 256" << std::endl;
+    outfile << "0 256 256 0 1 0 128 128 256 0 2 0 128 128 256 0 3 0 128 128 256" << std::endl;
+    outfile.close();
+  }
+
   /**
   * Test AREA mode map generation
   */
@@ -74,6 +81,8 @@ protected:
       for (int y = map_size / 2; y < map_size - 1; ++y) {
         for (int x = 0; x < map_size / 2 - 1; ++x) {
           EXPECT_EQ(1, blob_top_data_->cpu_data()[ind(1, y, x)]);
+          EXPECT_EQ(1, blob_top_data_->cpu_data()[ind(2, y, x)]);
+          EXPECT_EQ(1, blob_top_data_->cpu_data()[ind(3, y, x)]);
         }
       }
     }
@@ -194,7 +203,7 @@ TYPED_TEST_CASE(MapDataLayerTest, TestDtypesAndDevices);
 
 TYPED_TEST(MapDataLayerTest, TestAreaMap)
 {
-  this->Prepare();
+  this->PrepareMultiple();
   this->TestAreaMap();
 }
 
