@@ -89,7 +89,7 @@ inline void buildAreaMap(int map_ch, int map_width, int map_height,
       for (int x = 0; x < map_width; ++x){
         int offset = y * map_width + x;
         Dtype sum = 0;
-        for (int c = 0; c < map_ch-1; ++c) sum += data[offset + channel_offset * c];
+        for (int c = 0; c < map_ch; ++c) sum += data[offset + channel_offset * c];
         sum = std::max(Dtype(kLOG_THRESHOLD), sum);
         for (int c = 0; c <map_ch; ++c) data[offset + channel_offset * c]/= sum;
       }

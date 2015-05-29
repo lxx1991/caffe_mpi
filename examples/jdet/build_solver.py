@@ -19,8 +19,8 @@ db_path_file = 'examples/jdet/db_paths.yaml'
 
 import yaml
 db_path = yaml.load(open(db_path_file));
-train_db_path = db_path['train_imagenet']
-val_db_path = db_path['val_imagenet']
+train_db_path = db_path['train_{}'.format(net_name)]
+val_db_path = db_path['val_{}'.format(net_name)]
 
 starting_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
