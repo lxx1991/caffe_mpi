@@ -153,6 +153,7 @@ class Net {
     return param_names_index_;
   }
   inline const vector<int>& param_owners() const { return param_owners_; }
+  inline const vector<pair<int ,int> >& param_layer_indices() const {return param_layer_indices_;}
   /// @brief Input and output blob numbers
   inline int num_inputs() const { return net_input_blobs_.size(); }
   inline int num_outputs() const { return net_output_blobs_.size(); }
@@ -185,6 +186,13 @@ class Net {
   /// @brief return whether NetState state meets NetStateRule rule
   static bool StateMeetsRule(const NetState& state, const NetStateRule& rule,
       const string& layer_name);
+
+ /**
+  * @brief helper for retriving the layer related to a blob
+  */
+ inline shared_ptr<Layer<Dtype> > layer_by_param(int param_id){
+  return layers_[param_layer_indices_[param_id].first];
+ }
 
  protected:
   // Helpers for Init.
@@ -242,6 +250,7 @@ class Net {
   vector<int> param_owners_;
   vector<string> param_display_names_;
   vector<pair<int, int> > param_layer_indices_;
+  vector<pair<int, int> > top_layer_indices_;
   map<string, int> param_names_index_;
   /// blob indices for the input and the output of the net
   vector<int> net_input_blob_indices_;

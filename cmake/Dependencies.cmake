@@ -11,12 +11,12 @@ find_package(Threads REQUIRED)
 list(APPEND Caffe_LINKER_LIBS ${CMAKE_THREAD_LIBS_INIT})
 
 # ---[ Google-glog
-find_package(Glog REQUIRED)
+include("cmake/External/glog.cmake")
 include_directories(SYSTEM ${GLOG_INCLUDE_DIRS})
 list(APPEND Caffe_LINKER_LIBS ${GLOG_LIBRARIES})
 
 # ---[ Google-gflags
-find_package(GFlags REQUIRED)
+include("cmake/External/gflags.cmake")
 include_directories(SYSTEM ${GFLAGS_INCLUDE_DIRS})
 list(APPEND Caffe_LINKER_LIBS ${GFLAGS_LIBRARIES})
 
@@ -154,4 +154,13 @@ endif()
 # ---[ Doxygen
 if(BUILD_docs)
   find_package(Doxygen)
+endif()
+
+if (USE_MPI)
+  set(MPIEXEC "/usr/local/openmpi/bin/mpiexec")
+  find_package(MPI)
+  include_directories(SYSTEM ${MPI_CXX_INCLUDE_PATH})
+  list(APPEND Caffe_LINKER_LIBS ${MPI_CXX_LIBRARIES})
+  add_definitions(-DUSE_MPI)
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${MPI_CXX_LINK_FLAGS}")
 endif()
