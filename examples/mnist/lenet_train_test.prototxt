@@ -11,8 +11,8 @@ layer {
     scale: 0.00390625
   }
   data_param {
-    source: "examples/mnist/mnist_train_lmdb"
-    batch_size: 64
+    source: "/media/ssd/caffe_bvlc/examples/mnist/mnist_train_lmdb"
+    batch_size: 16
     backend: LMDB
   }
 }
@@ -28,8 +28,8 @@ layer {
     scale: 0.00390625
   }
   data_param {
-    source: "examples/mnist/mnist_test_lmdb"
-    batch_size: 100
+    source: "/media/ssd/caffe_bvlc/examples/mnist/mnist_test_lmdb"
+    batch_size: 25
     backend: LMDB
   }
 }
@@ -102,9 +102,17 @@ layer {
   }
 }
 layer {
+  name: "gather"
+  type: "Gather"
+  bottom: "pool2"
+  bottom: "label"
+  top: "pool2_all"
+  top: "label_all"
+}
+layer {
   name: "ip1"
   type: "InnerProduct"
-  bottom: "pool2"
+  bottom: "pool2_all"
   top: "ip1"
   param {
     lr_mult: 1
@@ -153,7 +161,7 @@ layer {
   name: "accuracy"
   type: "Accuracy"
   bottom: "ip2"
-  bottom: "label"
+  bottom: "label_all"
   top: "accuracy"
   include {
     phase: TEST
@@ -163,6 +171,6 @@ layer {
   name: "loss"
   type: "SoftmaxWithLoss"
   bottom: "ip2"
-  bottom: "label"
+  bottom: "label_all"
   top: "loss"
 }

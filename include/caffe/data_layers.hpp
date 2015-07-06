@@ -400,6 +400,15 @@ public:
   virtual inline int ExactNumBottomBlobs() const { return 0; }
   virtual inline int ExactNumTopBlobs() const { return 1; }
 
+  #ifdef USE_MPI
+  inline virtual void advance_cursor(){
+        text_file_cursor_++;
+        if(text_file_cursor_ == text_file_database_.end()){
+          text_file_cursor_ = text_file_database_.begin();
+        }
+  }
+  #endif
+
 protected:
 
   /**
@@ -462,6 +471,19 @@ public:
   virtual inline int ExactNumBottomBlobs() const { return 0; }
   virtual inline int ExactNumTopBlobs() const { return 1; }
 
+  #ifdef USE_MPI
+  inline virtual void advance_cursor(){
+    string buffer;
+    std::getline(mfs_, buffer);
+    mfs_.peek();
+     //rewind if necessary
+    if (mfs_.eof()){
+      mfs_.seekg(0);
+    }
+ 
+  }
+  #endif
+
 protected:
 
   /**
@@ -482,6 +504,8 @@ protected:
   int batch_size_;
 
   std::ifstream mfs_;
+
+
 
 };
 

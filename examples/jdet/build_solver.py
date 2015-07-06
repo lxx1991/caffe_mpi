@@ -1,7 +1,7 @@
 import sys
 import os
 import shutil
-sys.path.append('python/caffe/proto/')
+sys.path.append('build/install/python/caffe/proto/')
 
 from caffe_pb2 import SolverParameter, NetParameter
 from datetime import date, datetime
@@ -44,7 +44,7 @@ text_format.Merge(open(solver_temp).read(), solver)
 
 #modify parameter
 solver.net = proto_name
-solver.device_id = int(device_id)
+#solver.device_id = int(device_id)
 solver.snapshot_prefix = snapshot_path
 
 #modify network file to point to the local database

@@ -3,7 +3,7 @@ layer {
   name: "data"
   type: "Data"
   top: "data"
-  top: "label"
+  top: "label_local"
   include {
     phase: TRAIN
   }
@@ -21,16 +21,17 @@ layer {
 #    mirror: true
 #  }
   data_param {
-    source: "examples/imagenet/ilsvrc12_train_lmdb"
-    batch_size: 256
+    source: "/media/ssd2/dataset/imagenet_sqr_enc_train_lmdb/"
+    batch_size: 64
     backend: LMDB
+    #force_encoded_color: true
   }
 }
 layer {
   name: "data"
   type: "Data"
   top: "data"
-  top: "label"
+  top: "label_local"
   include {
     phase: TEST
   }
@@ -48,9 +49,10 @@ layer {
 #    mirror: true
 #  }
   data_param {
-    source: "examples/imagenet/ilsvrc12_val_lmdb"
+    source: "/media/ssd2/dataset/imagenet_sqr_enc_val_lmdb/"
     batch_size: 50
     backend: LMDB
+    #force_encoded_color: true
   }
 }
 layer {
@@ -269,12 +271,20 @@ layer {
   name: "pool5"
   type: "Pooling"
   bottom: "conv5"
-  top: "pool5"
+  top: "pool5_local"
   pooling_param {
     pool: MAX
     kernel_size: 3
     stride: 2
   }
+}
+layer {
+  name: "gather"
+  type: "Gather"
+  bottom: "pool5_local"
+  bottom: "label_local"
+  top: "pool5"
+  top: "label"
 }
 layer {
   name: "fc6"
