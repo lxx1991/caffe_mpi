@@ -304,6 +304,7 @@ void Solver<Dtype>::SyncGradient(){
       caffe_gpu_scal(net_params[param_id]->count(),
                      Dtype(1.)/Dtype(Caffe::MPI_all_rank()),
                      net_params[param_id]->mutable_gpu_diff());
+      DLOG(INFO)<<"Syncing gradients";
     }
   }
   t2 = MPI_Wtime();
@@ -334,6 +335,7 @@ void Solver<Dtype>::SyncData(){
                           MPI_COMM_WORLD
       );
       CHECK_EQ(err, MPI_SUCCESS)<<"MPI Operation failed";
+      DLOG(INFO)<<"Syncing model";
     }
   }
   t2 = MPI_Wtime();
@@ -353,6 +355,7 @@ void Solver<Dtype>::SyncOutput(shared_ptr<Net<Dtype> > net){
     caffe_gpu_scal(result[j]->count(),
                    Dtype(1.)/Dtype(Caffe::MPI_all_rank()),
                    result[j]->mutable_gpu_data());
+    DLOG(INFO)<<"Syncing outputs";
   }
 
 }
@@ -364,6 +367,7 @@ Dtype Solver<Dtype>::SyncLoss(Dtype loss){
              MPI_SUM,
              0, MPI_COMM_WORLD
   );
+  DLOG(INFO)<<"Syncing loss";
   return sum_loss / Caffe::MPI_all_rank();
 }
 #endif
