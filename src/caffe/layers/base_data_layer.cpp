@@ -2,7 +2,6 @@
 #include <vector>
 
 #include "caffe/data_layers.hpp"
-#include "caffe/net.hpp"
 #include "caffe/util/io.hpp"
 
 namespace caffe {
@@ -21,11 +20,11 @@ void BaseDataLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
   } else {
     output_labels_ = true;
   }
-  // The subclasses should setup the size of bottom and top
-  DataLayerSetUp(bottom, top);
   data_transformer_.reset(
       new DataTransformer<Dtype>(transform_param_, this->phase_));
   data_transformer_->InitRand();
+  // The subclasses should setup the size of bottom and top
+  DataLayerSetUp(bottom, top);
 }
 
 template <typename Dtype>
@@ -40,6 +39,10 @@ void BasePrefetchingDataLayer<Dtype>::LayerSetUp(
   if (this->output_labels_) {
     this->prefetch_label_.mutable_cpu_data();
   }
+#ifdef USE_MPI
+  //advance (my_rank) mini-batches to be ready for first run
+  BaseDataLayer<Dtype>::OffsetCursor(top[0]->num() * Caffe::MPI_my_rank());
+#endif
   DLOG(INFO) << "Initializing prefetch";
   this->CreatePrefetchThread();
   DLOG(INFO) << "Prefetch initialized.";
@@ -63,15 +66,24 @@ void BasePrefetchingDataLayer<Dtype>::Forward_cpu(
   JoinPrefetchThread();
   DLOG(INFO) << "Thread joined";
   // Reshape to loaded data.
-  top[0]->Reshape(this->prefetch_data_.shape());
+  top[0]->ReshapeLike(prefetch_data_);
   // Copy the data
   caffe_copy(prefetch_data_.count(), prefetch_data_.cpu_data(),
              top[0]->mutable_cpu_data());
   DLOG(INFO) << "Prefetch copied";
   if (this->output_labels_) {
+    // Reshape to loaded labels.
+    top[1]->ReshapeLike(prefetch_label_);
+    // Copy the labels.
     caffe_copy(prefetch_label_.count(), prefetch_label_.cpu_data(),
                top[1]->mutable_cpu_data());
   }
+
+#ifdef USE_MPI
+  //advance (all_rank - (my_rank+1)) mini-batches to be ready for next run
+  BaseDataLayer<Dtype>::OffsetCursor(top[0]->num() * (Caffe::MPI_all_rank() - 1));
+#endif
+
   // Start a new prefetch thread
   DLOG(INFO) << "CreatePrefetchThread";
   CreatePrefetchThread();

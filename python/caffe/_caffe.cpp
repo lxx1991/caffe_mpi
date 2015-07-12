@@ -234,7 +234,7 @@ BOOST_PYTHON_MODULE(_caffe) {
     .add_property("channels", &Blob<Dtype>::channels)
     .add_property("height",   &Blob<Dtype>::height)
     .add_property("width",    &Blob<Dtype>::width)
-    .add_property("count",    static_cast<int (Blob<Dtype>::*)() const>(
+    .add_property("count",    static_cast<size_t (Blob<Dtype>::*)() const>(
         &Blob<Dtype>::count))
     .def("reshape",           bp::raw_function(&Blob_Reshape))
     .add_property("data",     bp::make_function(&Blob<Dtype>::mutable_cpu_data,
@@ -261,7 +261,8 @@ BOOST_PYTHON_MODULE(_caffe) {
     .add_property("iter", &Solver<Dtype>::iter)
     .def("solve", static_cast<void (Solver<Dtype>::*)(const char*)>(
           &Solver<Dtype>::Solve), SolveOverloads())
-    .def("step", &Solver<Dtype>::Step);
+    .def("step", &Solver<Dtype>::Step)
+    .def("restore", &Solver<Dtype>::Restore);
 
   bp::class_<SGDSolver<Dtype>, bp::bases<Solver<Dtype> >,
     shared_ptr<SGDSolver<Dtype> >, boost::noncopyable>(

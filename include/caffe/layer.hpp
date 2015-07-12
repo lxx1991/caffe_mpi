@@ -17,11 +17,11 @@ namespace caffe {
  * @brief An interface for the units of computation which can be composed into a
  *        Net.
  *
- * Layer&s must implement a Forward function, in which they take their input
- * (bottom) Blob&s (if any) and compute their output Blob&s (if any).
+ * Layer%s must implement a Forward function, in which they take their input
+ * (bottom) Blob%s (if any) and compute their output Blob%s (if any).
  * They may also implement a Backward function, in which they compute the error
- * gradients with respect to their input Blob&s, given the error gradients with
- * their output Blob&s.
+ * gradients with respect to their input Blob%s, given the error gradients with
+ * their output Blob%s.
  */
 template <typename Dtype>
 class Layer {
@@ -42,6 +42,17 @@ class Layer {
           blobs_[i]->FromProto(layer_param_.blobs(i));
         }
       }
+
+      #ifdef USE_MPI
+      //If this is a gather layer, all it subsequent layer doesn't need gradient sync.
+      //We will only change itself's property here,
+      //subsequent layers will be infered in the Net
+    if (is_gathering()){
+        set_need_sync(false);
+      }else{
+        set_need_sync(true);
+      }
+      #endif
     }
   virtual ~Layer() {}
 
@@ -285,6 +296,17 @@ class Layer {
     param_propagate_down_[param_id] = value;
   }
 
+  #ifdef USE_MPI
+  /**
+   * @brief Checks whether the layer accepts specifed parallel type
+   *
+   * If not supported, will halt the program with hints
+   */
+  inline virtual bool is_gathering() {return false;}
+  inline bool need_sync(){return need_sync_;}
+  inline void set_need_sync(bool val){need_sync_ = val;}
+  #endif
+
 
  protected:
   /** The protobuf that stores the layer parameters */
@@ -299,6 +321,13 @@ class Layer {
   /** The vector that indicates whether each top blob has a non-zero weight in
    *  the objective function. */
   vector<Dtype> loss_;
+
+  #ifdef USE_MPI
+  /**
+   * For parallel use
+   */
+  bool need_sync_;
+  #endif
 
   /** @brief Using the CPU device, compute the layer output. */
   virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
@@ -406,6 +435,7 @@ template <typename Dtype>
 inline Dtype Layer<Dtype>::Forward(const vector<Blob<Dtype>*>& bottom,
     const vector<Blob<Dtype>*>& top) {
   Dtype loss = 0;
+  Reshape(bottom, top);
   switch (Caffe::mode()) {
   case Caffe::CPU:
     Forward_cpu(bottom, top);

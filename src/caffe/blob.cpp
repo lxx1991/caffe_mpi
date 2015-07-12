@@ -28,6 +28,7 @@ void Blob<Dtype>::Reshape(const vector<int>& shape) {
   int* shape_data = static_cast<int*>(shape_data_->mutable_cpu_data());
   for (int i = 0; i < shape.size(); ++i) {
     CHECK_GE(shape[i], 0);
+    CHECK_LE(shape[i], INT_MAX / count_) << "blob size exceeds INT_MAX";
     count_ *= shape[i];
     shape_[i] = shape[i];
     shape_data[i] = shape[i];
@@ -36,8 +37,6 @@ void Blob<Dtype>::Reshape(const vector<int>& shape) {
     capacity_ = count_;
     data_.reset(new SyncedMemory(capacity_ * sizeof(Dtype)));
     diff_.reset(new SyncedMemory(capacity_ * sizeof(Dtype)));
-    if (Caffe::accumulate())
-      acum_diff_.reset(new SyncedMemory(capacity_ * sizeof(Dtype)));
   }
 }
 

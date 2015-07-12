@@ -14,7 +14,6 @@
 #include "caffe/filler.hpp"
 #include "caffe/internal_thread.hpp"
 #include "caffe/layer.hpp"
-#include "caffe/net.hpp"
 #include "caffe/proto/caffe.pb.h"
 #include "caffe/util/db.hpp"
 
@@ -29,7 +28,6 @@ template <typename Dtype>
 class BaseDataLayer : public Layer<Dtype> {
  public:
   explicit BaseDataLayer(const LayerParameter& param);
-  virtual ~BaseDataLayer() {}
   // LayerSetUp: implements common data layer setup functionality, and calls
   // DataLayerSetUp to do special data layer setup for individual layer types.
   // This method may not be overridden except by the BasePrefetchingDataLayer.
@@ -46,7 +44,30 @@ class BaseDataLayer : public Layer<Dtype> {
   virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
       const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom) {}
 
+  #ifdef USE_MPI
+    /**
+     * @brief call advance_cursor() for `step` times to offset the data access for parallel training
+     */
+    inline virtual void OffsetCursor(int step){
+      if (Caffe::parallel_mode() == Caffe::MPI){
+        for (int i = 0; i < step; ++i) this->advance_cursor();
+      }
+    }
+  #endif
+
  protected:
+
+  #ifdef USE_MPI
+  /**
+   * @brief The core utility for parallel based data access
+   *
+   * This move the "cursor" defined in each data layer one step forward
+   */
+  inline virtual void advance_cursor(){
+    LOG(FATAL)<<"Data must implement advance_cursor() method to be involved in the parallel training";
+  }
+  #endif
+
   TransformationParameter transform_param_;
   shared_ptr<DataTransformer<Dtype> > data_transformer_;
   bool output_labels_;
@@ -58,7 +79,6 @@ class BasePrefetchingDataLayer :
  public:
   explicit BasePrefetchingDataLayer(const LayerParameter& param)
       : BaseDataLayer<Dtype>(param) {}
-  virtual ~BasePrefetchingDataLayer() {}
   // LayerSetUp: implements common data layer setup functionality, and calls
   // DataLayerSetUp to do special data layer setup for individual layer types.
   // This method may not be overridden.
@@ -97,6 +117,16 @@ class DataLayer : public BasePrefetchingDataLayer<Dtype> {
 
  protected:
   virtual void InternalThreadEntry();
+
+  #ifdef USE_MPI
+  inline virtual void advance_cursor(){
+    cursor_->Next();
+    if (!cursor_->valid()) {
+      DLOG(INFO) << "Restarting data prefetching from start.";
+      cursor_->SeekToFirst();
+    }
+  }
+  #endif
 
   shared_ptr<db::DB> db_;
   shared_ptr<db::Cursor> cursor_;
@@ -171,6 +201,8 @@ class HDF5DataLayer : public Layer<Dtype> {
   unsigned int current_file_;
   hsize_t current_row_;
   std::vector<shared_ptr<Blob<Dtype> > > hdf_blobs_;
+  std::vector<unsigned int> data_permutation_;
+  std::vector<unsigned int> file_permutation_;
 };
 
 /**
@@ -237,6 +269,20 @@ class ImageDataLayer : public BasePrefetchingDataLayer<Dtype> {
   shared_ptr<Caffe::RNG> prefetch_rng_;
   virtual void ShuffleImages();
   virtual void InternalThreadEntry();
+
+  #ifdef USE_MPI
+  inline virtual void advance_cursor(){
+    lines_id_++;
+    if (lines_id_ >= lines_.size()) {
+      // We have reached the end. Restart from the first.
+      DLOG(INFO) << "Restarting data prefetching from start.";
+      lines_id_ = 0;
+      if (this->layer_param_.image_data_param().shuffle()) {
+        ShuffleImages();
+      }
+    }
+  }
+  #endif
 
   vector<std::pair<std::string, int> > lines_;
   int lines_id_;
@@ -309,6 +355,14 @@ class WindowDataLayer : public BasePrefetchingDataLayer<Dtype> {
  protected:
   virtual unsigned int PrefetchRand();
   virtual void InternalThreadEntry();
+
+  #ifdef USE_MPI
+  inline virtual void advance_cursor(){
+    //TODO: remove this
+    PrefetchRand();
+    this->transform_param_.mirror() && PrefetchRand();
+  }
+  #endif
 
   shared_ptr<Caffe::RNG> prefetch_rng_;
   vector<std::pair<std::string, vector<int> > > image_database_;

@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "boost/algorithm/string.hpp"
 #include "caffe/caffe.hpp"
 
 using caffe::Blob;
@@ -76,6 +77,19 @@ int device_query() {
 }
 RegisterBrewFunction(device_query);
 
+// Load the weights from the specified caffemodel(s) into the train and
+// test nets.
+void CopyLayers(caffe::Solver<float>* solver, const std::string& model_list) {
+  std::vector<std::string> model_names;
+  boost::split(model_names, model_list, boost::is_any_of(",") );
+  for (int i = 0; i < model_names.size(); ++i) {
+    LOG(INFO) << "Finetuning from " << model_names[i];
+    solver->net()->CopyTrainedLayersFrom(model_names[i]);
+    for (int j = 0; j < solver->test_nets().size(); ++j) {
+      solver->test_nets()[j]->CopyTrainedLayersFrom(model_names[i]);
+    }
+  }
+}
 
 // Train / Finetune a model.
 int train() {
@@ -87,13 +101,8 @@ int train() {
   caffe::SolverParameter solver_param;
   caffe::ReadProtoFromTextFileOrDie(FLAGS_solver, &solver_param);
 
-  // If the gpu flag is not provided, allow the mode and device to be set
-  // in the solver prototxt.
-  if (FLAGS_gpu < 0
-      && solver_param.solver_mode() == caffe::SolverParameter_SolverMode_GPU) {
-    FLAGS_gpu = solver_param.device_id();
-  }
 
+#ifndef USE_MPI
   // Set device id and mode
   if (FLAGS_gpu >= 0) {
     LOG(INFO) << "Use GPU with device ID " << FLAGS_gpu;
@@ -104,6 +113,64 @@ int train() {
     Caffe::set_mode(Caffe::CPU);
   }
 
+  // If the gpu flag is not provided, allow the mode and device to be set
+  // in the solver prototxt.
+  if (FLAGS_gpu < 0
+      && solver_param.solver_mode() == caffe::SolverParameter_SolverMode_GPU) {
+    LOG(INFO) <<"Swtiching to GPU 0";
+    Caffe::set_mode(Caffe::GPU);
+    if (solver_param.device_id_size() == 0){
+      Caffe::SetDevice(0);
+    }else{
+      Caffe::SetDevice(solver_param.device_id(0));
+    }
+  }
+  #else
+  if (Caffe::parallel_mode() == Caffe::MPI){
+    if (FLAGS_gpu >= 0 ){
+      LOG(WARNING)<<"We detect that you are setting device id in command line flags. This will be ignored in parallel mode";
+      LOG(WARNING)<<"Please set a list of usable devices in the solver file.";
+    }
+    if (solver_param.solver_mode() == caffe::SolverParameter_SolverMode_GPU){
+      Caffe::set_mode(Caffe::GPU);
+      if (solver_param.device_id_size() == 0){
+        LOG(INFO)<<"Using the automatic ordinal info for device id. Possible risk of over number";
+        Caffe::SetDevice(Caffe::MPI_my_rank());
+      }else {
+        CHECK_GE(solver_param.device_id_size(), Caffe::MPI_all_rank())
+          <<"If you would like to specify device id, please specify equal or more number of ids than the number of jobs";
+        Caffe::SetDevice(solver_param.device_id(Caffe::MPI_my_rank()));
+      }
+    }else{
+      Caffe::set_mode(Caffe::CPU);
+    }
+  }else{
+    if (FLAGS_gpu >= 0) {
+      LOG(INFO) << "Use GPU with device ID " << FLAGS_gpu;
+      Caffe::SetDevice(FLAGS_gpu);
+      Caffe::set_mode(Caffe::GPU);
+    } else {
+      LOG(INFO) << "Use CPU.";
+      Caffe::set_mode(Caffe::CPU);
+    }
+
+    // If the gpu flag is not provided, allow the mode and device to be set
+    // in the solver prototxt.
+    if (FLAGS_gpu < 0
+        && solver_param.solver_mode() == caffe::SolverParameter_SolverMode_GPU) {
+      LOG(INFO) <<"Swtiching to GPU 0";
+      Caffe::set_mode(Caffe::GPU);
+      if (solver_param.device_id_size() == 0){
+        Caffe::SetDevice(0);
+      }else{
+        Caffe::SetDevice(solver_param.device_id(0));
+      }
+    }
+  }
+
+
+  #endif
+
   LOG(INFO) << "Starting Optimization";
   shared_ptr<caffe::Solver<float> >
     solver(caffe::GetSolver<float>(solver_param));
@@ -112,8 +179,7 @@ int train() {
     LOG(INFO) << "Resuming from " << FLAGS_snapshot;
     solver->Solve(FLAGS_snapshot);
   } else if (FLAGS_weights.size()) {
-    LOG(INFO) << "Finetuning from " << FLAGS_weights;
-    solver->net()->CopyTrainedLayersFrom(FLAGS_weights);
+    CopyLayers(&*solver, FLAGS_weights);
     solver->Solve();
   } else {
     solver->Solve();
@@ -174,8 +240,8 @@ int test() {
   for (int i = 0; i < test_score.size(); ++i) {
     const std::string& output_name = caffe_net.blob_names()[
         caffe_net.output_blob_indices()[test_score_output_id[i]]];
-    const float loss_weight =
-        caffe_net.blob_loss_weights()[caffe_net.output_blob_indices()[i]];
+    const float loss_weight = caffe_net.blob_loss_weights()[
+        caffe_net.output_blob_indices()[test_score_output_id[i]]];
     std::ostringstream loss_msg_stream;
     const float mean_score = test_score[i] / FLAGS_iterations;
     if (loss_weight) {
@@ -239,9 +305,6 @@ int time() {
     forward_timer.Start();
     for (int i = 0; i < layers.size(); ++i) {
       timer.Start();
-      // Although Reshape should be essentially free, we include it here
-      // so that we will notice Reshape performance bugs.
-      layers[i]->Reshape(bottom_vecs[i], top_vecs[i]);
       layers[i]->Forward(bottom_vecs[i], top_vecs[i]);
       forward_time_per_layer[i] += timer.MicroSeconds();
     }
@@ -293,9 +356,17 @@ int main(int argc, char** argv) {
       "  time            benchmark model execution time");
   // Run tool or show usage.
   caffe::GlobalInit(&argc, &argv);
+
   if (argc == 2) {
-    return GetBrewFunction(caffe::string(argv[1]))();
+    int ret = GetBrewFunction(caffe::string(argv[1]))();
+    //Clean up after use.
+    caffe::GlobalFinalize();
+    return ret;
   } else {
     gflags::ShowUsageWithFlagsRestrict(argv[0], "tools/caffe");
+    //Clean up after use.
+    caffe::GlobalFinalize();
   }
+
+
 }
