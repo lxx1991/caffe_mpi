@@ -35,11 +35,19 @@ void CuDNNConvolutionLayer<Dtype>::Forward_gpu(
       // Bias.
       if (this->bias_term_) {
         const Dtype* bias_data = this->blobs_[1]->gpu_data();
+#if CUDNN_VERSION_MIN(4, 0, 0)
+        CUDNN_CHECK(cudnnAddTensor(handle_[g],
+              cudnn::dataType<Dtype>::one,
+              bias_desc_, bias_data + bias_offset_ * g,
+              cudnn::dataType<Dtype>::one,
+              top_descs_[i], top_data + top_offset_ * g));
+#else
         CUDNN_CHECK(cudnnAddTensor(handle_[g], CUDNN_ADD_SAME_C,
               cudnn::dataType<Dtype>::one,
               bias_desc_, bias_data + bias_offset_ * g,
               cudnn::dataType<Dtype>::one,
               top_descs_[i], top_data + top_offset_ * g));
+#endif
       }
     }
 
@@ -87,7 +95,7 @@ void CuDNNConvolutionLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
               bottom_descs_[i], bottom_data + bottom_offset_ * g,
               top_descs_[i],    top_diff + top_offset_ * g,
               conv_descs_[i],
-              bwd_filter_algo_[i], workspaceData_bwd[g]->mutable_gpu_data(),
+              bwd_filter_algo_[i], workspaceData_bwd_filter[g]->mutable_gpu_data(),
               workspace_bwd_filter_sizes_[i],
               cudnn::dataType<Dtype>::one,
               filter_desc_, weight_diff + weight_offset_ * g));
@@ -105,7 +113,7 @@ void CuDNNConvolutionLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
               filter_desc_, weight + weight_offset_ * g,
               top_descs_[i], top_diff + top_offset_ * g,
               conv_descs_[i],
-              bwd_data_algo_[i], workspaceData_bwd[this->group_  + g]->mutable_gpu_data(),
+              bwd_data_algo_[i], workspaceData_bwd_data[g]->mutable_gpu_data(),
               workspace_bwd_data_sizes_[i],
               cudnn::dataType<Dtype>::zero,
               bottom_descs_[i], bottom_diff + bottom_offset_ * g));
