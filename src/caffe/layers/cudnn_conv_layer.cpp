@@ -291,11 +291,6 @@ void CuDNNConvolutionLayer<Dtype>::Reshape(
   // By setting richness, you can increase the memory available to cuDNN and thus
   // let it choose fast but space consuming algorithms.
   for (int i = 0; i < bottom.size(); i++) {
-    if (!prev_bottom_shapes_[i].empty()){
-      continue;
-    }
-    prev_bottom_shapes_[i] = bottom[i]->shape();
-
     cudnn::setTensor4dDesc<Dtype>(&bottom_descs_[i],
                                   this->num_,
                                   this->channels_ / this->group_,
@@ -313,6 +308,11 @@ void CuDNNConvolutionLayer<Dtype>::Reshape(
     cudnn::setConvolutionDesc<Dtype>(&conv_descs_[i], bottom_descs_[i],
                                      filter_desc_, this->pad_h_, this->pad_w_,
                                      this->stride_h_, this->stride_w_);
+
+    if (!prev_bottom_shapes_[i].empty()){
+      continue;
+    }
+    prev_bottom_shapes_[i] = bottom[i]->shape();
 
     // choose forward and backward algorithms + workspace(s)
     const int kRequestedForwardAlgoCount = 6;
