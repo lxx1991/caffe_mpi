@@ -10,12 +10,11 @@ layer {
   transform_param {
     mirror: true
     crop_size: 227
-    mean_value: 128
-    #mean_file: "data/ilsvrc12/imagenet_mean.binaryproto"
+    mean_file: "data/ilsvrc12/imagenet_mean.binaryproto"
   }
   data_param {
-    source: "/data1/imagenet/img_256x256/ilsvrc12_train_lmdb"
-    batch_size: 25
+    source: "examples/imagenet/ilsvrc12_train_lmdb"
+    batch_size: 256
     backend: LMDB
   }
 }
@@ -30,12 +29,11 @@ layer {
   transform_param {
     mirror: false
     crop_size: 227
-    #mean_file: "data/ilsvrc12/imagenet_mean.binaryproto"
-    mean_value: 128
+    mean_file: "data/ilsvrc12/imagenet_mean.binaryproto"
   }
   data_param {
-    source: "/data1/imagenet/img_256x256/ilsvrc12_train_lmdb"
-    batch_size: 200
+    source: "examples/imagenet/ilsvrc12_val_lmdb"
+    batch_size: 50
     backend: LMDB
   }
 }
@@ -111,7 +109,7 @@ layer {
     num_output: 256
     pad: 2
     kernel_size: 5
-    #group: 2
+    group: 2
     weight_filler {
       type: "gaussian"
       std: 0.01
@@ -200,7 +198,7 @@ layer {
     num_output: 384
     pad: 1
     kernel_size: 3
-    #group: 2
+    group: 2
     weight_filler {
       type: "gaussian"
       std: 0.01
@@ -234,7 +232,7 @@ layer {
     num_output: 256
     pad: 1
     kernel_size: 3
-    #group: 2
+    group: 2
     weight_filler {
       type: "gaussian"
       std: 0.01
