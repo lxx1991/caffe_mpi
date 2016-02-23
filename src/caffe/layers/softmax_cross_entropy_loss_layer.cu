@@ -36,8 +36,19 @@ void SoftmaxWithCrossEntropyLossLayer<Dtype>::Forward_gpu(
   SoftmaxCrossEntropyLossForwardGPU<Dtype><<<CAFFE_GET_BLOCKS(nthreads),
       CAFFE_CUDA_NUM_THREADS>>>(nthreads, predict_prob_data,
                                 target_prob_data, loss_data);
+  Dtype loss_cross_entropy;
+  caffe_gpu_asum(nthreads, loss_data, &loss_cross_entropy);
+
+  SoftmaxCrossEntropyLossForwardGPU<Dtype><<<CAFFE_GET_BLOCKS(nthreads),
+      CAFFE_CUDA_NUM_THREADS>>>(nthreads, target_prob_data,
+                                target_prob_data, loss_data);
+
+  Dtype loss_entropy;
+  caffe_gpu_asum(nthreads, loss_data, &loss_entropy);
+
   Dtype loss;
-  caffe_gpu_asum(nthreads, loss_data, &loss);
+  loss = loss_cross_entropy - loss_entropy;
+  
   if (normalize_) {
     loss /= (outer_num_ * inner_num_);
   } else {

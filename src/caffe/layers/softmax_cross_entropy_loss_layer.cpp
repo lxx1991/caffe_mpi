@@ -73,6 +73,14 @@ void SoftmaxWithCrossEntropyLossLayer<Dtype>::Forward_cpu(
       }
     }
   }
+  for (int i = 0; i < outer_num_; ++i) {
+    for (int j = 0; j < inner_num_; ++j) {
+      for (int k = 0; k < predict_prob_.shape(softmax_axis_); ++k) {
+        loss += target_prob_data[i * dim + k * inner_num_ + j]
+            * log(std::max(target_prob_data[i * dim + k * inner_num_ + j], Dtype(FLT_MIN)));
+      }
+    }
+  }
   if (normalize_) {
     top[0]->mutable_cpu_data()[0] = loss / (outer_num_ * inner_num_);
   } else {
