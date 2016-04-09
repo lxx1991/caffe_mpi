@@ -74,9 +74,12 @@ void VideoDataLayer<Dtype>:: DataLayerSetUp(const vector<Blob<Dtype>*>& bottom, 
 	if (this->layer_param_.video_data_param().modality() == VideoDataParameter_Modality_FLOW)
 		CHECK(ReadSegmentFlowToDatum(lines_[lines_id_].first, lines_[lines_id_].second,
 									 offsets, new_height, new_width, new_length, &datum, name_pattern_.c_str()));
-	else
+	if (this->layer_param_.video_data_param().modality() == VideoDataParameter_Modality_RGB)
 		CHECK(ReadSegmentRGBToDatum(lines_[lines_id_].first, lines_[lines_id_].second,
 									offsets, new_height, new_width, new_length, &datum, true, name_pattern_.c_str()));
+	if (this->layer_param_.video_data_param().modality() == VideoDataParameter_Modality_VIDEO)
+		CHECK(ReadSegmentVideoToDatum(lines_[lines_id_].first, lines_[lines_id_].second,
+									offsets, new_height, new_width, new_length, &datum));
 	const int crop_size = this->layer_param_.transform_param().crop_size();
 	const int batch_size = this->layer_param_.video_data_param().batch_size();
 	if (crop_size > 0){
@@ -143,13 +146,19 @@ void VideoDataLayer<Dtype>::InternalThreadEntry(){
 									   offsets, new_height, new_width, new_length, &datum, name_pattern_.c_str())) {
 				continue;
 			}
-		} else{
+		} 
+		if (this->layer_param_.video_data_param().modality() == VideoDataParameter_Modality_RGB){
 			if(!ReadSegmentRGBToDatum(lines_[lines_id_].first, lines_[lines_id_].second,
 									  offsets, new_height, new_width, new_length, &datum, true, name_pattern_.c_str())) {
 				continue;
 			}
 		}
-
+		if (this->layer_param_.video_data_param().modality() == VideoDataParameter_Modality_VIDEO){
+			if(!ReadSegmentVideoToDatum(lines_[lines_id_].first, lines_[lines_id_].second,
+									  offsets, new_height, new_width, new_length, &datum)) {
+				continue;
+			}
+		}
 		int offset1 = this->prefetch_data_.offset(item_id);
     	        this->transformed_data_.set_cpu_data(top_data + offset1);
 		this->data_transformer_->Transform(datum, &(this->transformed_data_));
