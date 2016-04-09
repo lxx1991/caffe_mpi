@@ -362,7 +362,7 @@ bool ReadSegmentVideoToDatum(const string& filename, const int label,
     const vector<int> offsets, const int height, const int width, const int length, Datum* datum){
   cv::Mat cv_img, cv_img_origin;
   string* datum_string;
-  VideoCapture cap(filename);
+  cv::VideoCapture cap(filename);
   if(!cap.isOpened()) {
     LOG(ERROR) << "Could not initialize capturing of " << filename;
     return false;
@@ -381,8 +381,9 @@ bool ReadSegmentVideoToDatum(const string& filename, const int label,
       }else{
         cv_img = cv_img_origin;
       }
+      int num_channels = 3;
       if (file_id==1 && i==0){
-        int num_channels = 3;
+       
         datum->set_channels(num_channels*length*offsets.size());
         datum->set_height(cv_img.rows);
         datum->set_width(cv_img.cols);
