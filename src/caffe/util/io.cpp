@@ -373,7 +373,7 @@ bool ReadSegmentVideoToDatum(const string& filename, const int label,
     for (int file_id = 1; file_id < length+1; ++file_id){
       bool success = cap.read(cv_img_origin); 
       if (!success){
-        LOG(ERROR) << "Could not load frame of " << offset+file_id;
+        LOG(ERROR) << "Could not load frame of " << offset+file_id << "filenaem: " << filename;
         return false;
       }
       if (height > 0 && width > 0){
