@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "boost/scoped_ptr.hpp"
+#include "boost/unordered_map.hpp"
 #include "hdf5.h"
 
 #include "caffe/blob.hpp"
@@ -352,6 +353,7 @@ protected:
 	vector<int> lines_duration_;
 	int lines_id_;
 	string name_pattern_;
+	boost::unordered_map<string, void* > video_cap_pool_;
 };
 
 

@@ -3,6 +3,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <opencv2/highgui/highgui.hpp>
 
 #include "caffe/data_layers.hpp"
 #include "caffe/layer.hpp"
@@ -77,9 +78,14 @@ void VideoDataLayer<Dtype>:: DataLayerSetUp(const vector<Blob<Dtype>*>& bottom, 
 	if (this->layer_param_.video_data_param().modality() == VideoDataParameter_Modality_RGB)
 		CHECK(ReadSegmentRGBToDatum(lines_[lines_id_].first, lines_[lines_id_].second,
 									offsets, new_height, new_width, new_length, &datum, true, name_pattern_.c_str()));
-	if (this->layer_param_.video_data_param().modality() == VideoDataParameter_Modality_VIDEO)
-		CHECK(ReadSegmentVideoToDatum(lines_[lines_id_].first, lines_[lines_id_].second,
-									offsets, new_height, new_width, new_length, &datum));
+	if (this->layer_param_.video_data_param().modality() == VideoDataParameter_Modality_VIDEO) {
+		string filename = lines_[lines_id_].first;
+		cv::VideoCapture *cap = new cv::VideoCapture(filename);
+		CHECK(cap->isOpened())<<"OpenCV cannot open video file "<<filename<<" for capture";
+		video_cap_pool_.insert(std::make_pair(filename, cap));
+		CHECK(ReadSegmentVideoToDatum(cap, lines_[lines_id_].second,
+									  offsets, new_height, new_width, new_length, &datum));
+	}
 	const int crop_size = this->layer_param_.transform_param().crop_size();
 	const int batch_size = this->layer_param_.video_data_param().batch_size();
 	if (crop_size > 0){
@@ -154,7 +160,16 @@ void VideoDataLayer<Dtype>::InternalThreadEntry(){
 			}
 		}
 		if (this->layer_param_.video_data_param().modality() == VideoDataParameter_Modality_VIDEO){
-			if(!ReadSegmentVideoToDatum(lines_[lines_id_].first, lines_[lines_id_].second,
+			string filename = lines_[lines_id_].first;
+			void* cap;
+			if (video_cap_pool_.find(filename) == video_cap_pool_.end()){
+				cap = new cv::VideoCapture(filename);
+				CHECK(((cv::VideoCapture*)cap)->isOpened())<<"OpenCV cannot open video file "<<filename<<" for capture";
+				video_cap_pool_.insert(std::make_pair(filename, cap));
+			}else{
+				cap = video_cap_pool_[filename];
+			}
+			if(!ReadSegmentVideoToDatum(cap, lines_[lines_id_].second,
 									  offsets, new_height, new_width, new_length, &datum)) {
 				continue;
 			}

@@ -12,6 +12,7 @@
 #include <fstream>  // NOLINT(readability/streams)
 #include <string>
 #include <vector>
+#include <boost/unordered_map.hpp>
 
 #include "caffe/common.hpp"
 #include "caffe/proto/caffe.pb.h"
@@ -358,20 +359,17 @@ bool ReadSegmentRGBToDatum(const string& filename, const int label,
 	return true;
 }
 
-bool ReadSegmentVideoToDatum(const string& filename, const int label,
+bool ReadSegmentVideoToDatum(void * cap_ptr, const int label,
     const vector<int> offsets, const int height, const int width, const int length, Datum* datum){
   cv::Mat cv_img, cv_img_origin;
   string* datum_string;
-  cv::VideoCapture cap(filename);
-  if(!cap.isOpened()) {
-    LOG(ERROR) << "Could not initialize capturing of " << filename;
-    return false;
-  }
+  cv::VideoCapture& cap = *(cv::VideoCapture*)cap_ptr;
+
   for (int i = 0; i < offsets.size(); ++i){
     int offset = offsets[i];
     cap.set (CV_CAP_PROP_POS_FRAMES, offset+1);
     for (int file_id = 1; file_id < length+1; ++file_id){
-      bool success = cap.read(cv_img_origin); 
+      bool success = cap.read(cv_img_origin);
       if (!success){
         LOG(ERROR) << "Could not load frame of " << offset+file_id;
         return false;
