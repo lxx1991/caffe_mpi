@@ -63,9 +63,22 @@ void VideoDataLayer<Dtype>:: DataLayerSetUp(const vector<Blob<Dtype>*>& bottom, 
 	}
 
 	Datum datum;
+	int average_duration;
+	void* cap;
 	const unsigned int frame_prefectch_rng_seed = caffe_rng_rand();
 	frame_prefetch_rng_.reset(new Caffe::RNG(frame_prefectch_rng_seed));
-	int average_duration = (int) lines_duration_[lines_id_]/num_segments;
+	if (this->layer_param_.video_data_param().modality() != VideoDataParameter_Modality_VIDEO){
+		average_duration = (int) lines_duration_[lines_id_]/num_segments;
+	} else {
+		string filename = lines_[lines_id_].first;
+		cap = new cv::VideoCapture(filename);
+		CHECK(cap->isOpened())<<"OpenCV cannot open video file "<<filename<<" for capture";
+		video_cap_pool_.insert(std::make_pair(filename, cap));
+		int duration = cap->get(CV_CAP_PROP_FRAME_COUNT); 
+		average_duration = (int) duration/num_segments;
+	}
+
+	
 	vector<int> offsets;
 	for (int i = 0; i < num_segments; ++i){
 		caffe::rng_t* frame_rng = static_cast<caffe::rng_t*>(frame_prefetch_rng_->generator());
@@ -79,10 +92,6 @@ void VideoDataLayer<Dtype>:: DataLayerSetUp(const vector<Blob<Dtype>*>& bottom, 
 		CHECK(ReadSegmentRGBToDatum(lines_[lines_id_].first, lines_[lines_id_].second,
 									offsets, new_height, new_width, new_length, &datum, true, name_pattern_.c_str()));
 	if (this->layer_param_.video_data_param().modality() == VideoDataParameter_Modality_VIDEO) {
-		string filename = lines_[lines_id_].first;
-		cv::VideoCapture *cap = new cv::VideoCapture(filename);
-		CHECK(cap->isOpened())<<"OpenCV cannot open video file "<<filename<<" for capture";
-		video_cap_pool_.insert(std::make_pair(filename, cap));
 		CHECK(ReadSegmentVideoToDatum(cap, lines_[lines_id_].second,
 									  offsets, new_height, new_width, new_length, &datum));
 	}
@@ -129,8 +138,25 @@ void VideoDataLayer<Dtype>::InternalThreadEntry(){
 
 	for (int item_id = 0; item_id < batch_size; ++item_id){
 		CHECK_GT(lines_size, lines_id_);
-		vector<int> offsets;
-		int average_duration = (int) lines_duration_[lines_id_] / num_segments;
+		vector<int> offsets; 
+		int average_duration;
+		void* cap;
+	if (this->layer_param_.video_data_param().modality() != VideoDataParameter_Modality_VIDEO){
+		average_duration = (int) lines_duration_[lines_id_]/num_segments;
+	} else {
+		string filename = lines_[lines_id_].first;
+					
+			if (video_cap_pool_.find(filename) == video_cap_pool_.end()){
+				cap = new cv::VideoCapture(filename);
+				CHECK(((cv::VideoCapture*)cap)->isOpened())<<"OpenCV cannot open video file "<<filename<<" for capture";
+				video_cap_pool_.insert(std::make_pair(filename, cap));
+			}else{
+				cap = video_cap_pool_[filename];
+			}
+		nt duration = cap->get(CV_CAP_PROP_FRAME_COUNT); 
+		average_duration = (int) duration/num_segments;
+	}
+
 		for (int i = 0; i < num_segments; ++i){
 			if (this->phase_==TRAIN){
 				if (average_duration >= new_length){
@@ -161,14 +187,7 @@ void VideoDataLayer<Dtype>::InternalThreadEntry(){
 		}
 		if (this->layer_param_.video_data_param().modality() == VideoDataParameter_Modality_VIDEO){
 			string filename = lines_[lines_id_].first;
-			void* cap;
-			if (video_cap_pool_.find(filename) == video_cap_pool_.end()){
-				cap = new cv::VideoCapture(filename);
-				CHECK(((cv::VideoCapture*)cap)->isOpened())<<"OpenCV cannot open video file "<<filename<<" for capture";
-				video_cap_pool_.insert(std::make_pair(filename, cap));
-			}else{
-				cap = video_cap_pool_[filename];
-			}
+
 			if(!ReadSegmentVideoToDatum(cap, lines_[lines_id_].second,
 									  offsets, new_height, new_width, new_length, &datum)) {
 				continue;
