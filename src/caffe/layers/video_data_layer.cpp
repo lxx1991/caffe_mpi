@@ -10,6 +10,7 @@
 #include "caffe/util/io.hpp"
 #include "caffe/util/math_functions.hpp"
 #include "caffe/util/rng.hpp"
+#include <opencv2/highgui/highgui.hpp>
 
 #ifdef USE_MPI
 #include "mpi.h"
@@ -65,14 +66,14 @@ void VideoDataLayer<Dtype>:: DataLayerSetUp(const vector<Blob<Dtype>*>& bottom, 
 	const unsigned int frame_prefectch_rng_seed = caffe_rng_rand();
 	frame_prefetch_rng_.reset(new Caffe::RNG(frame_prefectch_rng_seed));
 
-	int average_duration;
+	int average_duration, duration;
 	if (this->layer_param_.video_data_param().modality() != VideoDataParameter_Modality_VIDEO)
 		average_duration = (int) lines_duration_[lines_id_]/num_segments;
 	else{
 		string filename = lines_[lines_id_].first;
-		cv::VideoCapture cap = VideoCapture(filename);
-		int duration = cap.get(CV_CAP_PROP_FRAME_COUNT);
-		average_duration = (int) lines_duration_[lines_id_]/num_segments;
+		cv::VideoCapture* cap = new cv::VideoCapture(filename);
+		duration = cap->get(CV_CAP_PROP_FRAME_COUNT);
+		average_duration = (int) duration/num_segments;
 	}
 	vector<int> offsets;
 	for (int i = 0; i < num_segments; ++i){
@@ -88,7 +89,7 @@ void VideoDataLayer<Dtype>:: DataLayerSetUp(const vector<Blob<Dtype>*>& bottom, 
 									offsets, new_height, new_width, new_length, &datum, true, name_pattern_.c_str()));
 	if (this->layer_param_.video_data_param().modality() == VideoDataParameter_Modality_VIDEO)
 		CHECK(ReadSegmentVideoToDatum(lines_[lines_id_].first, lines_[lines_id_].second,
-									offsets, new_height, new_width, new_length, &datum));
+									offsets, new_height, new_width, new_length, &datum, duration));
 	const int crop_size = this->layer_param_.transform_param().crop_size();
 	const int batch_size = this->layer_param_.video_data_param().batch_size();
 	if (crop_size > 0){
@@ -133,14 +134,14 @@ void VideoDataLayer<Dtype>::InternalThreadEntry(){
 	for (int item_id = 0; item_id < batch_size; ++item_id){
 		CHECK_GT(lines_size, lines_id_);
 		vector<int> offsets;
-			int average_duration;
+			int average_duration, duration;
 	if (this->layer_param_.video_data_param().modality() != VideoDataParameter_Modality_VIDEO)
 		average_duration = (int) lines_duration_[lines_id_]/num_segments;
 	else{
 		string filename = lines_[lines_id_].first;
-		cv::VideoCapture cap = VideoCapture(filename);
-		int duration = cap.get(CV_CAP_PROP_FRAME_COUNT);
-		average_duration = (int) lines_duration_[lines_id_]/num_segments;
+		cv::VideoCapture* cap = new cv::VideoCapture(filename);
+		duration = cap->get(CV_CAP_PROP_FRAME_COUNT);
+		average_duration = (int) duration/num_segments;
 	}
 		for (int i = 0; i < num_segments; ++i){
 			if (this->phase_==TRAIN){
@@ -172,7 +173,7 @@ void VideoDataLayer<Dtype>::InternalThreadEntry(){
 		}
 		if (this->layer_param_.video_data_param().modality() == VideoDataParameter_Modality_VIDEO){
 			if(!ReadSegmentVideoToDatum(lines_[lines_id_].first, lines_[lines_id_].second,
-									  offsets, new_height, new_width, new_length, &datum)) {
+									  offsets, new_height, new_width, new_length, &datum, duration)) {
 				continue;
 			}
 		}

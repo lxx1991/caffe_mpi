@@ -359,7 +359,7 @@ bool ReadSegmentRGBToDatum(const string& filename, const int label,
 }
 
 bool ReadSegmentVideoToDatum(const string& filename, const int label,
-    const vector<int> offsets, const int height, const int width, const int length, Datum* datum){
+    const vector<int> offsets, const int height, const int width, const int length, Datum* datum, const int duration){
   cv::Mat cv_img, cv_img_origin;
   string* datum_string;
   cv::VideoCapture cap(filename);
@@ -373,7 +373,8 @@ bool ReadSegmentVideoToDatum(const string& filename, const int label,
     for (int file_id = 1; file_id < length+1; ++file_id){
       bool success = cap.read(cv_img_origin); 
       if (!success){
-        LOG(ERROR) << "Could not load frame of " << offset+file_id << "filenaem: " << filename;
+        LOG(ERROR) << "Could not load frame of " << offset+file_id << " filename: " << filename << " duration: " << duration << " "
+         << cap.get(CV_CAP_PROP_FRAME_COUNT);
         return false;
       }
       if (height > 0 && width > 0){
