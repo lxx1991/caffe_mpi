@@ -64,7 +64,16 @@ void VideoDataLayer<Dtype>:: DataLayerSetUp(const vector<Blob<Dtype>*>& bottom, 
 	Datum datum;
 	const unsigned int frame_prefectch_rng_seed = caffe_rng_rand();
 	frame_prefetch_rng_.reset(new Caffe::RNG(frame_prefectch_rng_seed));
-	int average_duration = (int) lines_duration_[lines_id_]/num_segments;
+
+	int average_duration;
+	if (this->layer_param_.video_data_param().modality() != VideoDataParameter_Modality_VIDEO)
+		average_duration = (int) lines_duration_[lines_id_]/num_segments;
+	else{
+		string filename = lines_[lines_id_].first;
+		cv::VideoCapture cap = VideoCapture(filename);
+		int duration = cap.get(CV_CAP_PROP_FRAME_COUNT);
+		average_duration = (int) lines_duration_[lines_id_]/num_segments;
+	}
 	vector<int> offsets;
 	for (int i = 0; i < num_segments; ++i){
 		caffe::rng_t* frame_rng = static_cast<caffe::rng_t*>(frame_prefetch_rng_->generator());
@@ -124,7 +133,15 @@ void VideoDataLayer<Dtype>::InternalThreadEntry(){
 	for (int item_id = 0; item_id < batch_size; ++item_id){
 		CHECK_GT(lines_size, lines_id_);
 		vector<int> offsets;
-		int average_duration = (int) lines_duration_[lines_id_] / num_segments;
+			int average_duration;
+	if (this->layer_param_.video_data_param().modality() != VideoDataParameter_Modality_VIDEO)
+		average_duration = (int) lines_duration_[lines_id_]/num_segments;
+	else{
+		string filename = lines_[lines_id_].first;
+		cv::VideoCapture cap = VideoCapture(filename);
+		int duration = cap.get(CV_CAP_PROP_FRAME_COUNT);
+		average_duration = (int) lines_duration_[lines_id_]/num_segments;
+	}
 		for (int i = 0; i < num_segments; ++i){
 			if (this->phase_==TRAIN){
 				if (average_duration >= new_length){
