@@ -102,7 +102,7 @@ bool ReadSegmentRGBToDatum(const string& filename, const int label,
     const vector<int> offsets, const int height, const int width, const int length, Datum* datum, bool is_color,
                            const char* name_pattern);
 
-bool ReadSegmentVideoToDatum(void* video_capture, const int label,
+bool ReadSegmentVideoToDatum(string filename, const int label,
     const vector<int> offsets, const int height, const int width, const int length, Datum* datum);
 
 inline bool ReadImageToDatum(const string& filename, const int label,

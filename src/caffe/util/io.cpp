@@ -359,20 +359,21 @@ bool ReadSegmentRGBToDatum(const string& filename, const int label,
 	return true;
 }
 
-bool ReadSegmentVideoToDatum(void * cap_ptr, const int label,
+bool ReadSegmentVideoToDatum(string filename, const int label,
     const vector<int> offsets, const int height, const int width, const int length, Datum* datum){
   cv::Mat cv_img, cv_img_origin;
   string* datum_string;
-  cv::VideoCapture& cap = *(cv::VideoCapture*)cap_ptr;
+  cv::VideoCapture cap(filename);
+  CHECK(cap.isOpened())<<"OpenCV cannot open video file "<<filename<<" for capture";
 
   for (int i = 0; i < offsets.size(); ++i){
     int offset = offsets[i];
-    cap.set (CV_CAP_PROP_POS_FRAMES, offset+1);
+    cap.set (CV_CAP_PROP_POS_FRAMES, offset-1);
     for (int file_id = 1; file_id < length+1; ++file_id){
       bool success = cap.read(cv_img_origin);
       if (!success){
-        LOG(ERROR) << "Could not load frame of " << offset+file_id << " with frame count "
-         << cap.get(CV_CAP_PROP_FRAME_COUNT);
+        LOG(ERROR) << "Could not load frame " << offset+file_id -2<< " with frame count "
+         << cap.get(CV_CAP_PROP_FRAME_COUNT)<<" filename: "<<filename;
         return false;
       }
       if (height > 0 && width > 0){
