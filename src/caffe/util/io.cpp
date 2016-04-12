@@ -368,7 +368,7 @@ bool ReadSegmentVideoToDatum(string filename, const int label,
 
   for (int i = 0; i < offsets.size(); ++i){
     int offset = offsets[i];
-    cap.set (CV_CAP_PROP_POS_FRAMES, offset-1);
+    cap.set (CV_CAP_PROP_POS_FRAMES, offset);
     for (int file_id = 1; file_id < length+1; ++file_id){
       bool success = cap.read(cv_img_origin);
       if (!success){
