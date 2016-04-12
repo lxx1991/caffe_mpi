@@ -371,7 +371,8 @@ bool ReadSegmentVideoToDatum(void * cap_ptr, const int label,
     for (int file_id = 1; file_id < length+1; ++file_id){
       bool success = cap.read(cv_img_origin);
       if (!success){
-        LOG(ERROR) << "Could not load frame of " << offset+file_id;
+        LOG(ERROR) << "Could not load frame of " << offset+file_id << " filename: " << filename << " duration: " << duration << " "
+         << cap.get(CV_CAP_PROP_FRAME_COUNT);
         return false;
       }
       if (height > 0 && width > 0){

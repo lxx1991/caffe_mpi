@@ -3,7 +3,6 @@
 #include <string>
 #include <utility>
 #include <vector>
-#include <opencv2/highgui/highgui.hpp>
 
 #include "caffe/data_layers.hpp"
 #include "caffe/layer.hpp"
@@ -11,6 +10,7 @@
 #include "caffe/util/io.hpp"
 #include "caffe/util/math_functions.hpp"
 #include "caffe/util/rng.hpp"
+#include <opencv2/highgui/highgui.hpp>
 
 #ifdef USE_MPI
 #include "mpi.h"
@@ -74,11 +74,11 @@ void VideoDataLayer<Dtype>:: DataLayerSetUp(const vector<Blob<Dtype>*>& bottom, 
 		cap = new cv::VideoCapture(filename);
 		CHECK(cap->isOpened())<<"OpenCV cannot open video file "<<filename<<" for capture";
 		video_cap_pool_.insert(std::make_pair(filename, cap));
-		int duration = cap->get(CV_CAP_PROP_FRAME_COUNT); 
+		int duration = cap->get(CV_CAP_PROP_FRAME_COUNT);
 		average_duration = (int) duration/num_segments;
 	}
 
-	
+
 	vector<int> offsets;
 	for (int i = 0; i < num_segments; ++i){
 		caffe::rng_t* frame_rng = static_cast<caffe::rng_t*>(frame_prefetch_rng_->generator());
@@ -138,14 +138,14 @@ void VideoDataLayer<Dtype>::InternalThreadEntry(){
 
 	for (int item_id = 0; item_id < batch_size; ++item_id){
 		CHECK_GT(lines_size, lines_id_);
-		vector<int> offsets; 
+		vector<int> offsets;
 		int average_duration;
 		cv::VideoCapture* cap;
 	if (this->layer_param_.video_data_param().modality() != VideoDataParameter_Modality_VIDEO){
 		average_duration = (int) lines_duration_[lines_id_]/num_segments;
 	} else {
 		string filename = lines_[lines_id_].first;
-					
+
 			if (video_cap_pool_.find(filename) == video_cap_pool_.end()){
 				cap = new cv::VideoCapture(filename);
 				CHECK(((cv::VideoCapture*)cap)->isOpened())<<"OpenCV cannot open video file "<<filename<<" for capture";
@@ -153,7 +153,7 @@ void VideoDataLayer<Dtype>::InternalThreadEntry(){
 			}else{
 				cap = video_cap_pool_[filename];
 			}
-		int duration = cap->get(CV_CAP_PROP_FRAME_COUNT); 
+		int duration = cap->get(CV_CAP_PROP_FRAME_COUNT);
 		average_duration = (int) duration/num_segments;
 	}
 
