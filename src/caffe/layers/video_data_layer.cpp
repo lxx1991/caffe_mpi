@@ -140,7 +140,7 @@ void VideoDataLayer<Dtype>::InternalThreadEntry(){
 		CHECK_GT(lines_size, lines_id_);
 		vector<int> offsets;
 		int average_duration;
-		cv::VideoCapture* cap;
+		void* cap;
 	if (this->layer_param_.video_data_param().modality() != VideoDataParameter_Modality_VIDEO){
 		average_duration = (int) lines_duration_[lines_id_]/num_segments;
 	} else {
@@ -153,7 +153,7 @@ void VideoDataLayer<Dtype>::InternalThreadEntry(){
 			}else{
 				cap = video_cap_pool_[filename];
 			}
-		int duration = cap->get(CV_CAP_PROP_FRAME_COUNT);
+		int duration = ((cv::VideoCapture*)cap)->get(CV_CAP_PROP_FRAME_COUNT);
 		average_duration = (int) duration/num_segments;
 	}
 
