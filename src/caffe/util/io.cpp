@@ -368,13 +368,30 @@ bool ReadSegmentVideoToDatum(string filename, const int label,
 
   for (int i = 0; i < offsets.size(); ++i){
     int offset = offsets[i];
-    cap.set (CV_CAP_PROP_POS_FRAMES, offset);
+    if (offset > 0) cap.set (CV_CAP_PROP_POS_FRAMES, offset);
     for (int file_id = 1; file_id < length+1; ++file_id){
       bool success = cap.read(cv_img_origin);
       if (!success){
-        LOG(ERROR) << "Could not load frame " << offset+file_id -2<< " with frame count "
-         << cap.get(CV_CAP_PROP_FRAME_COUNT)<<" filename: "<<filename;
-        return false;
+        // here we do a exponential backoff, ultimately we have to start from the first frame
+        int backoff = 2;
+        int read_pos = 0;
+        int dst_pos = offset + file_id - 1;
+        do {
+            read_pos = std::max(0, dst_pos - backoff);
+            cap.set (CV_CAP_PROP_POS_FRAMES, read_pos);
+            success = cap.read(cv_img_origin);
+            backoff *= 2;
+        }while((!success)&&(read_pos > 0));
+        if (success){
+            for (int x = read_pos; x < dst_pos; x++){
+                success = cap.read(cv_img_origin);
+            }
+        }
+        if (!success) {
+            LOG(ERROR) << "Could not load frame " << offset + file_id - 2 << " with frame count "
+            << cap.get(CV_CAP_PROP_FRAME_COUNT) << " filename: " << filename;
+            return false;
+        }
       }
       if (height > 0 && width > 0){
         cv::resize(cv_img_origin, cv_img, cv::Size(width, height));
