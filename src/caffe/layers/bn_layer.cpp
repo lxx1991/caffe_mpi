@@ -41,6 +41,7 @@ void BNLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
         this->blobs_[3]->mutable_cpu_data());
   }
   this->param_propagate_down_.resize(this->blobs_.size(), true);
+  std_loaded_ = false;
 }
 
 template <typename Dtype>
@@ -59,6 +60,7 @@ void BNLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
 
   x_norm_.ReshapeLike(*(bottom[0]));
   x_inv_std_.ReshapeLike(batch_statistic_);
+  moving_average_buffer_.ReshapeLike(batch_statistic_);
 
   spatial_sum_multiplier_.Reshape(1, 1, height_, width_);
   caffe_set(spatial_sum_multiplier_.count(), Dtype(1),
@@ -93,7 +95,7 @@ void BNLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
         Dtype(1) / num_, spatial_statistic_.cpu_data(),
         batch_sum_multiplier_.cpu_data(), Dtype(0),
         batch_statistic_.mutable_cpu_data());
-    // Add to the moving average
+    // Add mean to the moving average
     if (!frozen_) {
       caffe_cpu_axpby(batch_statistic_.count(),
           Dtype(1) - bn_momentum_, batch_statistic_.cpu_data(),
@@ -127,18 +129,32 @@ void BNLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
     caffe_cpu_gemv<Dtype>(CblasTrans, num_, channels_, Dtype(1) / num_,
         spatial_statistic_.cpu_data(), batch_sum_multiplier_.cpu_data(),
         Dtype(0), batch_statistic_.mutable_cpu_data());
+
+    // Add var to the moving average
+    if (!std_loaded_) {
+      // load inverse std into std
+      caffe_powx(batch_statistic_.count(), this->blobs_[3]->cpu_data(), Dtype(-2.0),
+                 moving_average_buffer_.mutable_cpu_data());
+      caffe_add_scalar(batch_statistic_.count(), -bn_eps_,
+                       this->blobs_[3]->mutable_cpu_data());
+      std_loaded_ = true;
+    }
+
+    caffe_cpu_axpby(batch_statistic_.count(),
+        Dtype(1) - bn_momentum_, batch_statistic_.cpu_data(),
+        bn_momentum_, moving_average_buffer_.mutable_cpu_data());
+    caffe_copy(batch_statistic_.count(), moving_average_buffer_.cpu_data(), this->blobs_[3]->mutable_cpu_data());
+    caffe_add_scalar(batch_statistic_.count(), bn_eps_,
+                     this->blobs_[3]->mutable_cpu_data());
+    caffe_powx(batch_statistic_.count(), this->blobs_[3]->cpu_data(),
+               Dtype(-0.5), this->blobs_[3]->mutable_cpu_data());
+
     // Add eps
     caffe_add_scalar(batch_statistic_.count(), bn_eps_,
-        batch_statistic_.mutable_cpu_data());
+                     batch_statistic_.mutable_cpu_data());
     // Inverse standard deviation
     caffe_powx(batch_statistic_.count(), batch_statistic_.cpu_data(),
-        Dtype(-0.5), batch_statistic_.mutable_cpu_data());
-    // Add to the moving average
-    if (!frozen_) {
-      caffe_cpu_axpby(batch_statistic_.count(),
-          Dtype(1) - bn_momentum_, batch_statistic_.cpu_data(),
-          bn_momentum_, this->blobs_[3]->mutable_cpu_data());
-    }
+               Dtype(-0.5), batch_statistic_.mutable_cpu_data());
   }
   // Broadcast the inverse std
   caffe_cpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, num_, channels_, 1,

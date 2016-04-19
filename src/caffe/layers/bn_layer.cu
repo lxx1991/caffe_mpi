@@ -67,18 +67,32 @@ void BNLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
     caffe_gpu_gemv<Dtype>(CblasTrans, num_, channels_, Dtype(1) / num_,
         spatial_statistic_.gpu_data(), batch_sum_multiplier_.gpu_data(),
         Dtype(0), batch_statistic_.mutable_gpu_data());
+
+    // Add var to the moving average
+    if (!std_loaded_) {
+        // load inverse std into std
+        caffe_gpu_powx(batch_statistic_.count(), this->blobs_[3]->gpu_data(), Dtype(-2.0),
+                moving_average_buffer_.mutable_gpu_data());
+        caffe_gpu_add_scalar(batch_statistic_.count(), -bn_eps_,
+                        this->blobs_[3]->mutable_gpu_data());
+        std_loaded_ = true;
+    }
+
+    caffe_gpu_axpby(batch_statistic_.count(),
+            Dtype(1) - bn_momentum_, batch_statistic_.gpu_data(),
+            bn_momentum_, moving_average_buffer_.mutable_gpu_data());
+    caffe_copy(batch_statistic_.count(), moving_average_buffer_.gpu_data(), this->blobs_[3]->mutable_gpu_data());
+    caffe_gpu_add_scalar(batch_statistic_.count(), bn_eps_,
+                     this->blobs_[3]->mutable_gpu_data());
+    caffe_gpu_powx(batch_statistic_.count(), this->blobs_[3]->gpu_data(),
+                Dtype(-0.5), this->blobs_[3]->mutable_gpu_data());
+
     // Add eps
     caffe_gpu_add_scalar(batch_statistic_.count(), bn_eps_,
-        batch_statistic_.mutable_gpu_data());
+            batch_statistic_.mutable_gpu_data());
     // Inverse standard deviation
     caffe_gpu_powx(batch_statistic_.count(), batch_statistic_.gpu_data(),
-        Dtype(-0.5), batch_statistic_.mutable_gpu_data());
-    // Add to the moving average
-    if (!frozen_) {
-      caffe_gpu_axpby(batch_statistic_.count(),
-          Dtype(1) - bn_momentum_, batch_statistic_.gpu_data(),
-          bn_momentum_, this->blobs_[3]->mutable_gpu_data());
-    }
+            Dtype(-0.5), batch_statistic_.mutable_gpu_data());
   }
   // Broadcast the inverse std
   caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, num_, channels_, 1,

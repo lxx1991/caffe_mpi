@@ -728,6 +728,8 @@ class BNLayer : public Layer<Dtype> {
 
   Blob<Dtype> x_norm_;
   Blob<Dtype> x_inv_std_;
+  Blob<Dtype> moving_average_buffer_;
+  bool std_loaded_;
 
   Blob<Dtype> spatial_sum_multiplier_;
   Blob<Dtype> batch_sum_multiplier_;
