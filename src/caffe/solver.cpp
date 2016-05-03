@@ -12,6 +12,7 @@
 #include "caffe/util/upgrade_proto.hpp"
 #include "caffe/util/mpi_functions.hpp"
 #include "caffe/util/channel.hpp"
+#include "caffe/util/nccl.hpp"
 
 namespace caffe {
 
@@ -281,6 +282,12 @@ void Solver<Dtype>::SyncGradient(){
   double t1, t2;
   t1 = MPI_Wtime();
 
+#ifdef USE_NCCL
+  static NCCLCommunicator ncclComm(Caffe::device_id());
+#endif
+
+  cudaDeviceSynchronize();
+
   mpi_force_synchronize();
   for (int param_id = 0; param_id < net_params.size(); ++param_id) {
     int param_owner = param_owners[param_id];
@@ -296,6 +303,12 @@ void Solver<Dtype>::SyncGradient(){
 
     // conduct gradient synchronization here
     if (is_self && need_sync){
+
+#ifdef USE_NCCL
+      ncclComm.AllReduceSum(net_params[param_id]->mutable_gpu_diff(),
+                            net_params[param_id]->mutable_gpu_diff(),
+                            net_params[param_id]->count(), sizeof(Dtype));
+#endif
 
 #ifndef CPU_ONLY
       caffe_gpu_scal(net_params[param_id]->count(),

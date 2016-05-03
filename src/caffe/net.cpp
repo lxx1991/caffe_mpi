@@ -653,11 +653,14 @@ void Net<Dtype>::BackwardFromTo(int start, int end) {
             }
           }
           //sync gradient
-          if (ready_for_sync && layers_[i]->need_sync())
+          if (ready_for_sync && layers_[i]->need_sync()) {
+#ifndef USE_NCCL
             caffe_iallreduce(
-                this->params_[n]->mutable_gpu_diff(),
-                this->params_[n]->count()
+                    this->params_[n]->mutable_gpu_diff(),
+                    this->params_[n]->count()
             );
+#endif
+          }
         }
       }
 #endif //USE_MPI

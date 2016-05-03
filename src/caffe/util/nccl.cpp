@@ -9,9 +9,13 @@ namespace caffe {
         int rank = Caffe::MPI_my_rank();
         int world_size = Caffe::MPI_all_rank();
 
+        DLOG(INFO)<<"my rank "<<rank<<" world "<<world_size;
+
         CUDA_CHECK(cudaSetDevice(gpu_id));
-        NCCLCHECK(ncclGetUniqueId(&comm_id_));
         MPI_Barrier(MPI_COMM_WORLD);
+
+        // get nccl comm id
+        NCCLCHECK(ncclGetUniqueId(&comm_id_));
 
         // init NCCL comm
         MPI_Bcast(&comm_id_, NCCL_UNIQUE_ID_BYTES, MPI_CHAR, 0, MPI_COMM_WORLD);
@@ -33,14 +37,15 @@ namespace caffe {
             cudaStreamSynchronize(stream_);
         }
         else {
-            //NCCL does not support inplace all reduce
+            // NCCL does not support inplace all reduce
+            // here is the workaround
             if (count > buffer_->count()){
                 buffer_.reset(new Blob<float>(count, 1,1,1));
+
             }
             void* buffer_data = buffer_->mutable_gpu_data();
             NCCLCHECK(ncclAllReduce(src_ptr, buffer_data, count, ncclFloat, ncclSum,
                           nccl_comm_, stream_));
-            CUDA_CHECK(cudaStreamSynchronize(stream_));
             cudaMemcpyAsync(dst_ptr, buffer_data, count*sizeof(float),
                             cudaMemcpyDeviceToDevice, stream_);
             CUDA_CHECK(cudaStreamSynchronize(stream_));
