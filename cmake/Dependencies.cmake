@@ -164,3 +164,13 @@ if (USE_MPI)
   add_definitions(-DUSE_MPI)
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${MPI_CXX_LINK_FLAGS}")
 endif()
+
+if (USE_NCCL)
+  find_package(NCCL)
+  if (NCCL_FOUND)
+    include_directories(SYSTEM ${NCCL_INCLUDE_DIR})
+    list(APPEND Caffe_LINKER_LIBS ${NCCL_LIBRARIES})
+    add_definitions(-DUSE_NCCL)
+  endif()
+endif()
+

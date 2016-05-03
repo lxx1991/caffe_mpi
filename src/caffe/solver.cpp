@@ -338,7 +338,7 @@ template <typename Dtype>
 void Solver<Dtype>::SyncOutput(shared_ptr<Net<Dtype> > net){
   const vector<Blob<Dtype>*>& result = net->output_blobs();
   for (int j = 0; j < result.size(); ++j) {
-    caffe_iallreduce<Dtype>(result[j]->mutable_cpu_data(),
+    caffe_iallreduce<Dtype>(result[j]->mutable_gpu_data(),
                             result[j]->count());
   }
   mpi_force_synchronize();

@@ -10,6 +10,7 @@
 
 
 #include "caffe/util/channel.hpp"
+#include "caffe/util/nccl.hpp"
 
 #include "caffe/common.hpp"
 
@@ -20,7 +21,11 @@ namespace caffe {
 shared_ptr<MPIComm> MPIComm::singleton_;
 
 MPIComm::MPIComm() :
-    running_(false), started_(false){}
+    running_(false), started_(false){
+#ifdef USE_NCCL
+
+#endif
+}
 
 MPIComm::~MPIComm() {
   if (IsRunning()){
@@ -87,14 +92,23 @@ void MPIComm::AddJob(MPIJob new_job) {
 void MPIComm::DispatchJob(MPIJob &job) {
   MPI_Datatype data_type = (job.dtype_size_ == 4) ? MPI_FLOAT : MPI_DOUBLE;
 
+#ifdef USE_NCCL
+  static NCCLCommunicator ncclComm(Caffe::device_id());
+#endif
+
   // call MPI APIs for real works
   switch (job.op_) {
     case OP_SUM_ALL: {
       DLOG(INFO)<<"Running all reduce\n";
+#ifndef USE_NCCL
       MPI_CHECK(MPI_Allreduce((job.src_ptr_ == job.dst_ptr_) ? MPI_IN_PLACE : job.src_ptr_,
                               job.dst_ptr_, job.count_, data_type,
                               MPI_SUM, MPI_COMM_WORLD
       ));
+#else
+      ncclComm.AllReduceSum(job.src_ptr_, job.dst_ptr_,
+                            job.count_, job.dtype_size_);
+#endif
       break;
     }
     case OP_GATHER: {
