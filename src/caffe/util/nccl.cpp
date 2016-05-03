@@ -32,8 +32,9 @@ namespace caffe {
                                      int count, int dtype_size) {
 
         if (src_ptr != dst_ptr) {
-            NCCLCHECK(ncclAllReduce(src_ptr, dst_ptr, count, ncclFloat, ncclSum,
-                          nccl_comm_, stream_));
+            NCCLCHECK(ncclAllReduce(src_ptr, dst_ptr, count,
+                                    (dtype_size==4)?ncclFloat:ncclDouble, ncclSum,
+                                    nccl_comm_, stream_));
             cudaStreamSynchronize(stream_);
         }
         else {
@@ -44,8 +45,9 @@ namespace caffe {
 
             }
             void* buffer_data = buffer_->mutable_gpu_data();
-            NCCLCHECK(ncclAllReduce(src_ptr, buffer_data, count, ncclFloat, ncclSum,
-                          nccl_comm_, stream_));
+            NCCLCHECK(ncclAllReduce(src_ptr, buffer_data, count,
+                                    (dtype_size==4)?ncclFloat:ncclDouble, ncclSum,
+                                    nccl_comm_, stream_));
             cudaMemcpyAsync(dst_ptr, buffer_data, count*sizeof(float),
                             cudaMemcpyDeviceToDevice, stream_);
             CUDA_CHECK(cudaStreamSynchronize(stream_));
