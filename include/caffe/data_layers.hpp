@@ -10,6 +10,7 @@
 
 #include "caffe/blob.hpp"
 #include "caffe/common.hpp"
+#include "caffe/util/mining_hard.hpp"
 #include "caffe/data_transformer.hpp"
 #include "caffe/filler.hpp"
 #include "caffe/internal_thread.hpp"
@@ -137,15 +138,18 @@ protected:
 			}
 		}else if (cur_input_mode_ == SHUFFLE){
 			//NO OP
+		}else if (cur_input_mode_ == MINING) {
+             //NO OP
 		}
 	}
 #endif
 
 	shared_ptr<db::DB> db_;
 	shared_ptr<db::Cursor> cursor_;
+	shared_ptr<MiningHard> md_;
 
 	enum InputMode{
-			SEQUENCE, SHUFFLE
+			SEQUENCE, SHUFFLE, MINING
 	};
 	InputMode cur_input_mode_;
 	vector<string> shuffle_key_pool_;

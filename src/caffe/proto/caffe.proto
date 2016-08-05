@@ -199,10 +199,15 @@ message SolverParameter {
     SGD = 0;
     NESTEROV = 1;
     ADAGRAD = 2;
+    RMSPROP = 3;
   }
   optional SolverType solver_type = 30 [default = SGD];
   // numerical stability for AdaGrad
   optional float delta = 31 [default = 1e-8];
+
+  // RMSProp decay value
+  // MeanSquare(t) = rms_decay*MeanSquare(t-1) + (1-rms_decay)*SquareGradient(t)
+  optional float rms_decay = 38;
 
   // If true, print information about the state of the net that may help with
   // debugging learning problems.
@@ -332,6 +337,7 @@ message LayerParameter {
   optional AccuracyParameter accuracy_param = 102;
   optional ArgMaxParameter argmax_param = 103;
   optional BNParameter bn_param = 137;
+  optional BatchNormParameter batch_norm_param = 139;
   optional ConcatParameter concat_param = 104;
   optional ContrastiveLossParameter contrastive_loss_param = 105;
   optional ConvolutionParameter convolution_param = 106;
@@ -452,6 +458,18 @@ message ArgMaxParameter {
   optional uint32 top_k = 2 [default = 1];
 }
 
+message BatchNormParameter {
+  // If false, accumulate global mean/variance values via a moving average. If
+  // true, use those accumulated values instead of computing mean/variance
+  // across the batch.
+  optional bool use_global_stats = 1;
+  // How much does the moving average decay each iteration?
+  optional float moving_average_fraction = 2 [default = .999];
+  // Small value to add to the variance estimate so that we don't divide by
+  // zero.
+  optional float eps = 3 [default = 1e-5];
+}
+
 message BNParameter {
   optional FillerParameter slope_filler = 1;
   optional FillerParameter bias_filler = 2;
@@ -547,6 +565,21 @@ message DataParameter {
   optional bool force_encoded_color = 9 [default = false];
   // Enable within-shared shuffling
   optional bool shuffle = 10 [default = false];
+  // Hard example mining
+  optional MiningHardParameter mining_hard_param = 14;
+}
+
+message MiningHardParameter {
+  enum Strategy {
+    NAIVE = 0;
+    BALANCE = 1;
+  }
+  // File whith formate [key label notation] per line
+  optional string source = 1;
+  optional uint32 cls_num = 2;
+  optional uint32 batch_size = 3 [default = 256];
+  optional uint32 prefetch = 4 [default = 10000];
+  optional Strategy strategy = 5 [default = BALANCE];
 }
 
 message DropoutParameter {

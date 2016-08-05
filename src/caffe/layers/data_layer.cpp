@@ -26,6 +26,10 @@ void DataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top) {
   // Set initial input mode to sequence
   cur_input_mode_ = SEQUENCE;
+  if (this->layer_param_.data_param().has_mining_hard_param()) {
+    cur_input_mode_ = MINING;
+    md_.reset(new MiningHard(this->layer_param_.data_param().mining_hard_param()));
+  }
 
   // Initialize DB
   db_.reset(db::GetDB(this->layer_param_.data_param().backend()));
@@ -103,6 +107,8 @@ void DataLayer<Dtype>::InternalThreadEntry() {
       shuffle_key_pool_.push_back(cursor_->key());
     }else if (cur_input_mode_ == SHUFFLE){
       datum.ParseFromString(cursor_->Lookup(*shuffle_cursor_));
+    }else if(cur_input_mode_ == MINING) {
+      datum.ParseFromString(cursor_->Lookup(md_->peek()));
     }
     read_time += timer.MicroSeconds();
     timer.Start();
@@ -137,6 +143,8 @@ void DataLayer<Dtype>::InternalThreadEntry() {
         shuffle(shuffle_key_pool_.begin(), shuffle_key_pool_.end());
         shuffle_cursor_ = shuffle_key_pool_.begin();
       }
+    } else if (cur_input_mode_ == MINING) {
+      md_->next();
     }
   }
   timer.Stop();
