@@ -67,15 +67,16 @@ template <typename Dtype>
 __global__ void SoftmaxLossBackwardGPU(const int nthreads, const Dtype* top,
           const Dtype* label, Dtype* bottom_diff, const int num, const int dim,
           const int spatial_dim, const bool has_ignore_label_,
-          const int ignore_label_, Dtype* counts) {
+          const int ignore_label_, Dtype* counts, const Dtype threshold) {
   const int channels = dim / spatial_dim;
 
   CUDA_KERNEL_LOOP(index, nthreads) {
     const int n = index / spatial_dim;
     const int s = index % spatial_dim;
     const int label_value = static_cast<int>(label[n * spatial_dim + s]);
+    const Dtype prob = bottom_diff[n * dim + label_value * spatial_dim + s];
 
-    if (has_ignore_label_ && label_value == ignore_label_) {
+    if (prob > threshold || (has_ignore_label_ && label_value == ignore_label_)) {
       for (int c = 0; c < channels; ++c) {
         bottom_diff[n * dim + c * spatial_dim + s] = 0;
       }
@@ -105,10 +106,25 @@ void SoftmaxWithLossLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
     // Since this memory is never used for anything else,
     // we use to to avoid allocating new GPU memory.
     Dtype* counts = prob_.mutable_gpu_diff();
+    // Online mining hard example
+    const Dtype* prob_cpu_data = prob_.cpu_data();
+    const Dtype* label_cpu_data = bottom[1]->cpu_data();
+    std::vector<Dtype> probs;
+    Dtype threshold = 2.;
+    if (thresh_ratio_ < 1) {
+      for (int i = 0; i < outer_num_; ++i) {
+        for (int j = 0; j < inner_num_; ++j) {
+          const int label_value = static_cast<int>(label_cpu_data[i * inner_num_ + j]);
+          probs.push_back(prob_cpu_data[i * dim + label_value * inner_num_ + j]);
+        }
+      }
+      std::sort(probs.begin(), probs.end());
+      threshold = probs[static_cast<int>(probs.size() * thresh_ratio_)];
+    }
     // NOLINT_NEXT_LINE(whitespace/operators)
     SoftmaxLossBackwardGPU<Dtype><<<CAFFE_GET_BLOCKS(nthreads),
         CAFFE_CUDA_NUM_THREADS>>>(nthreads, top_data, label, bottom_diff,
-        outer_num_, dim, inner_num_, has_ignore_label_, ignore_label_, counts);
+        outer_num_, dim, inner_num_, has_ignore_label_, ignore_label_, counts, threshold);
     const Dtype loss_weight = top[0]->cpu_diff()[0];
     if (normalize_) {
       Dtype count;

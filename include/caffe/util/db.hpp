@@ -47,6 +47,7 @@ class DB {
 };
 
 DB* GetDB(DataParameter::DB backend);
+DB* GetDB(SibDataParameter::DB backend);
 DB* GetDB(const string& backend);
 
 }  // namespace db

@@ -409,4 +409,33 @@ bool ReadSegmentFlowToDatum(const string& filename, const int label,
 	return true;
 }
 
+cv::Mat DatumToCVMat(const Datum& datum) {
+  CHECK(!datum.encoded()) << "Datum encoded";
+  const bool has_uint8 = datum.data().size() > 0;
+  const int channels = datum.channels();
+  const int height = datum.height();
+  const int width = datum.width();
+  cv::Mat cv_img;
+
+  if (has_uint8)
+    cv_img.create(height, width, CV_8UC(channels));
+  else
+    cv_img.create(height, width, CV_32FC(channels));
+
+  for (int h = 0; h < height; ++h) {
+    int img_index = 0;
+    for (int w = 0; w < width; ++w) {
+      for (int c = 0; c < channels; ++c) {
+        int datum_index = (c * height + h) * width + w;
+        if (has_uint8)
+          cv_img.ptr<uchar>(h)[img_index++] = static_cast<uchar>(datum.data()[datum_index]);
+        else
+          cv_img.ptr<float>(h)[img_index++] = datum.float_data(datum_index);
+      }
+    }
+  }
+  return cv_img;
+}
+
+
 }  // namespace caffe

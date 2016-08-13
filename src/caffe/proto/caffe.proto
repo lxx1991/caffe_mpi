@@ -342,6 +342,7 @@ message LayerParameter {
   optional ContrastiveLossParameter contrastive_loss_param = 105;
   optional ConvolutionParameter convolution_param = 106;
   optional DataParameter data_param = 107;
+  optional SibDataParameter sib_data_param = 167;
   optional DropoutParameter dropout_param = 108;
   optional DummyDataParameter dummy_data_param = 109;
   optional EltwiseParameter eltwise_param = 110;
@@ -421,10 +422,21 @@ message TransformationParameter {
   //if set to true, will use original image processing mode
   // i.e. will use Inception style data augmentation
   optional bool original_image = 20 [ default = false];
+
+  // resize image to min(height, width) == short_edge_size,
+  // and crop (short_edge, short_edge_size)
+  repeated uint32 short_edge = 31;
+  // random crop image when phase is test
+  optional bool rand_crop_test = 33 [default = false];
+  // Standard color augmentation in AlexNet
+  optional int32 eigs_channels = 34 [default = 3];
+  repeated float eigs = 35;
 }
 
 // Message that stores parameters shared by loss layers
 message LossParameter {
+  // Mining Hard Example, probability threshhold of softmax loss
+  optional float thresh_ratio = 5 [default = 1];
   // If specified, ignore instances with the given label.
   optional int32 ignore_label = 1;
   // If true, normalize each batch across all instances (including spatial
@@ -561,6 +573,35 @@ message DataParameter {
   // DEPRECATED. See TransformationParameter. Specify if we want to randomly mirror
   // data.
   optional bool mirror = 6 [default = false];
+  // Force the encoded image to have 3 color channels
+  optional bool force_encoded_color = 9 [default = false];
+  // Enable within-shared shuffling
+  optional bool shuffle = 10 [default = false];
+  // Hard example mining
+  optional MiningHardParameter mining_hard_param = 14;
+}
+
+message SibDataParameter {
+  enum DB {
+    LEVELDB = 0;
+    LMDB = 1;
+  }
+  // Specify the data source.
+  optional string source = 1;
+  // Specify the batch size.
+  optional uint32 batch_size = 4;
+  // The rand_skip variable is for the data layer to skip a few data points
+  // to avoid all asynchronous sgd clients to start at the same point. The skip
+  // point would be set as rand_skip * rand(0,1). Note that rand_skip should not
+  // be larger than the number of keys in the database.
+  optional uint32 rand_skip = 7 [default = 0];
+  optional DB backend = 8 [default = LEVELDB];
+  // resize image to min(height, width) == short_edge_size,
+  // and crop (short_edge, short_edge_size)
+  repeated uint32 short_edge = 11;
+  optional bool mirror = 6 [default = false];
+  optional bool has_label = 15 [default = true];
+  optional uint32 sib_num = 12 [default = 2];
   // Force the encoded image to have 3 color channels
   optional bool force_encoded_color = 9 [default = false];
   // Enable within-shared shuffling
