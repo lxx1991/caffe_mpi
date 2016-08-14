@@ -67,7 +67,7 @@ void SibDataLayer<Dtype>::LayerSetUp(
   Datum datum;
   datum.ParseFromString(cursor_->value());
   // Use data_transformer to infer the expected blob shape from datum.
-  vector<int> top_shape = data_transformer_->InferBlobShape(datum);
+  vector<int> top_shape = data_transformer_->InferBlobShape(datum, true);
   transformed_data_.Reshape(top_shape);
   // Reshape top[0] and prefetch_data according to the batch_size.
   top_shape[0] = sib_data_param_.batch_size();
@@ -138,7 +138,7 @@ void SibDataLayer<Dtype>::InternalThreadEntry() {
   Datum datum;
   datum.ParseFromString(cursor_->value());
   // Use data_transformer to infer the expected blob shape from datum.
-  vector<int> top_shape = this->data_transformer_->InferBlobShape(datum);
+  vector<int> top_shape = this->data_transformer_->InferBlobShape(datum, true);
   this->transformed_data_.Reshape(top_shape);
   // Reshape prefetch_data according to the batch_size.
   top_shape[0] = batch_size;
