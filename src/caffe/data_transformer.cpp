@@ -139,6 +139,7 @@ void sampleRandomCropSize(int img_height, int img_width,
   }
 
   // fallback to normal 256-224 style size crop
+  LOG(INFO) << "Fallback to normal 256-224 style size crop.";
   crop_height = img_height / 8 * 7;
   crop_width = img_width / 8 * 7;
 }
@@ -524,9 +525,7 @@ void DataTransformer<Dtype>::Transform(const cv::Mat& cv_img,
     CHECK_EQ(crop_size, width);
     if (phase_ == TRAIN) {
       // in training, we randomly crop different sized crops
-      sampleRandomCropSize(img_height, img_width, crop_height, crop_width);
-
-
+      sampleRandomCropSize(img_height, img_width, crop_height, crop_width, param_.original_min_scale());
 
       h_off = (crop_height < img_height)?Rand(img_height - crop_height):0;
       w_off = (crop_width < img_width)?Rand(img_width - crop_width):0;

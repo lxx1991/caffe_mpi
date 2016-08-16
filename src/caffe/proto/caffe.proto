@@ -422,6 +422,7 @@ message TransformationParameter {
   //if set to true, will use original image processing mode
   // i.e. will use Inception style data augmentation
   optional bool original_image = 20 [ default = false];
+  optional float original_min_scale = 36 [default = 0.08];
 
   // resize image to min(height, width) == short_edge_size,
   // and crop (short_edge, short_edge_size)
