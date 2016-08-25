@@ -6,6 +6,9 @@
 #include "caffe/util/math_functions.hpp"
 #include "caffe/vision_layers.hpp"
 
+#include <thrust/device_vector.h>
+#include <thrust/sort.h>
+
 namespace caffe {
 
 template <typename Dtype>
@@ -67,16 +70,16 @@ template <typename Dtype>
 __global__ void LSRLossBackwardGPU(const int nthreads, const Dtype* top,
           const Dtype* label, Dtype* bottom_diff, const int num, const int dim,
           const int spatial_dim, const bool has_ignore_label_,
-          const int ignore_label_, Dtype* counts, const Dtype threshold) {
+          const int ignore_label_, Dtype* counts, const Dtype threshold, Dtype* loss_vec) {
   const int channels = dim / spatial_dim;
 
   CUDA_KERNEL_LOOP(index, nthreads) {
     const int n = index / spatial_dim;
     const int s = index % spatial_dim;
     const int label_value = static_cast<int>(label[n * spatial_dim + s]);
-    const Dtype prob = bottom_diff[n * dim + label_value * spatial_dim + s];
+    const Dtype loss = loss_vec[n * spatial_dim + s];
 
-    if (prob < threshold || (has_ignore_label_ && label_value == ignore_label_)) {
+    if (loss < threshold || (has_ignore_label_ && label_value == ignore_label_)) {
       for (int c = 0; c < channels; ++c) {
         bottom_diff[n * dim + c * spatial_dim + s] = 0;
       }
@@ -112,7 +115,8 @@ void LSRLossLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
     // Online mining hard example
     const Dtype* prob_cpu_data = prob_.cpu_data();
     const Dtype* label_cpu_data = bottom[1]->cpu_data();
-    std::vector<Dtype> loss_vec;
+    thrust::device_vector<Dtype> loss_vec;
+
     Dtype threshold = -1.;
     if (thresh_ratio_ > 0) {
       for (int i = 0; i < outer_num_; ++i) {
@@ -128,14 +132,15 @@ void LSRLossLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
           loss_vec.push_back(loss);
         }
       }
-      std::vector<Dtype> sort_loss(loss_vec.begin(), loss_vec.end());
-      std::sort(sort_loss.begin(), sort_loss.end());
-      threshold = sort_loss[static_cast<int>(sort_loss.size() * thresh_ratio_)];
+      thrust::device_vector<Dtype> sort_loss_vec(loss_vec.begin(), loss_vec.end());
+      thrust::sort(sort_loss_vec.begin(), sort_loss_vec.end());
+      threshold = sort_loss_vec[static_cast<int>(sort_loss_vec.size() * thresh_ratio_)];
     }
+    Dtype* loss_raw_pointer = thrust::raw_pointer_cast(loss_vec.data());
     // NOLINT_NEXT_LINE(whitespace/operators)
     LSRLossBackwardGPU<Dtype><<<CAFFE_GET_BLOCKS(nthreads),
         CAFFE_CUDA_NUM_THREADS>>>(nthreads, top_data, label, bottom_diff,
-        outer_num_, dim, inner_num_, has_ignore_label_, ignore_label_, counts, threshold);
+        outer_num_, dim, inner_num_, has_ignore_label_, ignore_label_, counts, threshold, loss_raw_pointer);
     const Dtype loss_weight = top[0]->cpu_diff()[0];
     if (normalize_) {
       Dtype count;

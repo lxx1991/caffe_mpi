@@ -109,15 +109,15 @@ void LSRLossLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
           for (int c = 0; c < bottom[0]->shape(softmax_axis_); ++c) {
             loss -= log(std::max(prob_data[i * dim + c * inner_num_ + j], Dtype(FLT_MIN)));
           }
-          loss = Dtype(0.000274) * loss; // 1. / 365 * loss
+          loss = Dtype(0.000274) * loss; // 0.1 * 1. / 365 * loss
           loss -= 0.9 * log(std::max(prob_data[i * dim + label_value * inner_num_ + j],
                            Dtype(FLT_MIN)));
           loss_vec.push_back(loss);
         }
       }
-      std::vector<Dtype> sort_loss(loss_vec.begin(), loss_vec.end());
-      std::sort(sort_loss.begin(), sort_loss.end());
-      threshold = sort_loss[static_cast<int>(sort_loss.size() * thresh_ratio_)];
+      std::vector<Dtype> sort_loss_vec(loss_vec.begin(), loss_vec.end());
+      std::sort(sort_loss_vec.begin(), sort_loss_vec.end());
+      threshold = sort_loss_vec[static_cast<int>(sort_loss_vec.size() * thresh_ratio_)];
     }
 
     for (int i = 0; i < outer_num_; ++i) {
