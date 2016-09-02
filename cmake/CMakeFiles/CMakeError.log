@@ -1,0 +1,57 @@
+Determining if the pthread_create exist failed with the following output:
+Change Dir: /nfs_data/ljxing/place365/yj_caffe/cmake/CMakeFiles/CMakeTmp
+
+Run Build Command:/usr/bin/make "cmTryCompileExec984166310/fast"
+make: Warning: File `Makefile' has modification time 3.6 s in the future
+/usr/bin/make -f CMakeFiles/cmTryCompileExec984166310.dir/build.make CMakeFiles/cmTryCompileExec984166310.dir/build
+make[1]: Entering directory `/nfs_data/ljxing/place365/yj_caffe/cmake/CMakeFiles/CMakeTmp'
+make[1]: Warning: File `CMakeFiles/cmTryCompileExec984166310.dir/flags.make' has modification time 3.6 s in the future
+/usr/bin/cmake -E cmake_progress_report /nfs_data/ljxing/place365/yj_caffe/cmake/CMakeFiles/CMakeTmp/CMakeFiles 1
+Building C object CMakeFiles/cmTryCompileExec984166310.dir/CheckSymbolExists.c.o
+/usr/bin/cc    -o CMakeFiles/cmTryCompileExec984166310.dir/CheckSymbolExists.c.o   -c /nfs_data/ljxing/place365/yj_caffe/cmake/CMakeFiles/CMakeTmp/CheckSymbolExists.c
+Linking C executable cmTryCompileExec984166310
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTryCompileExec984166310.dir/link.txt --verbose=1
+/usr/bin/cc       CMakeFiles/cmTryCompileExec984166310.dir/CheckSymbolExists.c.o  -o cmTryCompileExec984166310 -rdynamic 
+CMakeFiles/cmTryCompileExec984166310.dir/CheckSymbolExists.c.o: In function `main':
+CheckSymbolExists.c:(.text+0x16): undefined reference to `pthread_create'
+collect2: error: ld returned 1 exit status
+make[1]: *** [cmTryCompileExec984166310] Error 1
+make[1]: Leaving directory `/nfs_data/ljxing/place365/yj_caffe/cmake/CMakeFiles/CMakeTmp'
+make: *** [cmTryCompileExec984166310/fast] Error 2
+
+File /nfs_data/ljxing/place365/yj_caffe/cmake/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <pthread.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef pthread_create
+  return ((int*)(&pthread_create))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+
+Determining if the function pthread_create exists in the pthreads failed with the following output:
+Change Dir: /nfs_data/ljxing/place365/yj_caffe/cmake/CMakeFiles/CMakeTmp
+
+Run Build Command:/usr/bin/make "cmTryCompileExec1396291063/fast"
+make: Warning: File `Makefile' has modification time 3.6 s in the future
+/usr/bin/make -f CMakeFiles/cmTryCompileExec1396291063.dir/build.make CMakeFiles/cmTryCompileExec1396291063.dir/build
+make[1]: Entering directory `/nfs_data/ljxing/place365/yj_caffe/cmake/CMakeFiles/CMakeTmp'
+make[1]: Warning: File `CMakeFiles/cmTryCompileExec1396291063.dir/flags.make' has modification time 3.6 s in the future
+/usr/bin/cmake -E cmake_progress_report /nfs_data/ljxing/place365/yj_caffe/cmake/CMakeFiles/CMakeTmp/CMakeFiles 1
+Building C object CMakeFiles/cmTryCompileExec1396291063.dir/CheckFunctionExists.c.o
+/usr/bin/cc   -DCHECK_FUNCTION_EXISTS=pthread_create   -o CMakeFiles/cmTryCompileExec1396291063.dir/CheckFunctionExists.c.o   -c /usr/share/cmake-2.8/Modules/CheckFunctionExists.c
+Linking C executable cmTryCompileExec1396291063
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTryCompileExec1396291063.dir/link.txt --verbose=1
+/usr/bin/cc   -DCHECK_FUNCTION_EXISTS=pthread_create    CMakeFiles/cmTryCompileExec1396291063.dir/CheckFunctionExists.c.o  -o cmTryCompileExec1396291063 -rdynamic -lpthreads 
+/usr/bin/ld: cannot find -lpthreads
+collect2: error: ld returned 1 exit status
+make[1]: *** [cmTryCompileExec1396291063] Error 1
+make[1]: Leaving directory `/nfs_data/ljxing/place365/yj_caffe/cmake/CMakeFiles/CMakeTmp'
+make: *** [cmTryCompileExec1396291063/fast] Error 2
+
+

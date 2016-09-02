@@ -122,15 +122,15 @@ void sampleRandomCropSize(int img_height, int img_width,
     caffe_rng_uniform(1, min_scale, max_scale, &area_ratio);
     target_area = total_area * area_ratio;
 
-    caffe_rng_uniform(1, float(0), float(1), &flip_coin);
-    if (flip_coin > 0.5){
-        std::swap(crop_height, crop_width);
-    }
-
     // sample aspect ratio
     caffe_rng_uniform(1, min_as, max_as, &aspect_ratio);
     crop_height = int(sqrt(target_area / aspect_ratio));
     crop_width = int(sqrt(target_area * aspect_ratio));
+
+    caffe_rng_uniform(1, float(0), float(1), &flip_coin);
+    if (flip_coin > 0.5){
+        std::swap(crop_height, crop_width);
+    }
 
     if (crop_height <= img_height && crop_width <= img_width){
       return;
