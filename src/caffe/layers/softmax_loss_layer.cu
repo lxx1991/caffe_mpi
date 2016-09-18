@@ -76,7 +76,7 @@ __global__ void SoftmaxLossBackwardGPU(const int nthreads, const Dtype* top,
     const int label_value = static_cast<int>(label[n * spatial_dim + s]);
     const Dtype prob = bottom_diff[n * dim + label_value * spatial_dim + s];
 
-    if (prob < threshold || (has_ignore_label_ && label_value == ignore_label_)) {
+    if (prob > threshold || (has_ignore_label_ && label_value == ignore_label_)) {
       for (int c = 0; c < channels; ++c) {
         bottom_diff[n * dim + c * spatial_dim + s] = 0;
       }
@@ -110,7 +110,7 @@ void SoftmaxWithLossLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
     const Dtype* prob_cpu_data = prob_.cpu_data();
     const Dtype* label_cpu_data = bottom[1]->cpu_data();
     std::vector<Dtype> probs;
-    Dtype threshold = 0.;
+    Dtype threshold = 2.;
     if (thresh_ratio_ < 1) {
       for (int i = 0; i < outer_num_; ++i) {
         for (int j = 0; j < inner_num_; ++j) {
@@ -119,7 +119,7 @@ void SoftmaxWithLossLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
         }
       }
       std::sort(probs.begin(), probs.end());
-      threshold = probs[static_cast<int>(probs.size() * (1-thresh_ratio_))];
+      threshold = probs[static_cast<int>(probs.size() * thresh_ratio_)];
     }
     // NOLINT_NEXT_LINE(whitespace/operators)
     SoftmaxLossBackwardGPU<Dtype><<<CAFFE_GET_BLOCKS(nthreads),

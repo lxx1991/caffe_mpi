@@ -100,7 +100,7 @@ void SoftmaxWithLossLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
     int count = 0;
     // Online mining hard examples
     std::vector<Dtype> probs;
-    Dtype threshold = 0.;
+    Dtype threshold = 2.;
     if (thresh_ratio_ < 1) {
       for (int i = 0; i < outer_num_; ++i) {
         for (int j = 0; j < inner_num_; ++j) {
@@ -109,14 +109,14 @@ void SoftmaxWithLossLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
         }
       }
       std::sort(probs.begin(), probs.end());
-      threshold = probs[static_cast<int>(probs.size() * (1-thresh_ratio_))];
+      threshold = probs[static_cast<int>(probs.size() * thresh_ratio_)];
     }
 
     for (int i = 0; i < outer_num_; ++i) {
       for (int j = 0; j < inner_num_; ++j) {
         const int label_value = static_cast<int>(label[i * inner_num_ + j]);
         const Dtype prob = bottom_diff[i * dim + label_value * inner_num_ + j];
-        if (prob < threshold || (has_ignore_label_ && label_value == ignore_label_)) {
+        if (prob > threshold || (has_ignore_label_ && label_value == ignore_label_)) {
           for (int c = 0; c < bottom[0]->shape(softmax_axis_); ++c) {
             bottom_diff[i * dim + c * inner_num_ + j] = 0;
           }
