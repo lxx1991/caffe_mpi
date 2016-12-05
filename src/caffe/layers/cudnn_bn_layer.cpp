@@ -9,7 +9,7 @@
 #include "caffe/util/math_functions.hpp"
 #include "caffe/vision_layers.hpp"
 
-#if CUDNN_VERSION_MIN(4, 0, 0)
+#if CUDNN_VERSION_MIN(5, 0, 0)
 
 namespace caffe {
 
@@ -17,14 +17,6 @@ template <typename Dtype>
 void CuDNNBNLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top) {
   BNLayer<Dtype>::LayerSetUp(bottom, top);
-  if (this->bn_eps_ < CUDNN_BN_MIN_EPSILON) {
-    LOG(WARNING) << "bn_eps is set to CUDNN_BN_MIN_EPSILON.";
-    // Merely setting as CUDNN_BN_MIN_EPSILON fails the check due to
-    // float / double precision problem.
-    this->bn_eps_ = CUDNN_BN_MIN_EPSILON * 10;
-  }
-  scale_buf_.ReshapeLike(*(this->blobs_[0]));
-  bias_buf_.ReshapeLike(*(this->blobs_[1]));
   save_mean_.ReshapeLike(*(this->blobs_[2]));
   save_inv_variance_.ReshapeLike(*(this->blobs_[3]));
 
@@ -34,6 +26,8 @@ void CuDNNBNLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
   cudnn::createTensor4dDesc<Dtype>(&top_desc_);
   cudnn::createTensor4dDesc<Dtype>(&bn_param_desc_);
   handles_setup_ = true;
+  
+  LOG(INFO)<<"using cuDNN BN engine";
 }
 
 template <typename Dtype>
@@ -55,6 +49,20 @@ void CuDNNBNLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
   // Fix to the spatial mode
   CUDNN_CHECK(cudnnDeriveBNTensorDescriptor(bn_param_desc_,
       bottom_desc_, CUDNN_BATCHNORM_SPATIAL));
+
+  if (this->frozen_){
+    this->broadcast_buffer_.ReshapeLike(*(bottom[0]));
+    this->spatial_statistic_.Reshape(this->num_, this->channels_, 1, 1);
+    this->batch_statistic_.Reshape(1, this->channels_, 1, 1);
+
+    this->spatial_sum_multiplier_.Reshape(1, 1, this->height_, this->width_);
+    caffe_set(this->spatial_sum_multiplier_.count(), Dtype(1),
+      this->spatial_sum_multiplier_.mutable_cpu_data());
+    this->batch_sum_multiplier_.Reshape(this->num_, 1, 1, 1);
+    caffe_set(this->batch_sum_multiplier_.count(), Dtype(1),
+      this->batch_sum_multiplier_.mutable_cpu_data());
+
+  }
 }
 
 template <typename Dtype>

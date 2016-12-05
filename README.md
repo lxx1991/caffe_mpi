@@ -4,7 +4,20 @@
 
 This branch hosts the code for the technical report ["Towards Good Practices for Very Deep Two-stream ConvNets"](http://arxiv.org/abs/1507.02159), and more.
 
+* [Updates](#updates)
+* [Features](#features)
+* [Usage](#usage)
+* [Working Examples](#working-examples)
+* [Extension](#extension)
+* [Questions](#questions)
+* [Citation](#citation)
+
+
 ### Updates
+- Jul 16, 2016
+  * New working sample: "Real-time Action Recognition with Enhanced Motion Vector CNNs" on CVPR 2016. 
+- Apr 27, 2016
+  * cuDNN v5 support, featuring the super fast WINOGrad Convolution and cuDNN implementation of BatchNormalization.
 - Dec 23, 2015
   * Refactored cudnn wrapper to control overall memory consumption. Will automatically find the best algorithm combination under memory constraint.
 - Dec 17, 2015
@@ -19,11 +32,12 @@ This branch hosts the code for the technical report ["Towards Good Practices for
 - Training on optical flow data. 
 - Data augmentation with fixed corner cropping and multi-scale cropping.
 - Parallel training with multiple GPUs.
-- cuDNNv4 integration.
+- Newest cuDNN integration.
+- Slim memory footprints in both training and testing,
 
 ### Usage
 
-*See more in* [Wiki](https://github.com/yjxiong/caffe/wiki).
+#### *See more in* [Wiki](https://github.com/yjxiong/caffe/wiki).
 
 Generally it's the same as the original caffe. Please see the original README. 
 Please see following instruction for accessing features above. More detailed documentation is on the way.
@@ -38,8 +52,8 @@ Please see following instruction for accessing features above. More detailed doc
   - Set `multi_scale` to `true` in `transform_param`
   - In `transform_param`, specify `scale_ratios` as a list of floats smaller than one, default is `[1, .875, .75, .65]`
   - In `transform_param`, specify `max_distort` to an integer, which will limit the aspect ratio distortion, default to `1`
-- cuDNN v4
- - The cuDNN v4 wrapper has optimized engines for convolution and batch normalization.
+- cuDNN v5
+ - The cuDNN v5 wrapper has optimized engines for convolution and batch normalization.
  - The solver protobuf config has a parameter `richness` which specifies the total GPU memory in MBs available to the cudnn convolution engine as workspaces. Default `richness` is 300 (300MB). Using this parameter you can control the GPU memory consumption of training, the system will find the best setup under the memory limit for you.
 - Training with multiple GPUs
   - Requires OpenMPI > 1.7.4 ([Why?](https://www.open-mpi.org/faq/?category=runcuda)). **Remember to compile your OpenMPI with option `--with-cuda`**
@@ -52,8 +66,23 @@ make && make install
 mpirun -np 4 ./install/bin/caffe train --solver=<Your Solver File> [--weights=<Pretrained caffemodel>]
 ```
 **Note**: actual batch_size will be `num_device` times `batch_size` specified in network's prototxt.
+- Runtime memory optimization
+  - Memory optimization drastically reduces memory usage (half for training and almost all for testing) by
+  safely sharing underlying storage of a series of blobs.
+  Note in this case, the Python/Matlab interfaces can no longer retrieve correct contents of affected blobs.
+  - Training time memory optimization is automatically enabled.
+  - To adjust memory optimization setting, add 'optimize_mem' option to the network prototxt. It can be set to
+  `TRAIN_ONLY` (default), `ALL_OPTIM`, and `NO_OPTIM`.
+  - Testing time optimization is disabled by default. To enable testing time optimization, set `optimize_mem` to `NO_OPTIM`
+  - To disable memory optimization, set `optimize_mem` to `NO_OPTIM`. This may be useful when working with intermediate blobs.
 
 ### Working Examples
+- Actionness Estimation Using Hybrid FCNs
+  - [CVPR 2016 paper](http://www.cv-foundation.org/openaccess/content_cvpr_2016/papers/Wang_Actionness_Estimation_Using_CVPR_2016_paper.pdf)
+  - [Project Site](https://github.com/wanglimin/Actionness-Estimation)
+- Real-time Action Recognition with Enhanced Motion Vector CNNs
+  - [CVPR 2016 paper](https://wanglimin.github.io/papers/ZhangWWQW_CVPR16.pdf)
+  - [Project Site](http://zbwglory.github.io/MV-CNN/index.html)
 - Action recognition on UCF101
   - [Project Site](http://personal.ie.cuhk.edu.hk/~xy012/others/action_recog/)
   - [Caffe Model Files](https://github.com/yjxiong/caffe/tree/action_recog/models/action_recognition)

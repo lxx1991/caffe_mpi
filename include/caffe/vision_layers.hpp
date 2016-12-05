@@ -271,11 +271,11 @@ class CuDNNConvolutionLayer : public ConvolutionLayer<Dtype> {
    *  The latter approach is prone to problem and has issues in memory alignment
    **/
   size_t workspaceSizeInBytes_fwd;  // size of underlying storage
-  vector<shared_ptr<SyncedMemory> > workspaceData_fwd;  // underlying storage
+  static vector<shared_ptr<SyncedMemory> > workspaceData_fwd;  // underlying storage
 
   size_t workspaceSizeInBytes_bwd;  // size of underlying storage
-  vector<shared_ptr<SyncedMemory> > workspaceData_bwd_filter;  // underlying storage
-  vector<shared_ptr<SyncedMemory> > workspaceData_bwd_data;  // underlying storage
+  static vector<shared_ptr<SyncedMemory> > workspaceData_bwd_filter;  // underlying storage
+  static vector<shared_ptr<SyncedMemory> > workspaceData_bwd_data;  // underlying storage
 
   vector<vector<int> > prev_bottom_shapes_;
 
@@ -557,6 +557,46 @@ class SPPLayer : public Layer<Dtype> {
   /// the internal Concat layers that the Flatten layers feed into
   shared_ptr<ConcatLayer<Dtype> > concat_layer_;
 };
+
+/**
+ * @brief ROIPoolingLayer - Region of Interest Pooling Layer
+ */
+    template <typename Dtype>
+    class ROIPoolingLayer : public Layer<Dtype> {
+    public:
+        explicit ROIPoolingLayer(const LayerParameter& param)
+                : Layer<Dtype>(param) {}
+        virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
+                                const vector<Blob<Dtype>*>& top);
+        virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
+                             const vector<Blob<Dtype>*>& top);
+
+        virtual inline const char* type() const { return "ROIPooling"; }
+
+        virtual inline int MinBottomBlobs() const { return 2; }
+        virtual inline int MaxBottomBlobs() const { return 2; }
+        virtual inline int MinTopBlobs() const { return 1; }
+        virtual inline int MaxTopBlobs() const { return 1; }
+
+    protected:
+        virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+                                 const vector<Blob<Dtype>*>& top);
+        virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+                                 const vector<Blob<Dtype>*>& top);
+        virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
+                                  const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+        virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
+                                  const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+
+        int channels_;
+        int height_;
+        int width_;
+        int pooled_height_;
+        int pooled_width_;
+        Dtype spatial_scale_;
+        Blob<int> max_idx_;
+    };
+
 
 }  // namespace caffe
 
