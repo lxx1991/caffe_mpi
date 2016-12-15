@@ -65,6 +65,7 @@ models/*
 *.binaryproto
 *leveldb
 *lmdb
+layer_cascade_matlab/*
 
 # build, distribute, and bins (+ python proto bindings)
 build

@@ -277,7 +277,7 @@ message ParamSpec {
 // NOTE
 // Update the next available ID when you add a new LayerParameter field.
 //
-// LayerParameter next available layer-specific ID: 163 (last added: batch_reduction_param)
+// LayerParameter next available layer-specific ID: 164 (last added: mask_param)
 message LayerParameter {
   optional string name = 1; // the layer name
   optional string type = 2; // the layer type
@@ -344,6 +344,7 @@ message LayerParameter {
   optional InnerProductParameter inner_product_param = 117;
   optional LogParameter log_param = 134;
   optional LRNParameter lrn_param = 118;
+  optional MaskParameter mask_param = 163;
   optional MemoryDataParameter memory_data_param = 119;
   optional MVNParameter mvn_param = 120;
   optional PoolingParameter pooling_param = 121;
@@ -751,6 +752,12 @@ message LRNParameter {
   }
   optional NormRegion norm_region = 4 [default = ACROSS_CHANNELS];
   optional float k = 5 [default = 1.];
+}
+
+message MaskParameter {
+  optional float threshold = 1 [default = 1.0];
+  optional bool prev_mask = 2 [default = false];
+  optional uint32 ignore_label = 3 [default = 255];
 }
 
 message MemoryDataParameter {

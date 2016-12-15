@@ -179,6 +179,62 @@ class ConvolutionLayer : public BaseConvolutionLayer<Dtype> {
   virtual void compute_output_shape();
 };
 
+
+template <typename Dtype>
+class RegionConvolutionLayer : public Layer<Dtype> {
+ public:
+  explicit RegionConvolutionLayer(const LayerParameter& param)
+      : Layer<Dtype>(param) {}
+
+  virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+
+  virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+
+  virtual inline int ExactNumBottomBlobs() const { return 3; }
+  virtual inline int ExactNumTopBlobs() const { return 1; }
+
+  virtual inline const char* type() const { return "RegionConvolution"; }
+
+ protected:
+  virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+  virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+
+  virtual void compute_output_shape();
+
+  int kernel_h_, kernel_w_;
+  int dilation_h_, dilation_w_;
+  int num_;
+  int channels_;
+  int pad_h_, pad_w_;
+  int height_, width_;
+  int spatial_dim_;
+  int num_output_;
+  int height_out_, width_out_;
+  bool bias_term_;
+  bool is_1x1_;
+
+  int conv_out_channels_;
+  int conv_in_channels_;
+  int conv_out_spatial_dim_;
+  int conv_in_height_;
+  int conv_in_width_;
+  int kernel_dim_;
+  int mask_cnt_;
+
+  Blob<Dtype> col_buffer_;
+  Blob<Dtype> top_buffer_;
+  Blob<Dtype> bias_multiplier_;
+  
+};
+
 /**
  * @brief Convolve the input with a bank of learned filters, and (optionally)
  *        add biases, treating filters and convolution parameters in the
@@ -597,6 +653,51 @@ class SPPLayer : public Layer<Dtype> {
         Dtype spatial_scale_;
         Blob<int> max_idx_;
     };
+
+
+  /**
+   * @brief Tests whether the input exceeds a threshold: outputs 1 for inputs
+   *        above threshold; 0 otherwise.
+   */
+  template <typename Dtype>
+  class MaskLayer : public Layer<Dtype> {
+   public:
+    /**
+     * @param param provides ThresholdParameter threshold_param,
+     *     with ThresholdLayer options:
+     *   - threshold (\b optional, default 0).
+     *     the threshold value @f$ t @f$ to which the input values are compared.
+     */
+    explicit MaskLayer(const LayerParameter& param)
+        : Layer<Dtype>(param) {}
+
+    virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
+        const vector<Blob<Dtype>*>& top);
+
+    virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+
+    virtual inline const char* type() const { return "Mask"; }
+    virtual inline int MinBottomBlobs() const { return 1; }
+    virtual inline int MaxBottomBlobs() const { return 3; }
+    virtual inline int ExactNumTopBlobs() const { return 2; }
+
+
+   protected:
+
+    virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+        const vector<Blob<Dtype>*>& top);
+    /// @brief Not implemented (non-differentiable function)
+    virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
+        const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+
+    Dtype threshold_;
+    bool prev_mask_;
+    int ignore_label_;
+  };
+
+
+
 
 
 }  // namespace caffe
