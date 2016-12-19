@@ -92,9 +92,9 @@ void MaskLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
           if (flag) continue;
         }
         //keep pixel (i, j)
-        idx[++cnt] = Dtype(i);
-        idx[spatial_dim + 1 + cnt] = Dtype(j);
-        mask[index] = Dtype(cnt);
+        idx[1 + cnt] = Dtype(i);
+        idx[spatial_dim + 2 + cnt] = Dtype(j);
+        mask[index] = Dtype(cnt++);
       }
   }
   else if (prev_mask != NULL && label == NULL)
@@ -118,9 +118,9 @@ void MaskLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
             }
           if (flag) continue;
           //keep pixel (i, j)
-          idx[++cnt] = Dtype(i);
-          idx[spatial_dim + 1 + cnt] = Dtype(j);
-          mask[index] = Dtype(cnt);
+          idx[1 + cnt] = Dtype(i);
+          idx[spatial_dim + 2 + cnt] = Dtype(j);
+          mask[index] = Dtype(cnt++);
       }
   }
   else if (prev_mask == NULL && label != NULL)
@@ -151,9 +151,9 @@ void MaskLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
           if (flag) continue;
         }
         //keep pixel (i, j)
-        idx[++cnt] = Dtype(i);
-        idx[spatial_dim + 1 + cnt] = Dtype(j);
-        mask[index] = Dtype(cnt);
+        idx[1 + cnt] = Dtype(i);
+        idx[spatial_dim + 2 + cnt] = Dtype(j);
+        mask[index] = Dtype(cnt++);
       }
   }
   else if (prev_mask == NULL && label == NULL)
@@ -173,9 +173,9 @@ void MaskLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
             }
           if (flag) continue;
           //keep pixel (i, j)
-          idx[++cnt] = Dtype(i);
-          idx[spatial_dim + 1 + cnt] = Dtype(j);
-          mask[index] = Dtype(cnt);
+          idx[1 + cnt] = Dtype(i);
+          idx[spatial_dim + 2 + cnt] = Dtype(j);
+          mask[index] = Dtype(cnt++);
       }
   }
 

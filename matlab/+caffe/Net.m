@@ -87,6 +87,15 @@ classdef Net < handle
     function backward_prefilled(self)
       caffe_('net_backward', self.hNet_self);
     end
+    function set_input_data(self, input_data)
+      CHECK(iscell(input_data), 'input_data must be a cell array');
+      CHECK(length(input_data) == length(self.inputs), ...
+        'input data cell length must match input blob number');
+      % copy data to input blobs
+      for n = 1:length(self.inputs)
+        self.blobs(self.inputs{n}).set_data(input_data{n});
+      end
+    end
     function res = forward(self, input_data)
       CHECK(iscell(input_data), 'input_data must be a cell array');
       CHECK(length(input_data) == length(self.inputs), ...

@@ -16,10 +16,10 @@ __global__ void move_back_kernel(const int n, const Dtype* data_im, const Dtype*
     const int h = (index / width) % height;
     const int temp = static_cast<int>(data_mask[h * width + w]);
     if (temp == -1)
-      data[index] = data_im[index];
+      data[index] = 0;//data_im[index];
     else
     {
-      const int c = (index / width) / height;
+      const int c = index / (width * height);
       data[index] = top_buffer[c * mask_cnt + temp];
     }
   }
@@ -40,23 +40,28 @@ void RegionConvolutionLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bott
   mask_cnt_ = bottom[2]->cpu_data()[0];
 
 
-  //region im2col
-  region_im2col_gpu(bottom_data, index_1, index_2, mask_cnt_, conv_in_channels_, conv_in_height_, conv_in_width_,
-        kernel_h_, kernel_w_, pad_h_, pad_w_, dilation_h_, dilation_w_, col_buffer_.mutable_gpu_data());
+  if (mask_cnt_!=0)
+  {
+    //region im2col
+    region_im2col_gpu(bottom_data, index_1, index_2, mask_cnt_, conv_in_channels_, conv_in_height_, conv_in_width_,
+          kernel_h_, kernel_w_, pad_h_, pad_w_, dilation_h_, dilation_w_, col_buffer_.mutable_gpu_data());
 
-  //gemmm
-  caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, conv_out_channels_, mask_cnt_, kernel_dim_,
-      (Dtype)1., weights, col_buffer_.gpu_data(),
-      (Dtype)0., top_buffer);
+    //gemmm
+    caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, conv_out_channels_, mask_cnt_, kernel_dim_,
+        (Dtype)1., weights, col_buffer_.gpu_data(),
+        (Dtype)0., top_buffer);
 
-  //bias
-  if (this->bias_term_) {
-    caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, num_output_,
-    mask_cnt_, 1, (Dtype)1., this->blobs_[1]->gpu_data(), bias_multiplier_.gpu_data(),
-    (Dtype)1., top_buffer);
+    //bias
+    if (this->bias_term_) {
+      caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, num_output_,
+      mask_cnt_, 1, (Dtype)1., this->blobs_[1]->gpu_data(), bias_multiplier_.gpu_data(),
+      (Dtype)1., top_buffer);
+    }
   }
 
   //move back
+  //caffe_gpu_set(count, static_cast<Dtype>(0), top_data);
+
   move_back_kernel<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
         count, bottom_data, mask_data, top_buffer_.gpu_data(), conv_in_height_, conv_in_width_, mask_cnt_,
         top_data);
@@ -122,7 +127,7 @@ void RegionConvolutionLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top
     caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasTrans, conv_out_channels_,
         kernel_dim_, mask_cnt_,
         (Dtype)1., top_buffer_.gpu_diff() , col_buffer_.gpu_data(),
-        (Dtype)1., this->blobs_[0]->mutable_gpu_data());
+        (Dtype)1., this->blobs_[0]->mutable_gpu_diff());
   }
 
   //data gradient

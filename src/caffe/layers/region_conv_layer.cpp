@@ -118,10 +118,10 @@ void RegionConvolutionLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
   CHECK_EQ(bottom[1]->height(), height_);
   CHECK_EQ(bottom[1]->width(), width_);
 
-  CHECK_EQ(bottom[1]->num(), num_);
-  CHECK_EQ(bottom[1]->channels(), 1);
-  CHECK_EQ(bottom[1]->height(), 2);
-  CHECK_EQ(bottom[1]->width(), spatial_dim_ + 1);
+  CHECK_EQ(bottom[2]->num(), num_);
+  CHECK_EQ(bottom[2]->channels(), 1);
+  CHECK_EQ(bottom[2]->height(), 2);
+  CHECK_EQ(bottom[2]->width(), spatial_dim_ + 1);
 
   // Shape the tops.
   compute_output_shape();
@@ -172,5 +172,6 @@ STUB_GPU(RegionConvolutionLayer);
 #endif
 
 INSTANTIATE_CLASS(RegionConvolutionLayer);
+REGISTER_LAYER_CLASS(RegionConvolution);
 
 }  // namespace caffe

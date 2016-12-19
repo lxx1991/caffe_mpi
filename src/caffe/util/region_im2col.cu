@@ -19,12 +19,12 @@ __global__ void region_im2col_gpu_kernel(const int n, const Dtype* data_im,
     const int m_index = index % mask_cnt;
     const int h_col = index_1[m_index];
     const int w_col = index_2[m_index];
-    const int c_im = m_index / mask_cnt;
+    const int c_im = index / mask_cnt;
     const int c_col = c_im * kernel_h * kernel_w;
     const int h_offset = h_col - pad_h;
     const int w_offset = w_col - pad_w;
     Dtype* data_col_ptr = data_col;
-    data_col_ptr += c_col * mask_cnt + index;
+    data_col_ptr += c_col * mask_cnt + m_index;
     const Dtype* data_im_ptr = data_im;
     data_im_ptr += (c_im * height + h_offset) * width + w_offset;
     for (int i = 0; i < kernel_h; ++i) {
