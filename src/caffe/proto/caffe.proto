@@ -418,6 +418,7 @@ message TransformationParameter {
   optional int32 upper_size = 17;
   optional int32 upper_height = 18;
   optional int32 upper_width = 19;
+  optional int32 ignore_label = 21;
 }
 
 // Message that stores parameters shared by loss layers
@@ -942,6 +943,7 @@ message SegDataParameter{
   // Whether or not ImageLayer should shuffle the list of files at every epoch.
   optional bool shuffle = 3 [default = false];
   optional bool balance = 4 [default = false];
+  optional uint32 batch_size = 5 [default = 1];
 }
 
 message SigmoidParameter {
