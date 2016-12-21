@@ -32,7 +32,7 @@ void RegionConvolutionLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bott
   const Dtype* weights = this->blobs_[0]->gpu_data();
   const Dtype* bottom_data = bottom[0]->gpu_data();
   Dtype* top_data = top[0]->mutable_gpu_data();
-  Dtype* top_buffer = top_buffer_.mutable_gpu_data();
+  Dtype* top_buffer = top_buffer_->mutable_gpu_data();
   const Dtype* mask_data = bottom[1]->gpu_data();
   const Dtype* index_1 = bottom[2]->gpu_data()+bottom[2]->offset(0, 0, 0, 1);
   const Dtype* index_2 = bottom[2]->gpu_data()+bottom[2]->offset(0, 0, 1, 1);
@@ -44,11 +44,11 @@ void RegionConvolutionLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bott
   {
     //region im2col
     region_im2col_gpu(bottom_data, index_1, index_2, mask_cnt_, conv_in_channels_, conv_in_height_, conv_in_width_,
-          kernel_h_, kernel_w_, pad_h_, pad_w_, dilation_h_, dilation_w_, col_buffer_.mutable_gpu_data());
+          kernel_h_, kernel_w_, pad_h_, pad_w_, dilation_h_, dilation_w_, col_buffer_->mutable_gpu_data());
 
     //gemmm
     caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, conv_out_channels_, mask_cnt_, kernel_dim_,
-        (Dtype)1., weights, col_buffer_.gpu_data(),
+        (Dtype)1., weights, col_buffer_->gpu_data(),
         (Dtype)0., top_buffer);
 
     //bias
@@ -63,7 +63,7 @@ void RegionConvolutionLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bott
   //caffe_gpu_set(count, static_cast<Dtype>(0), top_data);
 
   move_back_kernel<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
-        count, bottom_data, mask_data, top_buffer_.gpu_data(), conv_in_height_, conv_in_width_, mask_cnt_,
+        count, bottom_data, mask_data, top_buffer_->gpu_data(), conv_in_height_, conv_in_width_, mask_cnt_,
         top_data);
 
   CUDA_POST_KERNEL_CHECK;
@@ -108,25 +108,25 @@ void RegionConvolutionLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top
   //pick_out_kernel
   int num_kernels = conv_out_channels_ * mask_cnt_;
   pick_out_kernel<Dtype><<<CAFFE_GET_BLOCKS(num_kernels), CAFFE_CUDA_NUM_THREADS>>>(
-        num_kernels, top_diff, height_out_, width_out_, index_1, index_2, mask_cnt_, top_buffer_.mutable_gpu_diff());
+        num_kernels, top_diff, height_out_, width_out_, index_1, index_2, mask_cnt_, top_buffer_->mutable_gpu_diff());
 
 
 
   // Bias gradient, if necessary.
   if (this->bias_term_ && this->param_propagate_down_[1]) {
     caffe_gpu_gemv<Dtype>(CblasNoTrans, num_output_, mask_cnt_, 1.,
-        top_buffer_.gpu_diff(), bias_multiplier_.gpu_data(), 1., this->blobs_[1]->mutable_gpu_diff());
+        top_buffer_->gpu_diff(), bias_multiplier_.gpu_data(), 1., this->blobs_[1]->mutable_gpu_diff());
   }
 
   // weight gradient
   if (this->param_propagate_down_[0]) {
 
     region_im2col_gpu(bottom_data, index_1, index_2, mask_cnt_, conv_in_channels_, conv_in_height_, conv_in_width_,
-            kernel_h_, kernel_w_, pad_h_, pad_w_, dilation_h_, dilation_w_, col_buffer_.mutable_gpu_data());
+            kernel_h_, kernel_w_, pad_h_, pad_w_, dilation_h_, dilation_w_, col_buffer_->mutable_gpu_data());
 
     caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasTrans, conv_out_channels_,
         kernel_dim_, mask_cnt_,
-        (Dtype)1., top_buffer_.gpu_diff() , col_buffer_.gpu_data(),
+        (Dtype)1., top_buffer_->gpu_diff() , col_buffer_->gpu_data(),
         (Dtype)1., this->blobs_[0]->mutable_gpu_diff());
   }
 
@@ -134,10 +134,10 @@ void RegionConvolutionLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top
   if (propagate_down[0]) {
     caffe_gpu_gemm<Dtype>(CblasTrans, CblasNoTrans, kernel_dim_,
         mask_cnt_, conv_out_channels_,
-        (Dtype)1., weights , top_buffer_.gpu_diff(),
-        (Dtype)0., col_buffer_.mutable_gpu_data());
+        (Dtype)1., weights , top_buffer_->gpu_diff(),
+        (Dtype)0., col_buffer_->mutable_gpu_data());
 
-    region_col2im_gpu(col_buffer_.gpu_data(), 
+    region_col2im_gpu(col_buffer_->gpu_data(), 
         index_1, index_2, mask_data,
         mask_cnt_, conv_in_channels_,
         conv_in_height_, conv_in_width_, kernel_h_, kernel_w_,

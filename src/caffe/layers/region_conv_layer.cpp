@@ -9,6 +9,12 @@
 namespace caffe {
 
 template <typename Dtype>
+Blob<Dtype>* RegionConvolutionLayer<Dtype>::col_buffer_ = new Blob<Dtype>();
+
+template <typename Dtype>
+Blob<Dtype>* RegionConvolutionLayer<Dtype>::top_buffer_ = new Blob<Dtype>();
+
+template <typename Dtype>
 void RegionConvolutionLayer<Dtype>::compute_output_shape() {
   this->height_out_ = (this->height_ + 2 * this->pad_h_ - (this->dilation_h_ * (this->kernel_h_ - 1) + 1)) + 1;
   this->width_out_ = (this->width_ + 2 * this->pad_w_ - (this->dilation_w_ * (this->kernel_w_ - 1) + 1)) + 1;
@@ -137,8 +143,13 @@ void RegionConvolutionLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
   // overly large memory usage. In the special case of 1x1 convolution
   // it goes lazily unused to save memory.
 
-  col_buffer_.Reshape(1, kernel_dim_, height_out_, width_out_);
-  top_buffer_.Reshape(1, conv_out_channels_, height_out_, width_out_);
+
+  if (col_buffer_->count() < kernel_dim_ * height_out_ * width_out_)
+    col_buffer_->Reshape(1, kernel_dim_, height_out_, width_out_);
+
+
+  if (top_buffer_->count() < conv_out_channels_ * height_out_ * width_out_)
+    top_buffer_->Reshape(1, conv_out_channels_, height_out_, width_out_);
   
   // Set up the all ones "bias multiplier" for adding biases by BLAS
   if (bias_term_) {
