@@ -134,6 +134,21 @@ classdef Net < handle
     function reshape(self)
       caffe_('net_reshape', self.hNet_self);
     end
+    function reshape_as_input(self, input_data)
+      CHECK(iscell(input_data), 'input_data must be a cell array');
+      CHECK(length(input_data) == length(self.inputs), ...
+        'input data cell length must match input blob number');
+      % reshape input blobs
+      for n = 1:length(self.inputs)
+        if isempty(input_data{n})
+          continue;
+        end
+        input_data_size = size(input_data{n});
+        input_data_size_extended = [input_data_size, ones(1, 4 - length(input_data_size))];
+        self.blobs(self.inputs{n}).reshape(input_data_size_extended);
+      end
+      self.reshape();
+    end
     function save(self, weights_file)
       CHECK(ischar(weights_file), 'weights_file must be a string');
       caffe_('net_save', self.hNet_self, weights_file);
