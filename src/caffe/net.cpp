@@ -67,6 +67,9 @@ void Net<Dtype>::Init(const NetParameter& in_param) {
   for (int input_id = 0; input_id < param.input_size(); ++input_id) {
     const int layer_id = -1;  // inputs have fake layer ID -1
     AppendTop(param, layer_id, input_id, &available_blobs, &blob_name_to_idx);
+
+    // input blobs are excluded from memory optimization by default
+    excluded_blob_names_.insert(param.input(input_id));
   }
   DLOG(INFO) << "Memory required for data: " << memory_used_ * sizeof(Dtype);
   // For each layer, set up its input and output
@@ -282,6 +285,9 @@ void Net<Dtype>::Init(const NetParameter& in_param) {
     LOG(INFO) << "This network produces output " << *it;
     net_output_blobs_.push_back(blobs_[blob_name_to_idx[*it]].get());
     net_output_blob_indices_.push_back(blob_name_to_idx[*it]);
+
+    // add output blob name to default excluded blobs
+    excluded_blob_names_.insert(*it);
   }
   for (size_t blob_id = 0; blob_id < blob_names_.size(); ++blob_id) {
     blob_names_index_[blob_names_[blob_id]] = blob_id;
@@ -293,6 +299,20 @@ void Net<Dtype>::Init(const NetParameter& in_param) {
   debug_info_ = param.debug_info();
   LOG(INFO) << "Network initialization done.";
   LOG(INFO) << "Memory required for data: " << memory_used_ * sizeof(Dtype);
+
+  // optimize memory
+  optimize_memory_ = (param.mem_param().optimize_train() && phase_ == TRAIN) ||
+                     (param.mem_param().optimize_test() && phase_ == TEST);
+
+  // add additional specified blobs to the exclusion list
+  for (int ex_id = 0; ex_id < param.mem_param().exclude_blob_size(); ++ex_id){
+    excluded_blob_names_.insert(param.mem_param().exclude_blob(ex_id));
+  }
+
+  // launch memory optimization if necessary
+  if (!debug_info_ && optimize_memory_) {
+    MemoryOptimize_v2();
+  }
 }
 
 template <typename Dtype>
@@ -623,9 +643,32 @@ void Net<Dtype>::BackwardFromTo(int start, int end) {
   CHECK_LT(start, layers_.size());
 
   for (int i = start; i >= end; --i) {
+    if (optimize_memory_) {
+      // Manually set the bottom diff to zero if it is not backpropagated.
+      // If not set, they may be corrupted when memory optimization is on.
+      const vector<Blob<Dtype>*>& bottom_vec = bottom_vecs_[i];
+      for (int j = 0; j < bottom_vec.size(); ++j)
+        if (!layer_need_backward_[i] || !bottom_need_backward_[i][j]) {
+          bottom_vec[j]->scale_diff(0);
+        }
+    }
     if (layer_need_backward_[i]) {
+
+      //DEBUG USE
+//      for (int x = 0; x < top_vecs_[i].size(); ++x){
+//        LOG(INFO)<<"Layer "<<i<<" name "<<layer_names_[i]
+//          <<" top blob "<<x<<" ptr: "<<top_vecs_[i][x]->gpu_diff();
+//      }
+//
+//      for (int x = 0; x < bottom_vecs_[i].size(); ++x){
+//        LOG(INFO)<<"Layer "<<i<<" name "<<layer_names_[i]
+//          <<" bottom blob "<<x<<" ptr: "<<bottom_vecs_[i][x]->mutable_gpu_diff();
+//      }
+      //END DEBUG
+
       layers_[i]->Backward(
           top_vecs_[i], bottom_need_backward_[i], bottom_vecs_[i]);
+
       if (debug_info_) { BackwardDebugInfo(i); }
 
 #ifdef USE_MPI
@@ -940,6 +983,305 @@ const shared_ptr<Layer<Dtype> > Net<Dtype>::layer_by_name(
     LOG(WARNING) << "Unknown layer name " << layer_name;
   }
   return layer_ptr;
+}
+
+/**
+ * This class is the core of memory optimization
+ * It simulates an abstract ``slot'' with shared by multiple syncedmem instances.
+ * The slot will be held exclusively by one syncedmem at a time.
+ * This starts when the related layer writes data to this memory block and ends when the data is no-longer needed for
+ * propagation.
+ * During the dry-run process, a dynamic number of slots are created when deemed necessary (no empty slot is available
+ * when we are acquring one).
+ * By keeping track of data depedencies, we can safely make a series of blobs share the underlying storage without the
+ * risk of data corruption.
+ */
+class SlotMeta {
+public:
+    SlotMeta()
+      : key_(), ref_(0) { }
+
+    SlotMeta(const string& key, int ref)
+      : key_(key), ref_(ref) { }
+
+    inline const string& key() const { return key_; }
+    inline int ref() const { return ref_; }
+
+    inline void DerefOne(){
+      CHECK_GT(ref_, 0)<<"Trying to deference a free slot. Potentially this is a bug in the memory optimization process.";
+      ref_ -= 1;
+      if (ref_ == 0){
+        key_.clear();
+      }
+    }
+
+    inline void IncRef(){ref_ += 1;}
+
+    void RefSlot(const string& key, int ref) {
+      CHECK(key_.empty())<<"Referencing an non empty slot: "<<key_<<" with a new key: "<<key;
+      CHECK_GT(ref, 0);
+      key_ = key;
+      ref_ = ref;
+    }
+
+    inline bool Empty(){
+      return key_.empty();
+    }
+
+    inline bool isSlot(const string& key){return key_ == key;}
+
+private:
+    string key_;
+    int ref_;
+};
+
+size_t AcquireSlot(vector<SlotMeta>& slot_vec, const string& key, int ref) {
+  for (size_t i = 0 ; i < slot_vec.size(); ++i) {
+    if (slot_vec[i].Empty()) {
+      slot_vec[i].RefSlot(key, ref);
+      return i;
+    }
+  }
+
+  // no available slot, need a new one
+  slot_vec.push_back(SlotMeta(key, ref));
+
+  return slot_vec.size() - 1;
+}
+
+int FindSlot(vector<SlotMeta>& slot_vec, const string& key){
+  for (int i = 0; i < slot_vec.size(); ++i){
+    if (slot_vec[i].isSlot(key)){
+      return i;
+    }
+  }
+  return -1;
+}
+
+inline bool check_exclude(const std::set<string>& exclude_list, const string& blob_name){
+  return exclude_list.find(blob_name) != exclude_list.end();
+}
+
+
+inline string create_or_link(boost::unordered_map<string, string>& record,
+                             const string& blob_name, const string& suffix){
+  string name = blob_name + suffix;
+  if (record.find(name) != record.end()){
+    return record[name];
+  }else{
+    record[name] = name;
+    return name;
+  }
+}
+
+inline void exclude_both(boost::unordered_map<string, string>& record,
+                         std::set<string>& ex_set,
+                         const string& blob_name){
+  string root_data_name = create_or_link(record, blob_name, "_data");
+  string root_diff_name = create_or_link(record, blob_name, "_diff");
+
+  ex_set.insert(root_data_name);
+  ex_set.insert(root_diff_name);
+}
+
+template <typename Dtype>
+void Net<Dtype>::MemoryOptimize_v2(){
+  // Pre-works
+  // Check the share data/diff situation
+  boost::unordered_map<string, string> share_record;
+  std::set<string> excluded_names_;
+
+  LOG(INFO)<<"Starting Memory Optimization:";
+
+  LOG(INFO)<<"Checking data/diff sharing status";
+  for (int i = 0; i < layers_.size(); ++i){
+    const vector<Blob<Dtype>* >& layer_top = top_vecs_[i];
+    const vector<Blob<Dtype>* >& layer_bottom = bottom_vecs_[i];
+
+    for (int i_top = 0; i_top < layer_top.size(); ++i_top){
+
+      const string& top_name = blob_names_[top_id_vecs_[i][i_top]];
+      string root_top_data_name = create_or_link(share_record, top_name, "_data");
+      string root_top_diff_name = create_or_link(share_record, top_name, "_diff");
+
+      for (int i_bottom = 0; i_bottom < layer_bottom.size(); ++i_bottom){
+
+        const string& bottom_name = blob_names_[bottom_id_vecs_[i][i_bottom]];
+        string root_bottom_data_name = create_or_link(share_record, bottom_name, "_data");
+        string root_bottom_diff_name = create_or_link(share_record, bottom_name, "_diff");
+
+        // shared data memory blocks forms unions, we link all nodes in a union to their common root node
+        if (layers_[i]->is_sharing_data(i_top, i_bottom)){
+          share_record[root_top_data_name] = root_bottom_data_name;
+        }
+
+        // same goes for diff memory blocks
+        if (layers_[i]->is_sharing_diff(i_top, i_bottom)){
+          share_record[root_bottom_diff_name] = root_top_diff_name;
+        }
+      }
+    }
+  }
+
+  // Color the excluded sets
+  for (std::set<string>::iterator it = excluded_blob_names_.begin(); it != excluded_blob_names_.end(); ++it){
+    exclude_both(share_record, excluded_names_, *it);
+  }
+
+  // Exclude input & outputs
+  for (int i = 0; i < net_output_blob_indices_.size(); ++i){
+    exclude_both(share_record, excluded_names_, blob_names_[net_output_blob_indices_[i]]);
+    LOG(INFO)<<"excluding output "<<blob_names_[net_output_blob_indices_[i]];
+  }
+  for (int i = 0; i < net_input_blob_indices_.size(); ++i){
+    exclude_both(share_record, excluded_names_, blob_names_[net_input_blob_indices_[i]]);
+    LOG(INFO)<<"excluding input "<<blob_names_[net_input_blob_indices_[i]];
+  }
+
+  // Exclude network sources, aka data layers
+  for (int i = 0; i < layers_.size(); ++i) {
+    if (bottom_vecs_[i].size() == 0){
+      for (int i_top = 0; i_top < top_vecs_[i].size(); ++i_top){
+        const string& top_name = blob_names_[top_id_vecs_[i][i_top]];
+        exclude_both(share_record, excluded_names_, top_name);
+        LOG(INFO)<<"excluding data layer output "<<top_name;
+      }
+    }
+  }
+
+  // Exclude all losses
+  for (int i = 0; i < layers_.size(); ++i){
+    for (int i_top = 0; i_top < top_vecs_[i].size(); ++i_top){
+      if (layers_[i]->loss(i_top)){
+        const string& top_name = blob_names_[top_id_vecs_[i][i_top]];
+        exclude_both(share_record, excluded_names_, top_name);
+        LOG(INFO)<<"excluding loss "<<top_name;
+      }
+    }
+  }
+
+  // Pre-works done
+  // Dry run to determine dependencies.
+
+  vector<SlotMeta> slots;
+  boost::unordered_map<string, int> slot_index;
+
+  int direction = 1;
+  string str_direction = "forward";
+  for (int i = 0; i >= 0;){
+    const vector<Blob<Dtype>* >& layer_output = (direction>0)?top_vecs_[i]:bottom_vecs_[i];
+    const vector<Blob<Dtype>* >& layer_input = (direction>0)?bottom_vecs_[i]:top_vecs_[i];
+
+    LOG(INFO)<< "layer " <<i<< " layer name: "<<layer_names_[i]<< " direction: "<<str_direction;
+    string suffix = (direction>0)?"_data":"_diff";
+
+    // Find slot for each layer output data
+    for (int i_out = 0; i_out < layer_output.size(); ++i_out){
+      const string& output_name = blob_names_[(direction>0)?top_id_vecs_[i][i_out]:bottom_id_vecs_[i][i_out]];
+
+      string root_full_name = create_or_link(share_record, output_name, suffix);
+
+      if (check_exclude(excluded_names_, root_full_name)) continue;
+
+      string output_full_name = output_name + suffix;
+
+      // not excluded, let's do the math
+      int idx = FindSlot(slots, output_full_name);
+      if (idx == -1){
+        if (root_full_name == output_full_name){
+          // not sharing data
+          idx = (int)AcquireSlot(slots, output_full_name, 1);
+          slot_index[output_full_name] = idx;
+          LOG(INFO)<<"blob "<<output_full_name<<" acquired new slot "<<idx;
+        }else{
+          // sharing data with its root
+          slot_index[output_full_name] = slot_index[root_full_name];
+          slots[slot_index[root_full_name]].IncRef();
+          LOG(INFO)<<"blob "<<output_full_name<<" shares its root " <<root_full_name<<"'s slot: "<<slot_index[output_full_name];
+        }
+      } else {
+        // in-place operations
+        slots[idx].IncRef();
+      }
+
+    }
+
+    // Deref the layer's output if necessary
+    for (int i_in = 0; i_in < layer_input.size(); ++i_in){
+      const string& input_name = blob_names_[(direction>0)?bottom_id_vecs_[i][i_in]:top_id_vecs_[i][i_in]];
+      string root_full_name = create_or_link(share_record, input_name, suffix);
+
+      if (check_exclude(excluded_names_, root_full_name)) continue;
+
+      string input_full_name = input_name + suffix;
+
+      if (phase_ == TRAIN && layer_need_backward_[i] && direction > 0) {
+        LOG(INFO)<<"skipping deref";
+        continue;
+      }
+
+      int idx = FindSlot(slots, root_full_name);
+      slots[idx].DerefOne();
+      LOG(INFO)<<"deref slot "<<idx<<" held by blob "<<root_full_name;
+    }
+
+    // reverse once we reach the end of forward
+    if (direction > 0 && i == layers_.size() - 1) {
+      direction = -1;
+      str_direction = "backward";
+    }else{
+      i += direction;
+    }
+
+  }
+
+
+  // Memory assignment
+  shared_storage_.resize(slots.size());
+  for (int i_mem = 0; i_mem < shared_storage_.size(); i_mem++){
+    shared_storage_[i_mem].reset(new SyncedMemory(1));
+  }
+
+  size_t count_raw = 0;
+  size_t count_opt = 0;
+  for (int i_blob = 0; i_blob < blobs_.size(); ++i_blob){
+    const string& name = blob_names_[i_blob];
+    const size_t bytes = blobs_[i_blob]->count() * sizeof(Dtype);
+    count_raw += bytes * 2;
+    int idx = -1;
+
+    // all blobs in the same slot share a same externally hosted SyncedMem instance
+    // we will keep track of the estimated memory usage reduction while linking them to the SyncedMem
+    if (slot_index.find(name + "_data") != slot_index.end()) {
+      idx = slot_index[name + "_data"];
+      blobs_[i_blob]->SetDataStorage(shared_storage_[idx]);
+      shared_storage_[idx]->Resize(bytes);
+    } else {
+      count_opt += bytes;
+    }
+    LOG(INFO) << "blob " << i_blob
+        << " name " << blob_names_[i_blob]
+        << " data idx " << idx;
+    if (slot_index.find(name + "_diff") != slot_index.end()) {
+      idx = slot_index[name + "_diff"];
+      blobs_[i_blob]->SetDiffStorage(shared_storage_[idx]);
+      shared_storage_[idx]->Resize(bytes);
+    } else {
+      count_opt += bytes;
+    }
+    LOG(INFO) << "blob " << i_blob
+        << " name " << blob_names_[i_blob]
+        << " diff idx " << idx;
+  }
+
+  for (int i_mem = 0; i_mem < shared_storage_.size(); i_mem++){
+    LOG(INFO) << "storage memory slot " << i_mem
+        << " size " << shared_storage_[i_mem]->size();
+    count_opt += shared_storage_[i_mem]->size();
+  }
+
+  LOG(INFO) << "raw memory " << count_raw << " opt memory " << count_opt;
+
 }
 
 INSTANTIATE_CLASS(Net);

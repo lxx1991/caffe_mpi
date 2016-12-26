@@ -14,6 +14,8 @@ This branch hosts the code for the technical report ["Towards Good Practices for
 
 
 ### Updates
+- Dec, 2016
+  * Major updates of the codebase. New features include memory optimization and dilated convolution.
 - Aug 23, 2016
   * [Temporal Segment Networks](https://github.com/yjxiong/temporal-segment-networks): a new state of the art action recognition framework is open sourced.
 - Aug 1, 2016
@@ -36,7 +38,8 @@ This branch hosts the code for the technical report ["Towards Good Practices for
 - Training on optical flow data. 
 - Data augmentation with fixed corner cropping and multi-scale cropping.
 - Parallel training with multiple GPUs.
-- cuDNNv5 integration.
+- Newest cuDNN integration.
+- Slim memory footprints in both training and testing,
 
 ### Usage
 
@@ -69,6 +72,10 @@ make && make install
 mpirun -np 4 ./install/bin/caffe train --solver=<Your Solver File> [--weights=<Pretrained caffemodel>]
 ```
 **Note**: actual batch_size will be `num_device` times `batch_size` specified in network's prototxt.
+- Runtime memory optimization
+  - Memory optimization drastically reduces memory usage (half for training and almost all for testing) by
+  safely sharing underlying storage of a series of blobs.
+  - For usage and the mechanism behind the scene, see the [Wiki Page](https://github.com/yjxiong/caffe/wiki/Memory-Optimization)
 
 ### Working Examples
 - Temporal Segment Networks: Towards Good Practices for Deep Action Recognition

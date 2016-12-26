@@ -89,6 +89,9 @@ message NetParameter {
   // connectivity and behavior, is specified as a LayerParameter.
   repeated LayerParameter layer = 100;  // ID 100 so layers are printed last.
 
+  // The configuration of memory optimization
+  optional MemoryOptimizationParameter mem_param = 200;
+
   // DEPRECATED: use 'layer' instead.
   repeated V1LayerParameter layers = 2;
 }
@@ -96,7 +99,7 @@ message NetParameter {
 // NOTE
 // Update the next available ID when you add a new SolverParameter field.
 //
-// SolverParameter next available ID: 38 (last added: richness)
+// SolverParameter next available ID: 39 (last added: group_id)
 message SolverParameter {
   //////////////////////////////////////////////////////////////////////////////
   // Specifying the train and test networks
@@ -181,6 +184,7 @@ message SolverParameter {
   optional SolverMode solver_mode = 17 [default = GPU];
   // the device_id will that be used in GPU mode. Use device_id = 0 in default.
   repeated int32 device_id = 18 ;
+  repeated int32 group_id = 38;
   // If non-negative, the seed with which the Solver will initialize the Caffe
   // random number generator -- useful for reproducible results. Otherwise,
   // (and by default) initialize using a seed derived from the system clock.
@@ -349,6 +353,7 @@ message LayerParameter {
   optional ReductionParameter reduction_param = 136;
   optional ReLUParameter relu_param = 123;
   optional ReshapeParameter reshape_param = 133;
+  optional SegDataParameter seg_data_param = 141;
   optional SigmoidParameter sigmoid_param = 124;
   optional SoftmaxParameter softmax_param = 125;
   optional SPPParameter spp_param = 132;
@@ -402,6 +407,16 @@ message TransformationParameter {
 
   //if set to true, it is optical flow field
   optional bool is_flow = 14 [default = false];
+
+  //if set to true, will use original image processing mode
+  // i.e. will use Inception style data augmentation
+  optional bool original_image = 20 [ default = false];
+
+  //height and width should be multiples of stride
+  optional int32 stride = 16 [default = 1];
+  optional int32 upper_size = 17;
+  optional int32 upper_height = 18;
+  optional int32 upper_width = 19;
 }
 
 // Message that stores parameters shared by loss layers
@@ -494,6 +509,9 @@ message ConvolutionParameter {
   optional uint32 stride = 6 [default = 1]; // The stride (equal in Y, X)
   optional uint32 stride_h = 13; // The stride height
   optional uint32 stride_w = 14; // The stride width
+  optional uint32 dilation = 16 [default = 1]; // The dilation (equal in Y, X)
+  optional uint32 dilation_h = 17; // The dilation height
+  optional uint32 dilation_w = 18; // The dilation width
   optional FillerParameter weight_filler = 7; // The filler for the weight
   optional FillerParameter bias_filler = 8; // The filler for the bias
   enum Engine {
@@ -564,6 +582,7 @@ message EltwiseParameter {
     PROD = 0;
     SUM = 1;
     MAX = 2;
+    STOCHASTIC_SUM = 3;
   }
   optional EltwiseOp operation = 1 [default = SUM]; // element-wise operation
   repeated float coeff = 2; // blob-wise coefficient for SUM operation
@@ -803,6 +822,7 @@ message ReductionParameter {
     ASUM = 2;
     SUMSQ = 3;
     MEAN = 4;
+    TOPK = 5;  // top-k reduction output the average of the largest k elements
   }
 
   optional ReductionOp operation = 1 [default = SUM]; // reduction operation
@@ -823,6 +843,8 @@ message ReductionParameter {
   optional int32 axis = 2 [default = 0];
 
   optional float coeff = 3 [default = 1.0]; // coefficient for output
+
+  optional int32 k = 4 [default = 1]; // k for top k reduction (only used in batch reduction layer)
 }
 
 // Message that stores parameters used by ReLULayer
@@ -903,6 +925,16 @@ message ReshapeParameter {
   //
   optional int32 axis = 2 [default = 0];
   optional int32 num_axes = 3 [default = -1];
+}
+
+message SegDataParameter{
+  // Specify the data source.
+  optional string source = 1;
+  // Specify the data root_dir.
+  optional string root_dir = 2;
+  // Whether or not ImageLayer should shuffle the list of files at every epoch.
+  optional bool shuffle = 3 [default = false];
+  optional bool balance = 4 [default = false];
 }
 
 message SigmoidParameter {
@@ -1284,4 +1316,21 @@ message BiasParameter {
 message BatchReductionParameter {
     repeated int32 level = 1;
     optional ReductionParameter reduction_param = 2;
+    optional bool pos = 3 [default = false];
+}
+
+message MemoryOptimizationParameter {
+  // Mode of optimization
+
+  // whether to optimize for all nets specified in train phase
+  optional bool optimize_train = 1 [default = true];
+
+  // whether to optimize for all nets specified in test phase
+  optional bool optimize_test = 2 [default = false];
+
+  // By default, all blobs for input and output are excluded from the optimization for safety.
+  // However, one can also claim a few blobs to be excluded.
+  // This is rather helpful when extracting features from intermediate blobs or debugging problems.
+  repeated string exclude_blob = 3;
+
 }
