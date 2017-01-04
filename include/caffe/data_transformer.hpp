@@ -40,7 +40,7 @@ class DataTransformer {
 
   
   void Transform(const Datum& datum_data, const Datum& datum_label, 
-               Blob<Dtype>* transformed_data, Blob<Dtype>* transformed_label);
+               Blob<Dtype>* transformed_data, Blob<Dtype>* transformed_label, int batch_iter = 0);
 
   /**
    * @brief Applies the transformation defined in the data layer's

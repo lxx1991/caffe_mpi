@@ -110,7 +110,7 @@ class BaseConvolutionLayer : public Layer<Dtype> {
   int col_offset_;
   int output_offset_;
 
-  Blob<Dtype> col_buffer_;
+  static Blob<Dtype> *col_buffer_;
   Blob<Dtype> bias_multiplier_;
 };
 
@@ -229,8 +229,8 @@ class RegionConvolutionLayer : public Layer<Dtype> {
   int kernel_dim_;
   int mask_cnt_;
 
-  Blob<Dtype> col_buffer_;
-  Blob<Dtype> top_buffer_;
+  static Blob<Dtype> *col_buffer_;
+  static Blob<Dtype> *top_buffer_;
   Blob<Dtype> bias_multiplier_;
   
 };

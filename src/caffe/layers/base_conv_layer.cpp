@@ -9,6 +9,10 @@
 namespace caffe {
 
 template <typename Dtype>
+Blob<Dtype>* BaseConvolutionLayer<Dtype>::col_buffer_ = new Blob<Dtype>();
+
+
+template <typename Dtype>
 void BaseConvolutionLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top) {
   CHECK_EQ(4, bottom[0]->num_axes()) << "Input must have 4 axes, "
@@ -148,9 +152,11 @@ void BaseConvolutionLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
   // overly large memory usage. In the special case of 1x1 convolution
   // it goes lazily unused to save memory.
   if (reverse_dimensions()) {
-    col_buffer_.Reshape(1, kernel_dim_, height_, width_);
+    if (col_buffer_->count() < kernel_dim_ * height_ * width_)
+      col_buffer_->Reshape(1, kernel_dim_, height_, width_);
   } else {
-    col_buffer_.Reshape(1, kernel_dim_, height_out_, width_out_);
+    if (col_buffer_->count() < kernel_dim_ * height_out_ * width_out_)
+      col_buffer_->Reshape(1, kernel_dim_, height_out_, width_out_);
   }
   // Set up the all ones "bias multiplier" for adding biases by BLAS
   if (bias_term_) {
@@ -167,9 +173,9 @@ void BaseConvolutionLayer<Dtype>::forward_cpu_gemm(const Dtype* input,
   const Dtype* col_buff = input;
   if (!is_1x1_) {
     if (!skip_im2col) {
-      conv_im2col_cpu(input, col_buffer_.mutable_cpu_data());
+      conv_im2col_cpu(input, col_buffer_->mutable_cpu_data());
     }
-    col_buff = col_buffer_.cpu_data();
+    col_buff = col_buffer_->cpu_data();
   }
   for (int g = 0; g < group_; ++g) {
     caffe_cpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, conv_out_channels_ /
@@ -190,7 +196,7 @@ void BaseConvolutionLayer<Dtype>::forward_cpu_bias(Dtype* output,
 template <typename Dtype>
 void BaseConvolutionLayer<Dtype>::backward_cpu_gemm(const Dtype* output,
     const Dtype* weights, Dtype* input) {
-  Dtype* col_buff = col_buffer_.mutable_cpu_data();
+  Dtype* col_buff = col_buffer_->mutable_cpu_data();
   if (is_1x1_) {
     col_buff = input;
   }
@@ -210,8 +216,8 @@ void BaseConvolutionLayer<Dtype>::weight_cpu_gemm(const Dtype* input,
     const Dtype* output, Dtype* weights) {
   const Dtype* col_buff = input;
   if (!is_1x1_) {
-    conv_im2col_cpu(input, col_buffer_.mutable_cpu_data());
-    col_buff = col_buffer_.cpu_data();
+    conv_im2col_cpu(input, col_buffer_->mutable_cpu_data());
+    col_buff = col_buffer_->cpu_data();
   }
   for (int g = 0; g < group_; ++g) {
     caffe_cpu_gemm<Dtype>(CblasNoTrans, CblasTrans, conv_out_channels_ / group_,
@@ -236,9 +242,9 @@ void BaseConvolutionLayer<Dtype>::forward_gpu_gemm(const Dtype* input,
   const Dtype* col_buff = input;
   if (!is_1x1_) {
     if (!skip_im2col) {
-      conv_im2col_gpu(input, col_buffer_.mutable_gpu_data());
+      conv_im2col_gpu(input, col_buffer_->mutable_gpu_data());
     }
-    col_buff = col_buffer_.gpu_data();
+    col_buff = col_buffer_->gpu_data();
   }
   for (int g = 0; g < group_; ++g) {
     caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, conv_out_channels_ /
@@ -259,7 +265,7 @@ void BaseConvolutionLayer<Dtype>::forward_gpu_bias(Dtype* output,
 template <typename Dtype>
 void BaseConvolutionLayer<Dtype>::backward_gpu_gemm(const Dtype* output,
     const Dtype* weights, Dtype* input) {
-  Dtype* col_buff = col_buffer_.mutable_gpu_data();
+  Dtype* col_buff = col_buffer_->mutable_gpu_data();
   if (is_1x1_) {
     col_buff = input;
   }
@@ -279,8 +285,8 @@ void BaseConvolutionLayer<Dtype>::weight_gpu_gemm(const Dtype* input,
     const Dtype* output, Dtype* weights) {
   const Dtype* col_buff = input;
   if (!is_1x1_) {
-    conv_im2col_gpu(input, col_buffer_.mutable_gpu_data());
-    col_buff = col_buffer_.gpu_data();
+    conv_im2col_gpu(input, col_buffer_->mutable_gpu_data());
+    col_buff = col_buffer_->gpu_data();
   }
   for (int g = 0; g < group_; ++g) {
     caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasTrans, conv_out_channels_ / group_,

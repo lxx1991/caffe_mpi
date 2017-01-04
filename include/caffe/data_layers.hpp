@@ -380,11 +380,11 @@ protected:
 
 #ifdef USE_MPI
 	inline virtual void advance_cursor(){
-		lines_id_++;
+		lines_id_+= batch_size_;
 		if (lines_id_ >= lines_.size()) {
 			// We have reached the end. Restart from the first.
 			DLOG(INFO) << "Restarting data prefetching from start.";
-			lines_id_ = 0;
+			lines_id_ -= lines_.size();
 			if (this->layer_param_.seg_data_param().shuffle()) {
 				ShuffleImages();
 			}
@@ -394,6 +394,7 @@ protected:
 
 	vector<std::pair<std::string, std::string> > lines_;
 	int lines_id_;
+	int batch_size_;
 	string name_pattern_;
 };
 

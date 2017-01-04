@@ -320,7 +320,7 @@ void DataTransformer<Dtype>::Transform(const Datum& datum,
 
 template<typename Dtype>
 void DataTransformer<Dtype>::Transform(const Datum& datum_data, const Datum& datum_label, 
-                                       Blob<Dtype>* transformed_data, Blob<Dtype>* transformed_label) {
+                                       Blob<Dtype>* transformed_data, Blob<Dtype>* transformed_label, int batch_iter) {
 
 
   CHECK_EQ(datum_data.height(), datum_label.height());
@@ -369,7 +369,13 @@ void DataTransformer<Dtype>::Transform(const Datum& datum_data, const Datum& dat
   int crop_height = height / stride * stride;
   int crop_width = width / stride * stride;
 
-  if (param_.has_upper_size())
+
+  if (param_.has_crop_size())
+  {
+    crop_height = param_.crop_size();
+    crop_width = param_.crop_size();
+  }
+  else if (param_.has_upper_size())
   {
     crop_height = std::min(crop_height, param_.upper_size());
     crop_width = std::min(crop_width, param_.upper_size());
@@ -381,27 +387,40 @@ void DataTransformer<Dtype>::Transform(const Datum& datum_data, const Datum& dat
   }
 
 
-  int h_off = Rand(height - crop_height + 1);
-  int w_off = Rand(width - crop_width + 1);
+  int h_off, w_off;
+  if (height < crop_height)
+    h_off = -Rand(crop_height - height + 1);
+  else
+    h_off = Rand(height - crop_height + 1);
 
-  transformed_data->Reshape(1, datum_channels, crop_height, crop_width);
-  transformed_label->Reshape(1, 1, crop_height, crop_width);
+  if (width < crop_width)
+    w_off = -Rand(crop_width - width + 1);
+  else
+    w_off = Rand(width - crop_width + 1);
+
+
+  if (batch_iter == 0)
+  {
+    transformed_data->Reshape(transformed_data->num(), datum_channels, crop_height, crop_width);
+    transformed_label->Reshape(transformed_data->num(), 1, crop_height, crop_width);
+  }
 
   //for image data
   
-  Dtype datum_element;
   int top_index;
-  Dtype* ptr = transformed_data->mutable_cpu_data();
+  Dtype* ptr = transformed_data->mutable_cpu_data() + transformed_data->offset(batch_iter);
   for (int c = 0; c < datum_channels; ++c) {
     cv::Mat M(datum_height, datum_width, CV_8UC1);
     for (int h = 0; h < datum_height; ++h)
       for (int w = 0; w < datum_width; ++w) 
       {
         int data_index = (c * datum_height + h) * datum_width + w;
-        M.at<uchar>(h, w) = static_cast<uint8_t>(data[data_index]);
+        M.at<uint8_t>(h, w) = static_cast<uint8_t>(data[data_index]);
       }
     cv::resize(M, M, cv::Size(width, height));
-    cv::Mat cropM(M, cv::Rect(w_off, h_off, crop_width, crop_height));
+
+
+    //cv::Mat cropM(M, cv::Rect(w_off, h_off, crop_width, crop_height));
     for (int h = 0; h < crop_height; ++h)
       for (int w = 0; w < crop_width; ++w)
       {
@@ -411,32 +430,33 @@ void DataTransformer<Dtype>::Transform(const Datum& datum_data, const Datum& dat
         else 
           top_index = (c * crop_height + h) * crop_width + w;
 
-        datum_element = static_cast<Dtype>(cropM.at<uint8_t>(h, w));
         if (has_mean_file) 
         {
             NOT_IMPLEMENTED;
         } 
-        else if (has_mean_values) 
-          ptr[top_index] =(datum_element - mean_values_[c]) * scale;
-        else 
-          ptr[top_index] = datum_element * scale;
+        else if (has_mean_values)
+        {
+          ptr[top_index] = ((h+h_off)>=0) && ((h+h_off)<height) && ((w+w_off)>=0) && ((w+w_off)<width) ? (static_cast<Dtype>(M.at<uint8_t>(h+h_off, w+w_off)) - mean_values_[c]) * scale : 0;
+        }
+        else
+        {
+          ptr[top_index] = ((h+h_off)>=0) && ((h+h_off)<height) && ((w+w_off)>=0) && ((w+w_off)<width) ? static_cast<Dtype>(M.at<uint8_t>(h+h_off, w+w_off)) * scale : 0;
+        }
       }
     M.release();
-    cropM.release();
   }
 
   //for label
 
-  ptr = transformed_label->mutable_cpu_data();
+  ptr = transformed_label->mutable_cpu_data() + transformed_label->offset(batch_iter);
   cv::Mat M(datum_height, datum_width, CV_8UC1);
   for (int h = 0; h < datum_height; ++h)
     for (int w = 0; w < datum_width; ++w)
     {
       int data_index = h * datum_width + w;
-      M.at<uchar>(h, w) = static_cast<uint8_t>(label[data_index]);
+      M.at<uint8_t>(h, w) = static_cast<uint8_t>(label[data_index]);
     }
   cv::resize(M, M, cv::Size(width, height), 0, 0, CV_INTER_NN);
-  cv::Mat cropM(M, cv::Rect(w_off, h_off, crop_width, crop_height));
   for (int h = 0; h < crop_height; ++h)
     for (int w = 0; w < crop_width; ++w) 
     {
@@ -446,10 +466,9 @@ void DataTransformer<Dtype>::Transform(const Datum& datum_data, const Datum& dat
       else 
         top_index = h * crop_width + w;
 
-      ptr[top_index] = static_cast<Dtype>(cropM.at<uint8_t>(h, w));
+      ptr[top_index] = ((h+h_off)>=0) && ((h+h_off)<height) && ((w+w_off)>=0) && ((w+w_off)<width) ? static_cast<Dtype>(M.at<uint8_t>(h+h_off, w+w_off)) : param_.ignore_label();
     }
   M.release();
-  cropM.release();
 }
 
 
