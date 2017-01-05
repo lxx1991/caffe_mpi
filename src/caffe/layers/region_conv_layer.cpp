@@ -40,6 +40,11 @@ void RegionConvolutionLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& botto
       << "pad is pad OR pad_h and pad_w are required.";
   CHECK(!conv_param.has_stride() && !conv_param.has_stride_h() && !conv_param.has_stride_w()) << "Do not support stride now";
 
+  input_compression_ = this->layer_param_.region_convolution_param().input_compression();
+  output_compression_ = this->layer_param_.region_convolution_param().output_compression();
+
+
+
   if (conv_param.has_kernel_size()) {
     kernel_h_ = kernel_w_ = conv_param.kernel_size();
   } else {
@@ -107,22 +112,28 @@ template <typename Dtype>
 void RegionConvolutionLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top) {
 
-  CHECK_EQ(4, bottom[0]->num_axes()) << "Input must have 4 axes, "
-      << "corresponding to (num, channels, height, width)";
-
   num_ = bottom[0]->num();
-  height_ = bottom[0]->height();
-  width_ = bottom[0]->width();
+  height_ = bottom[1]->height();
+  width_ = bottom[1]->width();
 
   CHECK_EQ(num_, 1);
   CHECK_EQ(bottom[0]->channels(), channels_) << "Input size incompatible with"
     " convolution kernel.";
 
   spatial_dim_  = height_ * width_;
+  if (!input_compression_)
+  {
+    CHECK_EQ(bottom[0]->height(), height_);
+    CHECK_EQ(bottom[0]->width(), width_);
+  }
+  else
+  {
+    CHECK_EQ(bottom[0]->height(), 1);
+    CHECK_EQ(bottom[0]->width(), spatial_dim_);
+  }
+
   CHECK_EQ(bottom[1]->num(), num_);
   CHECK_EQ(bottom[1]->channels(), 1);
-  CHECK_EQ(bottom[1]->height(), height_);
-  CHECK_EQ(bottom[1]->width(), width_);
 
   CHECK_EQ(bottom[2]->num(), num_);
   CHECK_EQ(bottom[2]->channels(), 1);
@@ -132,8 +143,15 @@ void RegionConvolutionLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
   // Shape the tops.
   compute_output_shape();
 
-  top[0]->Reshape(num_, num_output_, height_out_, width_out_);
+  // only support in == out;
+  CHECK_EQ(height_, height_out_);
+  CHECK_EQ(width_, width_out_);
 
+  if (!output_compression_)
+    top[0]->Reshape(num_, num_output_, height_out_, width_out_);
+  else
+    top[0]->Reshape(num_, num_output_, 1, spatial_dim_);
+    
   conv_in_height_ = height_;
   conv_in_width_ = width_;
   conv_out_spatial_dim_ = height_out_ * width_out_;
@@ -147,7 +165,6 @@ void RegionConvolutionLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
   if (col_buffer_->count() < kernel_dim_ * height_out_ * width_out_)
     col_buffer_->Reshape(1, kernel_dim_, height_out_, width_out_);
 
-
   if (top_buffer_->count() < conv_out_channels_ * height_out_ * width_out_)
     top_buffer_->Reshape(1, conv_out_channels_, height_out_, width_out_);
   
@@ -159,9 +176,6 @@ void RegionConvolutionLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
         bias_multiplier_.mutable_cpu_data());
   }
 
-  // only support in == out;
-  CHECK_EQ(conv_in_height_, height_out_);
-  CHECK_EQ(conv_in_width_, width_out_);
 }
 
 

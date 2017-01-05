@@ -26,6 +26,16 @@ __global__ void move_back_kernel(const int n, const Dtype* data_im, const Dtype*
 }
 
 template <typename Dtype>
+__global__ void compression_move_back_kernel(const int n, const Dtype* top_buffer,
+    const int height, const int width, const int mask_cnt, Dtype* data) {
+  CUDA_KERNEL_LOOP(index, n) {
+    const int c = index / mask_cnt;
+    const int m_index = index % mask_cnt;
+    data[c * height * width + m_index] = top_buffer[index];
+  }
+}
+
+template <typename Dtype>
 void RegionConvolutionLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top) {
   
@@ -43,8 +53,16 @@ void RegionConvolutionLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bott
   if (mask_cnt_!=0)
   {
     //region im2col
-    region_im2col_gpu(bottom_data, index_1, index_2, mask_cnt_, conv_in_channels_, conv_in_height_, conv_in_width_,
-          kernel_h_, kernel_w_, pad_h_, pad_w_, dilation_h_, dilation_w_, col_buffer_->mutable_gpu_data());
+    if (!input_compression_)
+    {
+      region_im2col_gpu(bottom_data, index_1, index_2, mask_cnt_, conv_in_channels_, conv_in_height_, conv_in_width_,
+            kernel_h_, kernel_w_, pad_h_, pad_w_, dilation_h_, dilation_w_, col_buffer_->mutable_gpu_data());
+    }
+    else
+    {
+      compression_region_im2col_gpu(bottom_data, bottom[1]->gpu_data(), index_1, index_2, mask_cnt_, conv_in_channels_, conv_in_height_, conv_in_width_,
+            kernel_h_, kernel_w_, pad_h_, pad_w_, dilation_h_, dilation_w_, col_buffer_->mutable_gpu_data());
+    }
 
     //gemmm
     caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, conv_out_channels_, mask_cnt_, kernel_dim_,
@@ -58,14 +76,20 @@ void RegionConvolutionLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bott
       (Dtype)1., top_buffer);
     }
   }
-
   //move back
   //caffe_gpu_set(count, static_cast<Dtype>(0), top_data);
-
-  move_back_kernel<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
-        count, bottom_data, mask_data, top_buffer_->gpu_data(), conv_in_height_, conv_in_width_, mask_cnt_,
+  if (!output_compression_)
+  {
+    move_back_kernel<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
+          count, bottom_data, mask_data, top_buffer_->gpu_data(), conv_in_height_, conv_in_width_, mask_cnt_,
+          top_data);
+  }
+  else
+  {
+    compression_move_back_kernel<Dtype><<<CAFFE_GET_BLOCKS(mask_cnt_ * conv_out_channels_), CAFFE_CUDA_NUM_THREADS>>>(
+        mask_cnt_ * conv_out_channels_, top_buffer_->gpu_data(), height_out_, width_out_, mask_cnt_,
         top_data);
-
+  }
   CUDA_POST_KERNEL_CHECK;
 }
 
@@ -82,6 +106,17 @@ __global__ void pick_out_kernel(const int n, const Dtype* data_diff,
     const int h = index_1[m_index];
     const int w = index_2[m_index];
     diff_buffer[index] = data_diff[(c * height + h) * width + w];
+  }
+}
+
+template <typename Dtype>
+__global__ void compression_pick_out_kernel(const int n, const Dtype* data_diff,
+    const int height, const int width,
+    const int mask_cnt, Dtype* diff_buffer) {
+  CUDA_KERNEL_LOOP(index, n) {
+    const int m_index = index % mask_cnt;
+    const int c = index / mask_cnt;
+    diff_buffer[index] = data_diff[c * height * width + m_index];
   }
 }
 
@@ -107,9 +142,17 @@ void RegionConvolutionLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top
 
   //pick_out_kernel
   int num_kernels = conv_out_channels_ * mask_cnt_;
-  pick_out_kernel<Dtype><<<CAFFE_GET_BLOCKS(num_kernels), CAFFE_CUDA_NUM_THREADS>>>(
-        num_kernels, top_diff, height_out_, width_out_, index_1, index_2, mask_cnt_, top_buffer_->mutable_gpu_diff());
 
+  if (!output_compression_)
+  {
+    pick_out_kernel<Dtype><<<CAFFE_GET_BLOCKS(num_kernels), CAFFE_CUDA_NUM_THREADS>>>(
+          num_kernels, top_diff, height_out_, width_out_, index_1, index_2, mask_cnt_, top_buffer_->mutable_gpu_diff());
+  }
+  else
+  {
+    compression_pick_out_kernel<Dtype><<<CAFFE_GET_BLOCKS(num_kernels), CAFFE_CUDA_NUM_THREADS>>>(
+        num_kernels, top_diff, height_out_, width_out_, mask_cnt_, top_buffer_->mutable_gpu_diff());
+  }
 
 
   // Bias gradient, if necessary.
@@ -121,8 +164,16 @@ void RegionConvolutionLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top
   // weight gradient
   if (this->param_propagate_down_[0]) {
 
-    region_im2col_gpu(bottom_data, index_1, index_2, mask_cnt_, conv_in_channels_, conv_in_height_, conv_in_width_,
+    if (!input_compression_)
+    {
+      region_im2col_gpu(bottom_data, index_1, index_2, mask_cnt_, conv_in_channels_, conv_in_height_, conv_in_width_,
             kernel_h_, kernel_w_, pad_h_, pad_w_, dilation_h_, dilation_w_, col_buffer_->mutable_gpu_data());
+    }
+    else
+    {
+      compression_region_im2col_gpu(bottom_data, bottom[1]->gpu_data(), index_1, index_2, mask_cnt_, conv_in_channels_, conv_in_height_, conv_in_width_,
+            kernel_h_, kernel_w_, pad_h_, pad_w_, dilation_h_, dilation_w_, col_buffer_->mutable_gpu_data());
+    }
 
     caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasTrans, conv_out_channels_,
         kernel_dim_, mask_cnt_,
@@ -137,12 +188,25 @@ void RegionConvolutionLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top
         (Dtype)1., weights , top_buffer_->gpu_diff(),
         (Dtype)0., col_buffer_->mutable_gpu_data());
 
-    region_col2im_gpu(col_buffer_->gpu_data(), 
-        index_1, index_2, mask_data,
-        mask_cnt_, conv_in_channels_,
-        conv_in_height_, conv_in_width_, kernel_h_, kernel_w_,
-        pad_h_, pad_w_, dilation_h_, dilation_w_,
-        bottom_diff);
+    caffe_gpu_set(count, static_cast<Dtype>(0), bottom_diff);
+    if (!input_compression_)
+    {
+      region_col2im_gpu(col_buffer_->gpu_data(), 
+          index_1, index_2, mask_data,
+          mask_cnt_, conv_in_channels_,
+          conv_in_height_, conv_in_width_, kernel_h_, kernel_w_,
+          pad_h_, pad_w_, dilation_h_, dilation_w_,
+          bottom_diff);
+    }
+    else
+    {
+      compression_region_col2im_gpu(col_buffer_->gpu_data(), 
+          index_1, index_2, mask_data,
+          mask_cnt_, conv_in_channels_,
+          conv_in_height_, conv_in_width_, kernel_h_, kernel_w_,
+          pad_h_, pad_w_, dilation_h_, dilation_w_,
+          bottom_diff);
+    }
   }
 }
 

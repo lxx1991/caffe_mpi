@@ -277,7 +277,7 @@ message ParamSpec {
 // NOTE
 // Update the next available ID when you add a new LayerParameter field.
 //
-// LayerParameter next available layer-specific ID: 164 (last added: mask_param)
+// LayerParameter next available layer-specific ID: 165 (last added: region_convolution_param)
 message LayerParameter {
   optional string name = 1; // the layer name
   optional string type = 2; // the layer type
@@ -352,6 +352,7 @@ message LayerParameter {
   optional PReLUParameter prelu_param = 131;
   optional PythonParameter python_param = 130;
   optional ReductionParameter reduction_param = 136;
+  optional RegionConvolutionParameter region_convolution_param = 165;
   optional ReLUParameter relu_param = 123;
   optional ReshapeParameter reshape_param = 133;
   optional SegDataParameter seg_data_param = 141;
@@ -853,6 +854,12 @@ message ReductionParameter {
   optional float coeff = 3 [default = 1.0]; // coefficient for output
 
   optional int32 k = 4 [default = 1]; // k for top k reduction (only used in batch reduction layer)
+}
+
+// Message that stores parameters used by RegionConvolutionLayer
+message RegionConvolutionParameter {
+  optional bool input_compression = 1 [default = false];
+  optional bool output_compression = 2 [default = false];
 }
 
 // Message that stores parameters used by ReLULayer

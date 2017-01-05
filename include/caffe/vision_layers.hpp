@@ -229,6 +229,9 @@ class RegionConvolutionLayer : public Layer<Dtype> {
   int kernel_dim_;
   int mask_cnt_;
 
+  bool input_compression_;
+  bool output_compression_;
+
   static Blob<Dtype> *col_buffer_;
   static Blob<Dtype> *top_buffer_;
   Blob<Dtype> bias_multiplier_;
