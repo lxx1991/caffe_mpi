@@ -9,29 +9,18 @@
 namespace caffe {
 
 template <typename Dtype>
-__global__ void move_back_kernel(const int n, const Dtype* data_im, const Dtype* data_mask, const Dtype* top_buffer,
-    const int height, const int width, const int mask_cnt, Dtype* data) {
+__global__ void move_back_kernel(const int n, const Dtype* data_mask, const Dtype* top_buffer,
+    const int spatial_dim, const int mask_cnt, Dtype* data) {
   CUDA_KERNEL_LOOP(index, n) {
-    const int w = index % width;
-    const int h = (index / width) % height;
-    const int temp = static_cast<int>(data_mask[h * width + w]);
-    if (temp == -1)
-      data[index] = 0;//data_im[index];
-    else
-    {
-      const int c = index / (width * height);
-      data[index] = top_buffer[c * mask_cnt + temp];
-    }
+    const int temp = static_cast<int>(data_mask[index % spatial_dim]);
+    data[index] = (temp == -1) ? 0 : top_buffer[(index / spatial_dim) * mask_cnt + temp];
   }
 }
 
 template <typename Dtype>
-__global__ void compression_move_back_kernel(const int n, const Dtype* top_buffer,
-    const int height, const int width, const int mask_cnt, Dtype* data) {
+__global__ void compression_move_back_kernel(const int n, const Dtype* top_buffer, Dtype* data) {
   CUDA_KERNEL_LOOP(index, n) {
-    const int c = index / mask_cnt;
-    const int m_index = index % mask_cnt;
-    data[c * height * width + m_index] = top_buffer[index];
+    data[index] = top_buffer[index];
   }
 }
 
@@ -48,7 +37,6 @@ void RegionConvolutionLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bott
   const Dtype* index_2 = bottom[2]->gpu_data()+bottom[2]->offset(0, 0, 1, 1);
   const int count = top[0]->count();
   mask_cnt_ = bottom[2]->cpu_data()[0];
-
 
   if (mask_cnt_!=0)
   {
@@ -81,14 +69,13 @@ void RegionConvolutionLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bott
   if (!output_compression_)
   {
     move_back_kernel<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
-          count, bottom_data, mask_data, top_buffer_->gpu_data(), conv_in_height_, conv_in_width_, mask_cnt_,
+          count, mask_data, top_buffer_->gpu_data(), conv_in_height_ * conv_in_width_, mask_cnt_,
           top_data);
   }
   else
   {
     compression_move_back_kernel<Dtype><<<CAFFE_GET_BLOCKS(mask_cnt_ * conv_out_channels_), CAFFE_CUDA_NUM_THREADS>>>(
-        mask_cnt_ * conv_out_channels_, top_buffer_->gpu_data(), height_out_, width_out_, mask_cnt_,
-        top_data);
+        mask_cnt_ * conv_out_channels_, top_buffer_->gpu_data(), top_data);
   }
   CUDA_POST_KERNEL_CHECK;
 }
@@ -110,13 +97,9 @@ __global__ void pick_out_kernel(const int n, const Dtype* data_diff,
 }
 
 template <typename Dtype>
-__global__ void compression_pick_out_kernel(const int n, const Dtype* data_diff,
-    const int height, const int width,
-    const int mask_cnt, Dtype* diff_buffer) {
+__global__ void compression_pick_out_kernel(const int n, const Dtype* data_diff, Dtype* diff_buffer) {
   CUDA_KERNEL_LOOP(index, n) {
-    const int m_index = index % mask_cnt;
-    const int c = index / mask_cnt;
-    diff_buffer[index] = data_diff[c * height * width + m_index];
+    diff_buffer[index] = data_diff[index];
   }
 }
 
@@ -151,7 +134,7 @@ void RegionConvolutionLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top
   else
   {
     compression_pick_out_kernel<Dtype><<<CAFFE_GET_BLOCKS(num_kernels), CAFFE_CUDA_NUM_THREADS>>>(
-        num_kernels, top_diff, height_out_, width_out_, mask_cnt_, top_buffer_->mutable_gpu_diff());
+        num_kernels, top_diff, top_buffer_->mutable_gpu_diff());
   }
 
 

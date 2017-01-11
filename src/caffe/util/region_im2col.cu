@@ -77,7 +77,7 @@ __global__ void compression_region_im2col_gpu_kernel(const int n, const Dtype* d
     const int w_offset = w_col - pad_w;
     Dtype* data_col_ptr = data_col;
     data_col_ptr += c_col * mask_cnt + m_index;
-    const Dtype* data_im_ptr = data_im + c_im * height * width;
+    const Dtype* data_im_ptr = data_im + c_im * mask_cnt;
     const Dtype* data_mask_ptr = data_mask + h_offset * width + w_offset;
     for (int i = 0; i < kernel_h; ++i) {
       for (int j = 0; j < kernel_w; ++j) {
@@ -245,7 +245,7 @@ __global__ void compression_region_col2im_gpu_kernel(const int n, const Dtype* d
         }
       }
     }
-    data_im[c_im * height * width + m_index] = val;
+    data_im[c_im * mask_cnt + m_index] = val;
   }
 }
 

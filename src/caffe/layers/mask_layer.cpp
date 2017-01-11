@@ -34,6 +34,8 @@ void MaskLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
   }
   top[0]->Reshape(bottom[0]->num(), 1, bottom[0]->height(), bottom[0]->width());
   top[1]->Reshape(bottom[0]->num(), 1, 2, bottom[0]->height() * bottom[0]->width() + 1);
+  if (top.size() > 2)
+    top[2]->Reshape(bottom[0]->num(), 1, 1, 1);
 }
 
 
@@ -228,6 +230,8 @@ void MaskLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
   }*/
   idx[0] = Dtype(cnt);
   idx[spatial_dim + 1] = Dtype(cnt);
+  if (top.size() > 2)
+    top[2]->mutable_cpu_data()[0] = Dtype(cnt);
 }
 
 template <typename Dtype>

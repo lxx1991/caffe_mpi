@@ -115,10 +115,15 @@ __global__ void kernel_backward_bottom(
 template <typename Dtype>
 void SyncBNLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
     const vector<Blob<Dtype>*>& top) {
+
+  int spatial_dim = height_ * width_;
+  if (bottom.size() == 3)
+    spatial_dim = static_cast<int>(bottom[2]->cpu_data()[0]);
+
   if (this->phase_ == TEST) {
     kernel_test_forward<<<CAFFE_GET_BLOCKS(bottom[0]->count()),
         CAFFE_CUDA_NUM_THREADS>>>(
-      num_, channels_, height_ * width_,
+      num_, channels_, spatial_dim,
       this->blobs_[0]->gpu_data(),
       this->blobs_[1]->gpu_data(),
       this->blobs_[2]->gpu_data(),
@@ -129,10 +134,10 @@ void SyncBNLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
     );
     CUDA_POST_KERNEL_CHECK;
   } else {
-    const int m = num_ * height_ * width_ * Caffe::MPI_all_rank();
+    const int m = num_ * spatial_dim * Caffe::MPI_all_rank();
     // compute local E[x] and E[x^2]
     kernel_local_stats<<<channels_, CAFFE_CUDA_NUM_THREADS>>>(
-      num_, channels_, height_ * width_,
+      num_, channels_, spatial_dim,
       static_cast<Dtype>(m),
       bottom[0]->gpu_data(),
       mean_buffer_.mutable_gpu_data(),
@@ -163,7 +168,7 @@ void SyncBNLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
     // compute output
     kernel_test_forward<<<CAFFE_GET_BLOCKS(bottom[0]->count()),
         CAFFE_CUDA_NUM_THREADS>>>(
-      num_, channels_, height_ * width_,
+      num_, channels_, spatial_dim,
       this->blobs_[0]->gpu_data(),
       this->blobs_[1]->gpu_data(),
       mean_buffer_.gpu_data(),
@@ -179,12 +184,17 @@ void SyncBNLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
 template <typename Dtype>
 void SyncBNLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
     const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom) {
+
+  int spatial_dim = height_ * width_;
+  if (bottom.size() == 3)
+    spatial_dim = static_cast<int>(bottom[2]->cpu_data()[0]);
+
   if (propagate_down[0]) {
     CHECK(this->param_propagate_down_[0] && this->param_propagate_down_[1])
         << "SyncBN layer params should backprop when the layer backprops";
     // compute local scale and bias diff
     kernel_backward_scale_bias<<<channels_, CAFFE_CUDA_NUM_THREADS>>>(
-      num_, channels_, height_ * width_,
+      num_, channels_, spatial_dim,
       mean_buffer_.gpu_data(),
       var_buffer_.gpu_data(),
       bn_eps_,
@@ -209,13 +219,13 @@ void SyncBNLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
     // compute bottom diff
     kernel_backward_bottom<<<CAFFE_GET_BLOCKS(bottom[0]->count()),
         CAFFE_CUDA_NUM_THREADS>>>(
-      num_, channels_, height_ * width_,
+      num_, channels_, spatial_dim,
       this->blobs_[0]->gpu_data(),
       this->blobs_[1]->gpu_data(),
       mean_buffer_.gpu_data(),
       var_buffer_.gpu_data(),
       bn_eps_,
-      static_cast<Dtype>(num_ * height_ * width_ * Caffe::MPI_all_rank()),
+      static_cast<Dtype>(num_ * spatial_dim * Caffe::MPI_all_rank()),
       top[0]->gpu_diff(),
       mean_buffer_.gpu_diff(),
       var_buffer_.gpu_diff(),
