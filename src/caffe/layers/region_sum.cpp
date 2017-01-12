@@ -9,8 +9,8 @@ namespace caffe {
 template <typename Dtype>
 void RegionSumLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top) {
-	op0_ = this->layer_param().eltwise_param().coeff(0);
-	op1_ = this->layer_param().eltwise_param().coeff(1);	
+	op1_ = this->layer_param().eltwise_param().coeff(0);
+	op2_ = this->layer_param().eltwise_param().coeff(1);	
 }
 
 template <typename Dtype>

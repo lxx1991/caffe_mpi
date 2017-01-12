@@ -117,11 +117,11 @@ void SyncBNLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
     const vector<Blob<Dtype>*>& top) {
 
   int spatial_dim = height_ * width_;
-  if (bottom.size() == 3)
-    spatial_dim = static_cast<int>(bottom[2]->cpu_data()[0]);
+  if (bottom.size() == 2)
+    spatial_dim = static_cast<int>(bottom[1]->cpu_data()[0]);
 
   if (this->phase_ == TEST) {
-    kernel_test_forward<<<CAFFE_GET_BLOCKS(bottom[0]->count()),
+    kernel_test_forward<<<CAFFE_GET_BLOCKS(num_ * channels_ * spatial_dim),
         CAFFE_CUDA_NUM_THREADS>>>(
       num_, channels_, spatial_dim,
       this->blobs_[0]->gpu_data(),
@@ -166,7 +166,7 @@ void SyncBNLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
         Dtype(1) - bn_momentum_, var_buffer_.gpu_data(),
         bn_momentum_, this->blobs_[3]->mutable_gpu_data());
     // compute output
-    kernel_test_forward<<<CAFFE_GET_BLOCKS(bottom[0]->count()),
+    kernel_test_forward<<<CAFFE_GET_BLOCKS(num_ * channels_ * spatial_dim),
         CAFFE_CUDA_NUM_THREADS>>>(
       num_, channels_, spatial_dim,
       this->blobs_[0]->gpu_data(),
@@ -186,8 +186,8 @@ void SyncBNLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
     const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom) {
 
   int spatial_dim = height_ * width_;
-  if (bottom.size() == 3)
-    spatial_dim = static_cast<int>(bottom[2]->cpu_data()[0]);
+  if (bottom.size() == 2)
+    spatial_dim = static_cast<int>(bottom[1]->cpu_data()[0]);
 
   if (propagate_down[0]) {
     CHECK(this->param_propagate_down_[0] && this->param_propagate_down_[1])
@@ -217,7 +217,7 @@ void SyncBNLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
                    var_buffer_.gpu_diff(),
                    this->blobs_[1]->mutable_gpu_diff());
     // compute bottom diff
-    kernel_backward_bottom<<<CAFFE_GET_BLOCKS(bottom[0]->count()),
+    kernel_backward_bottom<<<CAFFE_GET_BLOCKS(num_ * channels_ * spatial_dim),
         CAFFE_CUDA_NUM_THREADS>>>(
       num_, channels_, spatial_dim,
       this->blobs_[0]->gpu_data(),
