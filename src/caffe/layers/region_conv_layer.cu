@@ -170,8 +170,7 @@ void RegionConvolutionLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top
         mask_cnt_, conv_out_channels_,
         (Dtype)1., weights , top_buffer_->gpu_diff(),
         (Dtype)0., col_buffer_->mutable_gpu_data());
-
-    caffe_gpu_set(count, static_cast<Dtype>(0), bottom_diff);
+    caffe_gpu_set(bottom[0]->count(), static_cast<Dtype>(0), bottom_diff);
     if (!input_compression_)
     {
       region_col2im_gpu(col_buffer_->gpu_data(), 
