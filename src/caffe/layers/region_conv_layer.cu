@@ -36,7 +36,7 @@ void RegionConvolutionLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bott
   const Dtype* index_1 = bottom[2]->gpu_data()+bottom[2]->offset(0, 0, 0, 1);
   const Dtype* index_2 = bottom[2]->gpu_data()+bottom[2]->offset(0, 0, 1, 1);
   const int count = top[0]->count();
-  mask_cnt_ = bottom[2]->cpu_data()[0];
+  int mask_cnt_ = bottom[2]->cpu_data()[0];
 
   if (mask_cnt_!=0)
   {
@@ -68,8 +68,8 @@ void RegionConvolutionLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bott
   //caffe_gpu_set(count, static_cast<Dtype>(0), top_data);
   if (!output_compression_)
   {
-    move_back_kernel<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
-          count, mask_data, top_buffer_->gpu_data(), conv_in_height_ * conv_in_width_, mask_cnt_,
+    move_back_kernel<Dtype><<<CAFFE_GET_BLOCKS(conv_out_spatial_dim_ * conv_out_channels_), CAFFE_CUDA_NUM_THREADS>>>(
+          conv_out_spatial_dim_ * conv_out_channels_, mask_data, top_buffer_->gpu_data(), conv_out_spatial_dim_, mask_cnt_,
           top_data);
   }
   else
@@ -121,7 +121,7 @@ void RegionConvolutionLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top
   const Dtype* index_1 = bottom[2]->gpu_data()+bottom[2]->offset(0, 0, 0, 1);
   const Dtype* index_2 = bottom[2]->gpu_data()+bottom[2]->offset(0, 0, 1, 1);
   const int count = top[0]->count();
-  mask_cnt_ = bottom[2]->cpu_data()[0];
+  int mask_cnt_ = bottom[2]->cpu_data()[0];
 
   //pick_out_kernel
   int num_kernels = conv_out_channels_ * mask_cnt_;

@@ -116,7 +116,6 @@ void RegionConvolutionLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
   height_ = bottom[1]->height();
   width_ = bottom[1]->width();
 
-  CHECK_EQ(num_, 1);
   CHECK_EQ(bottom[0]->channels(), channels_) << "Input size incompatible with"
     " convolution kernel.";
 

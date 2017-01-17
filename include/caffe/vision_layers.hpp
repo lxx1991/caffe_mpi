@@ -227,7 +227,6 @@ class RegionConvolutionLayer : public Layer<Dtype> {
   int conv_in_height_;
   int conv_in_width_;
   int kernel_dim_;
-  int mask_cnt_;
 
   bool input_compression_;
   bool output_compression_;
@@ -697,6 +696,8 @@ class SPPLayer : public Layer<Dtype> {
     Dtype threshold_;
     bool prev_mask_;
     int ignore_label_;
+    int spatial_dim_;
+    int num_;
   };
 
 

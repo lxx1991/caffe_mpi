@@ -24,12 +24,22 @@ void RegionSumLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
   const Dtype* bottom_data1 = bottom[1]->gpu_data();
   Dtype* top_data = top[0]->mutable_gpu_data();
   const Dtype* mask_data = bottom[2]->gpu_data();
-  const int count = top[0]->count();
-  int mask_cnt_ = bottom[3]->cpu_data()[0];
+  const int spatial_dim = top[0]->height() * top[0]->width();
+  const int count = spatial_dim * top[0]->channels();
+  
 
-  forward_kernel<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
-      count, bottom_data0, bottom_data1, mask_data, top[0]->height() * top[0]->width(), op1_, op2_, mask_cnt_,
-      top_data);
+  for (int i=0; i<bottom[0]->num(); i++)
+  {
+    int mask_cnt = static_cast<int>(bottom[3]->cpu_data()[i]);
+    forward_kernel<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
+        count, bottom_data0, bottom_data1, mask_data, spatial_dim, op1_, op2_, mask_cnt,
+        top_data);
+
+    bottom_data0 += bottom[0]->offset(1);
+    bottom_data1 += bottom[1]->offset(1);
+    mask_data += bottom[2]->offset(1);
+    top_data += top[0]->offset(1);
+  }
 }
 
 template <typename Dtype>
@@ -52,12 +62,22 @@ void RegionSumLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
   Dtype* bottom_data1 = bottom[1]->mutable_gpu_diff();
   const Dtype* top_data = top[0]->gpu_diff();
   const Dtype* mask_data = bottom[2]->gpu_data();
-  const int count = top[0]->count();
-  int mask_cnt_ = bottom[3]->cpu_data()[0];
+  const int spatial_dim = top[0]->height() * top[0]->width();
+  const int count = spatial_dim * top[0]->channels();
 
-  backward_kernel<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
-      count, bottom_data0, bottom_data1, mask_data, top[0]->height() * top[0]->width(), op1_, op2_, mask_cnt_,
-      top_data);
+
+  for (int i=0; i<bottom[0]->num(); i++)
+  {
+    int mask_cnt = static_cast<int>(bottom[3]->cpu_data()[i]);
+    backward_kernel<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
+        count, bottom_data0, bottom_data1, mask_data, spatial_dim, op1_, op2_, mask_cnt,
+        top_data);
+
+    bottom_data0 += bottom[0]->offset(1);
+    bottom_data1 += bottom[1]->offset(1);
+    mask_data += bottom[2]->offset(1);
+    top_data += top[0]->offset(1);
+  }
 }
 
 INSTANTIATE_LAYER_GPU_FUNCS(RegionSumLayer);
