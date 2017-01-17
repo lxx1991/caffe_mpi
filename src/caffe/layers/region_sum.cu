@@ -12,7 +12,7 @@ __global__ void forward_kernel(const int n, const Dtype* data1, const Dtype* dat
     const int spatial_dim, const Dtype op1_, const Dtype op2_, const int mask_cnt, Dtype* data) {
   CUDA_KERNEL_LOOP(index, n) {
     const int temp = static_cast<int>(data_mask[index % spatial_dim]);
-    data[index] = data1[index] * op1_ + (temp == -1) ? 0 : data2[(index / spatial_dim) * mask_cnt + temp] * op2_;
+    data[index] = data1[index] * op1_ + ((temp == -1) ? 0 : data2[(index / spatial_dim) * mask_cnt + temp] * op2_);
   }
 }
 
