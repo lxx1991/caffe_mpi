@@ -420,6 +420,9 @@ message TransformationParameter {
   optional int32 upper_height = 18;
   optional int32 upper_width = 19;
   optional int32 ignore_label = 21;
+
+  repeated float rand_rotate = 22;
+  optional bool gaussian_blur = 23 [default = false]; 
 }
 
 // Message that stores parameters shared by loss layers
