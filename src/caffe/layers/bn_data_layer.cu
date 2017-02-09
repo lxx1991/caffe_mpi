@@ -319,8 +319,8 @@ void BNDataLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
     // synchronize
     cudaDeviceSynchronize();
     mpi_force_synchronize();
-    caffe_iallreduce(this->blobs_[0]->mutable_cpu_data(), this->channels_);
-    caffe_iallreduce(this->blobs_[1]->mutable_cpu_data(), this->channels_);
+    caffe_iallreduce(this->blobs_[0]->mutable_cpu_diff(), this->channels_);
+    caffe_iallreduce(this->blobs_[1]->mutable_cpu_diff(), this->channels_);
     caffe_iallreduce(this->blobs_[2]->mutable_cpu_data(), this->channels_);
     caffe_iallreduce(this->blobs_[3]->mutable_cpu_data(), this->channels_);
     mpi_force_synchronize();
