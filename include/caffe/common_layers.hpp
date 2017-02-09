@@ -918,6 +918,54 @@ class SyncBNLayer : public Layer<Dtype> {
 };
 #endif
 
+template <typename Dtype>
+class BNDataLayer : public BNLayer<Dtype> {
+public:
+  explicit BNDataLayer(const LayerParameter& param)
+    : BNLayer<Dtype>(param) {}
+  virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
+    const vector<Blob<Dtype>*>& top);
+  virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
+    const  vector<Blob<Dtype>*>& top);
+
+  virtual inline const char* type() const {return "BNData";}
+
+protected:
+  virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+    const vector<Blob<Dtype>*>& top);
+  virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+    const vector<Blob<Dtype>*>& top);
+  virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
+    const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+  virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
+    const vector<bool>& propagate_down,  const vector<Blob<Dtype>*>& bottom);
+
+
+  Blob<Dtype> x_norm_, x_std_;
+
+  Dtype *x_norm_gpu_data_, *x_norm_cpu_data_;
+  // dimension
+  int axis_, num_, channels_, hw_;
+
+  int count_;
+  // eps
+  Dtype var_eps_;
+  // decay factor
+  Dtype decay_;
+  // whether or not using moving average for inference
+  bool moving_average_;
+
+  Dtype* local_mean_;
+  Dtype* local_var_;
+  Dtype* local_scale_;
+  Dtype* local_shift_;
+  
+  Blob<Dtype>* blob_mean_;
+  Blob<Dtype>* blob_var_;
+  Blob<Dtype>* blob_scale_;
+  Blob<Dtype>* blob_shift_;
+};
+
 /**
 * @brief Normalizes input to unit-length vector
 */
