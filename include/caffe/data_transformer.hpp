@@ -140,6 +140,8 @@ class DataTransformer {
    */
   virtual int Rand(int n);
 
+  virtual void Rotation(cv::Mat& src, int degree, bool islabel);
+
   void Transform(const Datum& datum, Dtype* transformed_data);
   // Tranformation parameters
   TransformationParameter param_;

@@ -363,7 +363,7 @@ void DataTransformer<Dtype>::Transform(const Datum& datum_data, const Datum& dat
   float scale_ratios = std::max(Rand(int((upper_scale - lower_scale) * 1000.0) + 1) / 1000.0, 0.0) + lower_scale;
 
   int height = int(datum_height * scale_ratios + 0.5);
-  int xxx = int(datum_width * scale_ratios + 0.5);
+  int width = int(datum_width * scale_ratios + 0.5);
 
 
   int crop_height = height / stride * stride;
@@ -991,7 +991,8 @@ int DataTransformer<Dtype>::Rand(int n) {
   return ((*rng)() % n);
 }
 
-void Rotation(cv::Mat& src, int degree, bool islabel){
+template <typename Dtype>
+void DataTransformer<Dtype>::Rotation(cv::Mat& src, int degree, bool islabel){
   int height = src.size().height;
   int width = src.size().width;
 
