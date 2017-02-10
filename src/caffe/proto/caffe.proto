@@ -470,6 +470,7 @@ message BNParameter {
   // Will override the lr_param and freeze all the parameters.
   // Make sure to initialize the layer properly with pretrained parameters.
   optional bool frozen = 5 [default = false];
+  optional bool moving_average = 7 [default = false];
   enum Engine {
     DEFAULT = 0;
     CAFFE = 1;

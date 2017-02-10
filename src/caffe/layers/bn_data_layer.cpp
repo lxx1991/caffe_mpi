@@ -18,7 +18,7 @@ void BNDataLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
   // extract param
   this->var_eps_ = this->layer_param_.bn_param().eps();
   this->decay_ = 1 - this->layer_param_.bn_param().momentum();
-  this->moving_average_ = false;
+  this->moving_average_ = this->layer_param_.bn_param().moving_average();
   this->axis_ = 1;
   CHECK(this->axis_ == 1 || this->axis_ == 2) << "axis_ should be 1 or 2";
   this->channels_ = bottom[0]->LegacyShape(this->axis_);
