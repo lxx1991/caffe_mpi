@@ -78,6 +78,10 @@ mpirun -np 4 ./install/bin/caffe train --solver=<Your Solver File> [--weights=<P
   - For usage and the mechanism behind the scene, see the [Wiki Page](https://github.com/yjxiong/caffe/wiki/Memory-Optimization)
 
 ### Working Examples
+- Knowledge Guided Disambiguation for Large-Scale Scene Classification with Multi-Resolution CNNs
+  - [TIP Paper](http://guoshengcv.github.io/papers/scene.pdf)
+  - [Code & Models](https://github.com/wanglimin/MRCNN-Scene-Recognition)
+  - 1st in LSUN 2016 and 2nd in ILSVRC 2015 scene classification.
 - Temporal Segment Networks: Towards Good Practices for Deep Action Recognition
   - [ECCV 2016 paper](http://arxiv.org/abs/1608.00859v1)
   - [Action Recognition Framework](https://github.com/yjxiong/temporal-segment-networks)
