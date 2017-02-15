@@ -188,7 +188,20 @@ void BNDataLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
     {
       Dtype temp_scale = Dtype(1) / Caffe::MPI_all_rank();
       for (int i=0; i<channels_; i++)
-        this->d_.mutable_cpu_data()[i] = std::max(std::min((temp_scale * blob_mean_->cpu_data()[i] - this->d_.cpu_data()[i]) / (this->r_.cpu_data()[i] + this->bn_eps_), this->max_d_), -this->max_d_);
+      {
+        //LOG(ERROR) << this->max_d_;
+        //LOG(ERROR) << this->r_.cpu_data()[i] + this->bn_eps_;
+        //LOG(ERROR) << temp_scale * blob_mean_->cpu_data()[i] - this->d_.cpu_data()[i];
+        Dtype s1 = temp_scale * blob_mean_->cpu_data()[i] - this->d_.cpu_data()[i] , s2 = this->r_.cpu_data()[i] + this->bn_eps_;
+
+        if (s2 * this->max_d_ < s1)
+          this->d_.mutable_cpu_data()[i] = this->max_d_;
+        else if (-s2 * this->max_d_ > s1)
+          this->d_.mutable_cpu_data()[i] = -this->max_d_;
+        else
+          this->d_.mutable_cpu_data()[i] = s1 / s2;
+        //LOG(ERROR) << this->d_.cpu_data()[i];
+      }
     }
 
     
@@ -223,8 +236,15 @@ void BNDataLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
     {
       Dtype temp_scale = Dtype(1) / Caffe::MPI_all_rank();
       for (int i=0; i<channels_; i++)
-        this->r_.mutable_cpu_data()[i] = std::max(std::min((temp_scale * blob_var_->cpu_data()[i]) / (this->r_.cpu_data()[i] + this->bn_eps_), this->max_r_), 1/this->max_r_);
-
+      {
+        Dtype s1 = temp_scale * blob_var_->cpu_data()[i] , s2 = this->r_.cpu_data()[i] + this->bn_eps_;
+        if (s2 * this->max_r_ < s1)
+          this->r_.mutable_cpu_data()[i] = this->max_r_;
+        else if (s2 / this->max_r_ > s1)
+          this->r_.mutable_cpu_data()[i] = Dtype(1)/this->max_r_;
+        else
+          this->r_.mutable_cpu_data()[i] = s1 / s2;
+      }
       var_statistic_after_allreduce<Dtype><<<this->channels_, THREAD_BLOCK_SIZE>>>(num_, height_ * width_, channels_, Dtype(2),
                  Dtype(1. / (height_ * width_ * num_)), this->bn_eps_, Dtype(0.5),
                  save_mean, (this->phase_ == TEST || !this->param_propagate_down_[0]) && this->moving_average_,

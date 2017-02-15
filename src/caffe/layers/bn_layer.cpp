@@ -127,11 +127,12 @@ void BNLayer<Dtype>::update_max_rd()
   {
     this->max_r_ = 1;
     this->max_d_ = 0;
-    for (int i=0; i<this->relax_iter_.size(); i++)
-      if (global_iter >= this->relax_iter_.size())
+    for (int i=1; i<this->relax_iter_.size(); i++)
+      if (global_iter < this->relax_iter_.size())
       {
-        this->max_r_ = this->max_rs_[i];
-        this->max_d_ = this->max_ds_[i];
+        this->max_r_ = (this->max_rs_[i] - this->max_rs_[i-1]) / (relax_iter_[i] - relax_iter_[i-1]) * (global_iter - relax_iter_[i-1]) + this->max_rs_[i-1];
+        this->max_d_ = (this->max_ds_[i] - this->max_ds_[i-1]) / (relax_iter_[i] - relax_iter_[i-1]) * (global_iter - relax_iter_[i-1]) + this->max_ds_[i-1];
+        break;
       }
   }
 }
