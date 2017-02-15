@@ -277,7 +277,7 @@ message ParamSpec {
 // NOTE
 // Update the next available ID when you add a new LayerParameter field.
 //
-// LayerParameter next available layer-specific ID: 167 (last added: interp_param)
+// LayerParameter next available layer-specific ID: 168 (last added: rebn_param)
 message LayerParameter {
   optional string name = 1; // the layer name
   optional string type = 2; // the layer type
@@ -352,6 +352,7 @@ message LayerParameter {
   optional PowerParameter power_param = 122;
   optional PReLUParameter prelu_param = 131;
   optional PythonParameter python_param = 130;
+  optional ReBNParameter rebn_param = 167;
   optional ReductionParameter reduction_param = 136;
   optional RegionConvolutionParameter region_convolution_param = 165;
   optional ReLUParameter relu_param = 123;
@@ -837,6 +838,13 @@ message PythonParameter {
 
   //param_str to be sent to the python layer
   optional string param_str = 3;
+}
+
+message ReBNParameter {
+  optional bool rebn = 1 [default = false];
+  repeated uint32 relax_iter = 2;
+  repeated float max_r = 3;
+  repeated float max_d = 4; 
 }
 
 // Message that stores parameters used by ReductionLayer

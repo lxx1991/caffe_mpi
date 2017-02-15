@@ -13,6 +13,7 @@ void BNLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
   frozen_ = this->layer_param_.bn_param().frozen();
   bn_momentum_ = this->layer_param_.bn_param().momentum();
   bn_eps_ = this->layer_param_.bn_param().eps();
+  rebn_ = this->layer_param_.rebn_param().rebn();
   // Initialize parameters
   if (this->blobs_.size() > 0) {
     LOG(INFO) << "Skipping parameter initialization";
@@ -21,6 +22,13 @@ void BNLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
     vector<int> shape;
     shape.push_back(1);
     shape.push_back(bottom[0]->channels());
+
+    if (this->rebn_)
+    {
+      this->r_.Reshape(shape);
+      this->d_.Reshape(shape);
+    }
+
     // slope
     this->blobs_[0].reset(new Blob<Dtype>(shape));
     shared_ptr<Filler<Dtype> > slope_filler(GetFiller<Dtype>(
@@ -62,6 +70,29 @@ void BNLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
     this->layer_param_.mutable_param(1)->set_lr_mult(Dtype(0));
     this->layer_param_.mutable_param(1)->set_decay_mult(Dtype(0));
   }
+
+
+  //batch renorm
+  if (this->rebn_ && !this->frozen_){
+
+    this->relax_iter_.clear();
+    for (int i=0; i<this->layer_param_.rebn_param().relax_iter_size(); i++)
+    {
+      if (i>0)
+        CHECK_GE(this->layer_param_.rebn_param().relax_iter(i), this->relax_iter_.back());
+      this->relax_iter_.push_back(this->layer_param_.rebn_param().relax_iter(i));
+    }
+
+    this->max_rs_.clear();
+    for (int i=0; i<this->layer_param_.rebn_param().max_r_size(); i++)
+      this->max_rs_.push_back(this->layer_param_.rebn_param().max_r(i));
+    CHECK_EQ(this->max_rs_.size(), this->relax_iter_.size());
+
+    this->max_ds_.clear();
+    for (int i=0; i<this->layer_param_.rebn_param().max_d_size(); i++)
+      this->max_ds_.push_back(this->layer_param_.rebn_param().max_d(i));
+    CHECK_EQ(this->max_ds_.size(), this->relax_iter_.size());
+  }
 }
 
 template <typename Dtype>
@@ -90,6 +121,22 @@ void BNLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
 }
 
 template <typename Dtype>
+void BNLayer<Dtype>::update_max_rd() 
+{
+  if (this->rebn_ && !this->frozen_)
+  {
+    this->max_r_ = 1;
+    this->max_d_ = 0;
+    for (int i=0; i<this->relax_iter_.size(); i++)
+      if (global_iter >= this->relax_iter_.size())
+      {
+        this->max_r_ = this->max_rs_[i];
+        this->max_d_ = this->max_ds_[i];
+      }
+  }
+}
+
+template <typename Dtype>
 void BNLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
   const vector<Blob<Dtype>*>& top) {
   const Dtype* const_bottom_data = bottom[0]->cpu_data();
@@ -98,6 +145,8 @@ void BNLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
 
   const Dtype* scale_data = this->blobs_[0]->cpu_data();
   const Dtype* shift_data = this->blobs_[1]->cpu_data();
+
+  update_max_rd();
 
   // Mean normalization
   if (frozen_ || this->phase_ == TEST) {
@@ -114,6 +163,11 @@ void BNLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
         Dtype(1) / num_, spatial_statistic_.cpu_data(),
         batch_sum_multiplier_.cpu_data(), Dtype(0),
         batch_statistic_.mutable_cpu_data());
+    //renorm
+    if (rebn_)
+      for (int i=0; i<channels_; i++)
+        d_.mutable_cpu_data()[i] = std::max(std::min((batch_statistic_.cpu_data()[i] - this->blobs_[2]->cpu_data()[i]) / (this->blobs_[3]->cpu_data()[i] + bn_eps_), max_d_), -max_d_);
+
     // Add to the moving average
     if (!frozen_) {
       caffe_cpu_axpby(batch_statistic_.count(),
@@ -150,6 +204,11 @@ void BNLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
         spatial_statistic_.cpu_data(), batch_sum_multiplier_.cpu_data(),
         Dtype(0), batch_statistic_.mutable_cpu_data());
 
+    //renorm
+    if (rebn_)
+      for (int i=0; i<channels_; i++)
+        r_.mutable_cpu_data()[i] = std::max(std::min( (batch_statistic_.cpu_data()[i])/ (this->blobs_[3]->cpu_data()[i] + bn_eps_), max_r_), 1 / max_r_);
+      
     // Add to the moving average
     caffe_cpu_axpby(batch_statistic_.count(),
         Dtype(1) - bn_momentum_, batch_statistic_.cpu_data(),
@@ -174,6 +233,36 @@ void BNLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
   // Multiply with the inverse std
   caffe_mul(broadcast_buffer_.count(), const_top_data,
       broadcast_buffer_.cpu_data(), top_data);
+
+
+  if (!frozen_ && this->phase_ != TEST && rebn_)
+  {
+    // Broadcast the r
+    caffe_cpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, num_, channels_, 1,
+          Dtype(1), batch_sum_multiplier_.cpu_data(), r_.cpu_data(),
+          Dtype(0), spatial_statistic_.mutable_cpu_data());
+    caffe_cpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, num_ * channels_,
+        height_ * width_, 1, Dtype(1),
+        spatial_statistic_.cpu_data(), spatial_sum_multiplier_.cpu_data(),
+        Dtype(0), broadcast_buffer_.mutable_cpu_data());
+    // Multiply r
+    caffe_mul(broadcast_buffer_.count(), const_bottom_data,
+        broadcast_buffer_.cpu_data(), top_data);
+
+
+    // Broadcast the d
+    caffe_cpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, num_, channels_, 1,
+          Dtype(1), batch_sum_multiplier_.cpu_data(), d_.cpu_data(),
+          Dtype(0), spatial_statistic_.mutable_cpu_data());
+    caffe_cpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, num_ * channels_,
+        height_ * width_, 1, Dtype(1),
+        spatial_statistic_.cpu_data(), spatial_sum_multiplier_.cpu_data(),
+        Dtype(0), broadcast_buffer_.mutable_cpu_data());
+    // Add d
+    caffe_add(broadcast_buffer_.count(), const_top_data,
+        broadcast_buffer_.cpu_data(), top_data);
+  }
+
 
   // Save the normalized inputs and std for backprop
   if (!frozen_) {
@@ -322,7 +411,10 @@ void BNLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
         broadcast_buffer_.cpu_data(), Dtype(-1) / (num_ * height_ * width_),
         bottom_diff);
 
-    // Multiply with the inverse std
+    // Multiply with the inverse std and r(if rebn)
+    if (rebn_)
+      caffe_mul(channels_, r_.cpu_data(), x_inv_std_.cpu_data(), x_inv_std_.mutable_cpu_data());
+
     caffe_cpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, num_, channels_, 1,
         Dtype(1), batch_sum_multiplier_.cpu_data(), x_inv_std_.cpu_data(),
         Dtype(0), spatial_statistic_.mutable_cpu_data());

@@ -819,10 +819,15 @@ class BNLayer : public Layer<Dtype> {
 
   void AverageAllExceptChannel(const Dtype* input, Dtype* output);
   void BroadcastChannel(const Dtype* input, Dtype* output);
+  
+  void update_max_rd();
 
   bool frozen_;
+  bool rebn_;
   Dtype bn_momentum_;
   Dtype bn_eps_;
+  Dtype max_r_;
+  Dtype max_d_;
 
   int num_;
   int channels_;
@@ -838,6 +843,12 @@ class BNLayer : public Layer<Dtype> {
 
   Blob<Dtype> spatial_sum_multiplier_;
   Blob<Dtype> batch_sum_multiplier_;
+
+  Blob<Dtype> r_;
+  Blob<Dtype> d_;
+
+  vector<Dtype> max_rs_, max_ds_;
+  vector<int> relax_iter_;
 };
 
 
@@ -939,7 +950,6 @@ protected:
     const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
   virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
     const vector<bool>& propagate_down,  const vector<Blob<Dtype>*>& bottom);
-
 
   Blob<Dtype> x_norm_, x_std_;
 

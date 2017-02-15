@@ -19,6 +19,7 @@ void BNDataLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
   this->var_eps_ = this->layer_param_.bn_param().eps();
   this->decay_ = 1 - this->layer_param_.bn_param().momentum();
   this->moving_average_ = this->layer_param_.bn_param().moving_average();
+  this->rebn_ = this->layer_param_.rebn_param().rebn();
   this->axis_ = 1;
   CHECK(this->axis_ == 1 || this->axis_ == 2) << "axis_ should be 1 or 2";
   this->channels_ = bottom[0]->LegacyShape(this->axis_);
@@ -30,6 +31,12 @@ void BNDataLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
     this->blobs_.resize(4);
     vector<int> shape(4, 1);
     shape[this->axis_] = this->channels_;
+
+    if (this->rebn_)
+    {
+      this->r_.Reshape(shape);
+      this->d_.Reshape(shape);
+    }
 
     // fill scale with scale_filler
     this->blobs_[0].reset(new Blob<Dtype>(shape));
@@ -66,6 +73,27 @@ void BNDataLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
 
     this->layer_param_.mutable_param(3)->set_lr_mult(float(0));
     this->layer_param_.mutable_param(3)->set_decay_mult(float(0));
+  }
+
+  //batch renorm
+  if (this->rebn_ && !this->frozen_){
+    this->relax_iter_.clear();
+    for (int i=0; i<this->layer_param_.rebn_param().relax_iter_size(); i++)
+    {
+      if (i>0)
+        CHECK_GE(this->layer_param_.rebn_param().relax_iter(i), this->relax_iter_.back());
+      this->relax_iter_.push_back(this->layer_param_.rebn_param().relax_iter(i));
+    }
+
+    this->max_rs_.clear();
+    for (int i=0; i<this->layer_param_.rebn_param().max_r_size(); i++)
+      this->max_rs_.push_back(this->layer_param_.rebn_param().max_r(i));
+    CHECK_EQ(this->max_rs_.size(), this->relax_iter_.size());
+
+    this->max_ds_.clear();
+    for (int i=0; i<this->layer_param_.rebn_param().max_d_size(); i++)
+      this->max_ds_.push_back(this->layer_param_.rebn_param().max_d(i));
+    CHECK_EQ(this->max_ds_.size(), this->relax_iter_.size());
   }
 #endif
 }

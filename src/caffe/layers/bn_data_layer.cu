@@ -111,6 +111,29 @@ __global__ void var_statistic_after_allreduce(const int num, const int map_size,
 
 
 template <typename Dtype>
+__global__ void var_statistic_after_allreduce(const int num, const int map_size, const int channels,
+    Dtype in_pow, Dtype stat_ratio, Dtype stat_eps, Dtype stat_pow,
+    bool save_mean, bool moving_mean, Dtype decay, Dtype com_decay,
+    const Dtype* in, Dtype* history_mean, Dtype* out,
+    Dtype* x_norm,Dtype* x_std, const Dtype* r,const Dtype* d, const Dtype* scale,const Dtype* shift, Dtype* local_var)
+{
+#ifdef USE_MPI
+  Dtype temp = pow(local_var[blockIdx.x] + stat_eps, stat_pow);
+  Dtype scale_value = scale[blockIdx.x], shift_value = shift[blockIdx.x];
+  Dtype r_value = r[blockIdx.x], d_value = d[blockIdx.x];
+  if(threadIdx.x == 0) x_std[blockIdx.x] = temp;
+  for(int i = threadIdx.x; i < num * map_size; i += blockDim.x) {
+    int location = i / map_size * map_size * channels + (i % map_size) + blockIdx.x * map_size;
+    if(i < num * map_size) {
+      x_norm[location] = in[location] / temp * r_value + d_value;
+      out[location] = (in[location] / temp * r_value + d_value) * scale_value + shift_value;
+    }
+  }
+#endif
+}
+
+
+template <typename Dtype>
 void BNDataLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
     const vector<Blob<Dtype>*>& top) {
 #ifdef USE_MPI
@@ -118,6 +141,8 @@ void BNDataLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
   int channels_ = bottom[0]->channels();
   int height_ = bottom[0]->height();
   int width_ = bottom[0]->width();
+
+  update_max_rd();
 
   local_mean_ = blob_mean_->mutable_gpu_data();
   local_var_ = blob_var_->mutable_gpu_data();
@@ -132,6 +157,13 @@ void BNDataLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
     const Dtype* scale_data = this->blobs_[0]->gpu_data();
     const Dtype* shift_data = this->blobs_[1]->gpu_data();
     bool save_mean = this->phase_ == TRAIN && this->param_propagate_down_[0];
+
+
+    if (rebn_)
+    {
+      caffe_copy(channels_, this->blobs_[2]->gpu_data(), this->d_.mutable_gpu_data()); // temp buffer
+      caffe_copy(channels_, this->blobs_[3]->gpu_data(), this->r_.mutable_gpu_data()); // temp buffer
+    }
   
     mean_statistic_before_allreduce<Dtype><<<this->channels_, THREAD_BLOCK_SIZE>>>(num_, height_ * width_, channels_,
                      Dtype(1. / (height_ * width_ * num_)),save_mean,
@@ -150,6 +182,15 @@ void BNDataLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
     CUDA_CHECK(cudaMemcpy(blob_mean_->mutable_gpu_data(), blob_mean_->mutable_cpu_data(), this->channels_*sizeof(Dtype), cudaMemcpyHostToDevice));
     cudaDeviceSynchronize();
 
+
+
+    if (rebn_)
+    {
+      Dtype temp_scale = Dtype(1) / Caffe::MPI_all_rank();
+      for (int i=0; i<channels_; i++)
+        this->d_.mutable_cpu_data()[i] = std::max(std::min((temp_scale * blob_mean_->cpu_data()[i] - this->d_.cpu_data()[i]) / (this->r_.cpu_data()[i] + this->bn_eps_), this->max_d_), -this->max_d_);
+    }
+
     
     mean_statistic_after_allreduce<Dtype><<<this->channels_, THREAD_BLOCK_SIZE>>>(num_, height_ * width_, channels_,
                      Dtype(1. / (height_ * width_ * num_)),save_mean,
@@ -159,7 +200,7 @@ void BNDataLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
     int m = num_ * height_ * width_*Caffe::MPI_all_rank();
     Dtype bias_correction_factor = m > 1 ? Dtype(m)/(m-1) : 1;
     var_statistic_before_allreduce<Dtype><<<this->channels_, THREAD_BLOCK_SIZE>>>(num_, height_ * width_, channels_, Dtype(2),
-                     Dtype(1. / (height_ * width_ * num_)), this->var_eps_, Dtype(0.5),
+                     Dtype(1. / (height_ * width_ * num_)), this->bn_eps_, Dtype(0.5),
                      save_mean, (this->phase_ == TEST || !this->param_propagate_down_[0]) && this->moving_average_,
   		   //save_mean, (!this->param_propagate_down_[0]) && this->moving_average_,
                      this->decay_* bias_correction_factor, Dtype(1)-this->decay_* bias_correction_factor,
@@ -176,14 +217,32 @@ void BNDataLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
     mpi_force_synchronize();
     CUDA_CHECK(cudaMemcpy(blob_var_->mutable_gpu_data(), blob_var_->mutable_cpu_data(), this->channels_*sizeof(Dtype), cudaMemcpyHostToDevice));
     cudaDeviceSynchronize();
-    
-    var_statistic_after_allreduce<Dtype><<<this->channels_, THREAD_BLOCK_SIZE>>>(num_, height_ * width_, channels_, Dtype(2),
-                     Dtype(1. / (height_ * width_ * num_)), this->var_eps_, Dtype(0.5),
-                     save_mean, (this->phase_ == TEST || !this->param_propagate_down_[0]) && this->moving_average_,
-                     //save_mean, (!this->param_propagate_down_[0]) && this->moving_average_,
-                     this->decay_* bias_correction_factor, Dtype(1)-this->decay_*bias_correction_factor,
-                     const_top_data, this->blobs_[3]->mutable_gpu_data(),
-                     top_data,this->x_norm_.mutable_gpu_data(),this->x_std_.mutable_gpu_data(),scale_data,shift_data, local_var_);
+
+
+    if (rebn_)
+    {
+      Dtype temp_scale = Dtype(1) / Caffe::MPI_all_rank();
+      for (int i=0; i<channels_; i++)
+        this->r_.mutable_cpu_data()[i] = std::max(std::min((temp_scale * blob_var_->cpu_data()[i]) / (this->r_.cpu_data()[i] + this->bn_eps_), this->max_r_), 1/this->max_r_);
+
+      var_statistic_after_allreduce<Dtype><<<this->channels_, THREAD_BLOCK_SIZE>>>(num_, height_ * width_, channels_, Dtype(2),
+                 Dtype(1. / (height_ * width_ * num_)), this->bn_eps_, Dtype(0.5),
+                 save_mean, (this->phase_ == TEST || !this->param_propagate_down_[0]) && this->moving_average_,
+                 //save_mean, (!this->param_propagate_down_[0]) && this->moving_average_,
+                 this->decay_* bias_correction_factor, Dtype(1)-this->decay_*bias_correction_factor,
+                 const_top_data, this->blobs_[3]->mutable_gpu_data(),
+                 top_data,this->x_norm_.mutable_gpu_data(),this->x_std_.mutable_gpu_data(), this->r_.gpu_data(), this->d_.gpu_data(), scale_data,shift_data, local_var_);
+    }
+    else
+    {
+      var_statistic_after_allreduce<Dtype><<<this->channels_, THREAD_BLOCK_SIZE>>>(num_, height_ * width_, channels_, Dtype(2),
+                       Dtype(1. / (height_ * width_ * num_)), this->bn_eps_, Dtype(0.5),
+                       save_mean, (this->phase_ == TEST || !this->param_propagate_down_[0]) && this->moving_average_,
+                       //save_mean, (!this->param_propagate_down_[0]) && this->moving_average_,
+                       this->decay_* bias_correction_factor, Dtype(1)-this->decay_*bias_correction_factor,
+                       const_top_data, this->blobs_[3]->mutable_gpu_data(),
+                       top_data,this->x_norm_.mutable_gpu_data(),this->x_std_.mutable_gpu_data(), scale_data,shift_data, local_var_);
+    }
   }
 #endif
 }
@@ -257,6 +316,7 @@ __global__ void scale_shift_bottom_gradient_before_allreduce(const int num, cons
   __syncthreads();
 #endif
 }
+
 template <typename Dtype>
 __global__ void scale_shift_bottom_gradient_after_allreduce(const int num, const int map_size, const int channels,
     const Dtype* in, const Dtype* x_norm, Dtype* scale_diff, Dtype* shift_diff, const Dtype* scale_data,
@@ -268,6 +328,23 @@ __global__ void scale_shift_bottom_gradient_after_allreduce(const int num, const
     if(i < num * map_size) {
       out[location] = s_data_v * (in[location] - (x_norm[location] *
           local_scale[blockIdx.x] + local_shift[blockIdx.x]) / (num * map_size * num_thread)) / x_std_v;
+    }
+  }
+#endif
+}
+
+
+template <typename Dtype>
+__global__ void scale_shift_bottom_gradient_after_allreduce(const int num, const int map_size, const int channels,
+    const Dtype* in, const Dtype* x_norm, Dtype* scale_diff, Dtype* shift_diff, const Dtype* scale_data,
+    const Dtype* x_std, const Dtype* r, Dtype* out, const int num_thread, Dtype* local_scale, Dtype* local_shift) {
+#ifdef USE_MPI
+  Dtype s_data_v = scale_data[blockIdx.x], x_std_v = x_std[blockIdx.x], r_v = r[blockIdx.x];
+  for(int i = threadIdx.x; i < num * map_size; i += blockDim.x) {
+    int location = i / map_size * map_size * channels + (i % map_size) + blockIdx.x * map_size;
+    if(i < num * map_size) {
+      out[location] = s_data_v * (in[location] - (x_norm[location] *
+          local_scale[blockIdx.x] + local_shift[blockIdx.x]) / (num * map_size * num_thread)) / x_std_v * r_v;
     }
   }
 #endif
@@ -309,7 +386,12 @@ void BNDataLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
     CUDA_CHECK(cudaMemcpy(blob_scale_->mutable_gpu_data(), blob_scale_->mutable_cpu_data(), this->channels_*sizeof(Dtype), cudaMemcpyHostToDevice));
     CUDA_CHECK(cudaMemcpy(blob_shift_->mutable_gpu_data(), blob_shift_->mutable_cpu_data(), this->channels_*sizeof(Dtype), cudaMemcpyHostToDevice));
     cudaDeviceSynchronize(); 
-    scale_shift_bottom_gradient_after_allreduce<Dtype><<<this->channels_, THREAD_BLOCK_SIZE>>>(num_, height_ * width_, channels_,
+
+    if (rebn_)
+      scale_shift_bottom_gradient_after_allreduce<Dtype><<<this->channels_, THREAD_BLOCK_SIZE>>>(num_, height_ * width_, channels_,
+          const_top_diff, this->x_norm_.gpu_data(), scale_diff, shift_diff, scale_data, this->x_std_.gpu_data(), this->r_.gpu_data(), bottom_diff, Caffe::MPI_all_rank(), local_scale_,local_shift_);
+    else
+      scale_shift_bottom_gradient_after_allreduce<Dtype><<<this->channels_, THREAD_BLOCK_SIZE>>>(num_, height_ * width_, channels_,
         const_top_diff, this->x_norm_.gpu_data(), scale_diff, shift_diff, scale_data, this->x_std_.gpu_data(), bottom_diff, Caffe::MPI_all_rank(), local_scale_,local_shift_);
     CUDA_POST_KERNEL_CHECK;
     // scale mean and variance
