@@ -13,7 +13,7 @@ void BNLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
   frozen_ = this->layer_param_.bn_param().frozen();
   bn_momentum_ = this->layer_param_.bn_param().momentum();
   bn_eps_ = this->layer_param_.bn_param().eps();
-  rebn_ = this->layer_param_.rebn_param().rebn();
+  rebn_ = this->layer_param_.bn_param().rebn();
   // Initialize parameters
   if (this->blobs_.size() > 0) {
     LOG(INFO) << "Skipping parameter initialization";
@@ -74,23 +74,22 @@ void BNLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
 
   //batch renorm
   if (this->rebn_ && !this->frozen_){
-
     this->relax_iter_.clear();
-    for (int i=0; i<this->layer_param_.rebn_param().relax_iter_size(); i++)
+    for (int i=0; i<this->layer_param_.bn_param().relax_iter_size(); i++)
     {
       if (i>0)
-        CHECK_GE(this->layer_param_.rebn_param().relax_iter(i), this->relax_iter_.back());
-      this->relax_iter_.push_back(this->layer_param_.rebn_param().relax_iter(i));
+        CHECK_GE(this->layer_param_.bn_param().relax_iter(i), this->relax_iter_.back());
+      this->relax_iter_.push_back(this->layer_param_.bn_param().relax_iter(i));
     }
 
     this->max_rs_.clear();
-    for (int i=0; i<this->layer_param_.rebn_param().max_r_size(); i++)
-      this->max_rs_.push_back(this->layer_param_.rebn_param().max_r(i));
+    for (int i=0; i<this->layer_param_.bn_param().max_r_size(); i++)
+      this->max_rs_.push_back(this->layer_param_.bn_param().max_r(i));
     CHECK_EQ(this->max_rs_.size(), this->relax_iter_.size());
 
     this->max_ds_.clear();
-    for (int i=0; i<this->layer_param_.rebn_param().max_d_size(); i++)
-      this->max_ds_.push_back(this->layer_param_.rebn_param().max_d(i));
+    for (int i=0; i<this->layer_param_.bn_param().max_d_size(); i++)
+      this->max_ds_.push_back(this->layer_param_.bn_param().max_d(i));
     CHECK_EQ(this->max_ds_.size(), this->relax_iter_.size());
   }
 }
@@ -123,18 +122,19 @@ void BNLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
 template <typename Dtype>
 void BNLayer<Dtype>::update_max_rd() 
 {
-  if (this->rebn_ && !this->frozen_)
+  if (this->rebn_)
   {
     this->max_r_ = 1;
     this->max_d_ = 0;
     for (int i=1; i<this->relax_iter_.size(); i++)
-      if (global_iter < this->relax_iter_.size())
+      if (global_iter < this->relax_iter_[i])
       {
-        this->max_r_ = (this->max_rs_[i] - this->max_rs_[i-1]) / (relax_iter_[i] - relax_iter_[i-1]) * (global_iter - relax_iter_[i-1]) + this->max_rs_[i-1];
-        this->max_d_ = (this->max_ds_[i] - this->max_ds_[i-1]) / (relax_iter_[i] - relax_iter_[i-1]) * (global_iter - relax_iter_[i-1]) + this->max_ds_[i-1];
+        this->max_r_ = (this->max_rs_[i] - this->max_rs_[i-1]) / (this->relax_iter_[i] - this->relax_iter_[i-1]) * (global_iter - this->relax_iter_[i-1]) + this->max_rs_[i-1];
+        this->max_d_ = (this->max_ds_[i] - this->max_ds_[i-1]) / (this->relax_iter_[i] - this->relax_iter_[i-1]) * (global_iter - this->relax_iter_[i-1]) + this->max_ds_[i-1];
         break;
       }
   }
+ // LOG(ERROR)  << "++++++++++++++**********************" << this->max_r_ << ' ' << this->max_d_ << ' ' << global_iter <<  ' ' << this->relax_iter_.size() << ' ' << this->max_rs_.size();
 }
 
 template <typename Dtype>

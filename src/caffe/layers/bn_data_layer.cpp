@@ -16,10 +16,10 @@ void BNDataLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
   this->x_norm_cpu_data_ = NULL;
 
   // extract param
-  this->var_eps_ = this->layer_param_.bn_param().eps();
+  this->bn_eps_ = this->layer_param_.bn_param().eps();
   this->decay_ = 1 - this->layer_param_.bn_param().momentum();
   this->moving_average_ = this->layer_param_.bn_param().moving_average();
-  this->rebn_ = this->layer_param_.rebn_param().rebn();
+  this->rebn_ = this->layer_param_.bn_param().rebn();
   this->axis_ = 1;
   CHECK(this->axis_ == 1 || this->axis_ == 2) << "axis_ should be 1 or 2";
   this->channels_ = bottom[0]->LegacyShape(this->axis_);
@@ -78,23 +78,24 @@ void BNDataLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
   //batch renorm
   if (this->rebn_ && !this->frozen_){
     this->relax_iter_.clear();
-    for (int i=0; i<this->layer_param_.rebn_param().relax_iter_size(); i++)
+    for (int i=0; i<this->layer_param_.bn_param().relax_iter_size(); i++)
     {
       if (i>0)
-        CHECK_GE(this->layer_param_.rebn_param().relax_iter(i), this->relax_iter_.back());
-      this->relax_iter_.push_back(this->layer_param_.rebn_param().relax_iter(i));
+        CHECK_GE(this->layer_param_.bn_param().relax_iter(i), this->relax_iter_.back());
+      this->relax_iter_.push_back(this->layer_param_.bn_param().relax_iter(i));
     }
 
     this->max_rs_.clear();
-    for (int i=0; i<this->layer_param_.rebn_param().max_r_size(); i++)
-      this->max_rs_.push_back(this->layer_param_.rebn_param().max_r(i));
+    for (int i=0; i<this->layer_param_.bn_param().max_r_size(); i++)
+      this->max_rs_.push_back(this->layer_param_.bn_param().max_r(i));
     CHECK_EQ(this->max_rs_.size(), this->relax_iter_.size());
 
     this->max_ds_.clear();
-    for (int i=0; i<this->layer_param_.rebn_param().max_d_size(); i++)
-      this->max_ds_.push_back(this->layer_param_.rebn_param().max_d(i));
+    for (int i=0; i<this->layer_param_.bn_param().max_d_size(); i++)
+      this->max_ds_.push_back(this->layer_param_.bn_param().max_d(i));
     CHECK_EQ(this->max_ds_.size(), this->relax_iter_.size());
   }
+
 #endif
 }
 

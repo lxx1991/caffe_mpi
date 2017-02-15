@@ -958,8 +958,6 @@ protected:
   int axis_, num_, channels_, hw_;
 
   int count_;
-  // eps
-  Dtype var_eps_;
   // decay factor
   Dtype decay_;
   // whether or not using moving average for inference
