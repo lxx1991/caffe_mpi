@@ -142,7 +142,7 @@ void BNDataLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
   int height_ = bottom[0]->height();
   int width_ = bottom[0]->width();
 
-  update_max_rd();
+  this->update_max_rd();
 
   local_mean_ = blob_mean_->mutable_gpu_data();
   local_var_ = blob_var_->mutable_gpu_data();
@@ -159,7 +159,7 @@ void BNDataLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
     bool save_mean = this->phase_ == TRAIN && this->param_propagate_down_[0];
 
 
-    if (rebn_)
+    if (this->rebn_)
     {
       caffe_copy(channels_, this->blobs_[2]->gpu_data(), this->d_.mutable_gpu_data()); // temp buffer
       caffe_copy(channels_, this->blobs_[3]->gpu_data(), this->r_.mutable_gpu_data()); // temp buffer
@@ -184,7 +184,7 @@ void BNDataLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
 
 
 
-    if (rebn_)
+    if (this->rebn_)
     {
       Dtype temp_scale = Dtype(1) / Caffe::MPI_all_rank();
       for (int i=0; i<channels_; i++)
@@ -219,7 +219,7 @@ void BNDataLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
     cudaDeviceSynchronize();
 
 
-    if (rebn_)
+    if (this->rebn_)
     {
       Dtype temp_scale = Dtype(1) / Caffe::MPI_all_rank();
       for (int i=0; i<channels_; i++)
@@ -387,7 +387,7 @@ void BNDataLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
     CUDA_CHECK(cudaMemcpy(blob_shift_->mutable_gpu_data(), blob_shift_->mutable_cpu_data(), this->channels_*sizeof(Dtype), cudaMemcpyHostToDevice));
     cudaDeviceSynchronize(); 
 
-    if (rebn_)
+    if (this->rebn_)
       scale_shift_bottom_gradient_after_allreduce<Dtype><<<this->channels_, THREAD_BLOCK_SIZE>>>(num_, height_ * width_, channels_,
           const_top_diff, this->x_norm_.gpu_data(), scale_diff, shift_diff, scale_data, this->x_std_.gpu_data(), this->r_.gpu_data(), bottom_diff, Caffe::MPI_all_rank(), local_scale_,local_shift_);
     else
