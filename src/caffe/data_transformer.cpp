@@ -177,12 +177,20 @@ void DataTransformer<Dtype>::Transform(const Datum& datum,
     mean = data_mean_.mutable_cpu_data();
   }
   if (has_mean_values) {
-    CHECK(mean_values_.size() == 1 || mean_values_.size() == datum_channels) <<
+    CHECK(mean_values_.size() == 1 ||  datum_channels % mean_values_.size() == 0) <<
      "Specify either 1 mean_value or as many as channels: " << datum_channels;
     if (datum_channels > 1 && mean_values_.size() == 1) {
       // Replicate the mean_value for simplicity
       for (int c = 1; c < datum_channels; ++c) {
         mean_values_.push_back(mean_values_[0]);
+      }
+    }
+
+    if (mean_values_.size() < datum_channels){
+      // Replicate the mean_value group to fill up the datum channels
+      size_t group_size = mean_values_.size();
+      for (size_t c = group_size; c < datum_channels; ++c){
+        mean_values_.push_back(mean_values_[c % group_size]);
       }
     }
   }
@@ -660,7 +668,7 @@ void DataTransformer<Dtype>::Transform(const cv::Mat& cv_img,
     CHECK_EQ(crop_size, width);
     if (phase_ == TRAIN) {
       // in training, we randomly crop different sized crops
-      sampleRandomCropSize(img_height, img_width, crop_height, crop_width);
+      sampleRandomCropSize(img_height, img_width, crop_height, crop_width, 0.6, 1.0, 0.8, 1.25);
 
 
 

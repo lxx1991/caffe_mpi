@@ -712,6 +712,7 @@ message VideoDataParameter{
 
   // The type of input
   optional bool encoded = 15 [default = false];
+  optional bool grayscale = 16 [default = false];
 }
 message InfogainLossParameter {
   // Specify the infogain matrix source.
