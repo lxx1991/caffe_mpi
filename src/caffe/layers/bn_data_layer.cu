@@ -188,13 +188,13 @@ void BNDataLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
 
     if (this->rebn_)
     {
-      Dtype temp_scale = Dtype(1) / Caffe::MPI_all_rank();
+      //Dtype temp_scale = Dtype(1) / Caffe::MPI_all_rank();
       for (int i=0; i<channels_; i++)
       {
         //LOG(ERROR) << this->max_d_;
         //LOG(ERROR) << this->r_.cpu_data()[i] + this->bn_eps_;
         //LOG(ERROR) << temp_scale * blob_mean_->cpu_data()[i] - this->d_.cpu_data()[i];
-        Dtype s1 = temp_scale * blob_mean_->cpu_data()[i] - this->d_.cpu_data()[i] , s2 = sqrt(this->r_.cpu_data()[i] + this->bn_eps_);
+        Dtype s1 = blob_mean_->cpu_data()[i] - this->d_.cpu_data()[i] , s2 = sqrt(this->r_.cpu_data()[i] + this->bn_eps_);
 
         if (s2 * this->max_d_ <= s1)
           this->d_.mutable_cpu_data()[i] = this->max_d_;
@@ -237,11 +237,11 @@ void BNDataLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
 
     if (this->rebn_)
     {
-      Dtype temp_scale = Dtype(1) / Caffe::MPI_all_rank();
+      //Dtype temp_scale = Dtype(1) / Caffe::MPI_all_rank();
       for (int i=0; i<channels_; i++)
       {
         
-        Dtype s1 = sqrt(temp_scale * blob_var_->cpu_data()[i] + this->bn_eps_) , s2 = sqrt(this->r_.cpu_data()[i] + this->bn_eps_);
+        Dtype s1 = sqrt(blob_var_->cpu_data()[i] + this->bn_eps_) , s2 = sqrt(this->r_.cpu_data()[i] + this->bn_eps_);
 
         if (s2 * this->max_r_ <= s1)
           this->r_.mutable_cpu_data()[i] = this->max_r_;
