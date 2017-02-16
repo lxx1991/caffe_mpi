@@ -37,16 +37,17 @@ void BNLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
         batch_statistic_.mutable_gpu_data());
 
     if (rebn_)
-    {
-      /*
-      // r_ is temp buffer
-      caffe_copy(channels_, this->blobs_[3]->gpu_data(), r_.mutable_gpu_data());
-      caffe_gpu_add_scalar(channels_, bn_eps_, r_.mutable_gpu_data());
-      caffe_gpu_sub(channels_, batch_statistic_.gpu_data(), this->blobs_[2]->gpu_data(), d_.mutable_gpu_data());
-      caffe_gpu_div(channels_, d_.gpu_data(), r_.gpu_data(), d_.mutable_gpu_data());*/
       for (int i=0; i<channels_; i++)
-        d_.mutable_cpu_data()[i] = std::max(std::min((batch_statistic_.cpu_data()[i] - this->blobs_[2]->cpu_data()[i]) / (this->blobs_[3]->cpu_data()[i] + bn_eps_), max_d_), -max_d_);
-    }
+      {
+        Dtype s1 = batch_statistic_.cpu_data()[i] - this->blobs_[2]->cpu_data()[i] , s2 = sqrt(this->blobs_[3]->cpu_data()[i] + bn_eps_);
+
+        if (s2 * this->max_d_ <= s1)
+          this->d_.mutable_cpu_data()[i] = this->max_d_;
+        else if (-s2 * this->max_d_ >= s1)
+          this->d_.mutable_cpu_data()[i] = -this->max_d_;
+        else
+          this->d_.mutable_cpu_data()[i] = s1 / s2;
+      }
 
     // Add to the moving average
     if (!frozen_) {
@@ -85,7 +86,16 @@ void BNLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
 
     if (rebn_)
       for (int i=0; i<channels_; i++)
-        r_.mutable_cpu_data()[i] = std::max(std::min( (batch_statistic_.cpu_data()[i])/ (this->blobs_[3]->cpu_data()[i] + bn_eps_), max_r_), 1 / max_r_);
+      {
+        Dtype s1 = sqrt(batch_statistic_.cpu_data()[i] + bn_eps_) , s2 = sqrt(this->blobs_[3]->cpu_data()[i] + bn_eps_);
+
+        if (s2 * this->max_r_ <= s1)
+          this->r_.mutable_cpu_data()[i] = this->max_r_;
+        else if (s2 / this->max_r_ >= s1)
+          this->r_.mutable_cpu_data()[i] = Dtype(1)/this->max_r_;
+        else
+          this->r_.mutable_cpu_data()[i] = s1 / s2;
+      }
 
     // Add to the moving average
     caffe_gpu_axpby(batch_statistic_.count(),

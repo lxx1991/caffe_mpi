@@ -167,7 +167,17 @@ void BNLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
     //renorm
     if (rebn_)
       for (int i=0; i<channels_; i++)
-        d_.mutable_cpu_data()[i] = std::max(std::min((batch_statistic_.cpu_data()[i] - this->blobs_[2]->cpu_data()[i]) / (this->blobs_[3]->cpu_data()[i] + bn_eps_), max_d_), -max_d_);
+      {
+        Dtype s1 = batch_statistic_.cpu_data()[i] - this->blobs_[2]->cpu_data()[i] , s2 = sqrt(this->blobs_[3]->cpu_data()[i] + bn_eps_);
+
+        if (s2 * this->max_d_ <= s1)
+          this->d_.mutable_cpu_data()[i] = this->max_d_;
+        else if (-s2 * this->max_d_ >= s1)
+          this->d_.mutable_cpu_data()[i] = -this->max_d_;
+        else
+          this->d_.mutable_cpu_data()[i] = s1 / s2;
+      }
+
 
     // Add to the moving average
     if (!frozen_) {
@@ -208,7 +218,16 @@ void BNLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
     //renorm
     if (rebn_)
       for (int i=0; i<channels_; i++)
-        r_.mutable_cpu_data()[i] = std::max(std::min( (batch_statistic_.cpu_data()[i])/ (this->blobs_[3]->cpu_data()[i] + bn_eps_), max_r_), 1 / max_r_);
+      {
+        Dtype s1 = sqrt(batch_statistic_.cpu_data()[i] + bn_eps_) , s2 = sqrt(this->blobs_[3]->cpu_data()[i] + bn_eps_);
+
+        if (s2 * this->max_r_ <= s1)
+          this->r_.mutable_cpu_data()[i] = this->max_r_;
+        else if (s2 / this->max_r_ >= s1)
+          this->r_.mutable_cpu_data()[i] = Dtype(1)/this->max_r_;
+        else
+          this->r_.mutable_cpu_data()[i] = s1 / s2;
+      }
       
     // Add to the moving average
     caffe_cpu_axpby(batch_statistic_.count(),
