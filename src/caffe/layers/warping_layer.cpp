@@ -25,8 +25,8 @@ void WarpingLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
   width_ = bottom[0]->width();
   spatial_dim_ = height_ * width_;
 
-  head.Reshape(num_, 1, bottom[0]->height(), bottom[0]->width());
-  edge.Reshape(num_, 1, spatial_dim_+10, 5);
+  head_.Reshape(num_, 1, bottom[0]->height(), bottom[0]->width());
+  edge_.Reshape(num_, 1, spatial_dim_+10, 4); // prev, h, w, weight
 
   top[0]->ReshapeLike(*(bottom[0]));
 }

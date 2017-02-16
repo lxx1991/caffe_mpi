@@ -774,10 +774,11 @@ class WarpingLayer : public Layer<Dtype> {
       const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
   virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
       const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+  
   int num_, channels_, height_, width_;
-  int spatial_dim_, edge_cnt;
+  int spatial_dim_, edge_cnt_;
 
-  Blob<Dtype> head, edge;
+  Blob<Dtype> head_, edge_;
 };
 
 
