@@ -36,32 +36,14 @@ void BNLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
         batch_sum_multiplier_.gpu_data(), Dtype(0),
         batch_statistic_.mutable_gpu_data());
 
-    if (rebn_)
-      for (int i=0; i<channels_; i++)
-      {
-        Dtype s1 = batch_statistic_.cpu_data()[i] - this->blobs_[2]->cpu_data()[i] , s2 = sqrt(this->blobs_[3]->cpu_data()[i] + bn_eps_);
-
-        if (s2 * this->max_d_ <= s1)
-          this->d_.mutable_cpu_data()[i] = this->max_d_;
-        else if (-s2 * this->max_d_ >= s1)
-          this->d_.mutable_cpu_data()[i] = -this->max_d_;
-        else
-          this->d_.mutable_cpu_data()[i] = s1 / s2;
-
-        static int cnt = 0;
-        if (++cnt == 400000 && Caffe::MPI_my_rank() == 1)
-        {
-          cnt = 0;
-          LOG(ERROR)  << "ddddddddddddd" << ' '<<  s1 << ' '<< s2 << ' '<< s1/s2 << ' ' << -this->max_d_ << ' ' << this->max_d_ << ' ' << this->d_.cpu_data()[i];
-        }
-      }
-
     // Add to the moving average
     if (!frozen_) {
       caffe_gpu_axpby(batch_statistic_.count(),
           Dtype(1) - bn_momentum_, batch_statistic_.gpu_data(),
           bn_momentum_, this->blobs_[2]->mutable_gpu_data());
     }
+    if (this->rebn_)
+      caffe_copy(channels_, batch_statistic_.gpu_data(), this->d_.mutable_gpu_data()); // temp buffer
   }
   // Broadcast the mean vector
   caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, num_, channels_, 1,
@@ -91,29 +73,12 @@ void BNLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
         spatial_statistic_.gpu_data(), batch_sum_multiplier_.gpu_data(),
         Dtype(0), batch_statistic_.mutable_gpu_data());
 
-    if (rebn_)
-      for (int i=0; i<channels_; i++)
-      {
-        Dtype s1 = sqrt(batch_statistic_.cpu_data()[i] + bn_eps_) , s2 = sqrt(this->blobs_[3]->cpu_data()[i] + bn_eps_);
-
-        if (s2 * this->max_r_ <= s1)
-          this->r_.mutable_cpu_data()[i] = this->max_r_;
-        else if (s2 / this->max_r_ >= s1)
-          this->r_.mutable_cpu_data()[i] = Dtype(1)/this->max_r_;
-        else
-          this->r_.mutable_cpu_data()[i] = s1 / s2;
-        static int cnt = 0;
-        if (++cnt == 400000 && Caffe::MPI_my_rank() == 1)
-        {
-          cnt = 0;
-          LOG(ERROR)  << "rrrrrrrrrrrrr" << ' '<<  s1 << ' '<< s2 << ' '<<s1/s2 << ' ' << 1/this->max_r_ << ' ' << this->max_r_ << ' ' << this->r_.cpu_data()[i];
-        }
-      }
-
     // Add to the moving average
     caffe_gpu_axpby(batch_statistic_.count(),
         Dtype(1) - bn_momentum_, batch_statistic_.gpu_data(),
         bn_momentum_, this->blobs_[3]->mutable_gpu_data());
+    if (this->rebn_)
+      caffe_copy(channels_, batch_statistic_.gpu_data(), this->r_.mutable_gpu_data()); // temp buffer
   }
 
   // Add eps
@@ -133,35 +98,6 @@ void BNLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
   // Multiply with the inverse std
   caffe_gpu_mul(broadcast_buffer_.count(), const_top_data,
       broadcast_buffer_.gpu_data(), top_data);
-
-
-  if (!frozen_ && this->phase_ != TEST && rebn_)
-  {
-    // Broadcast the r
-    caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, num_, channels_, 1,
-          Dtype(1), batch_sum_multiplier_.gpu_data(), r_.gpu_data(),
-          Dtype(0), spatial_statistic_.mutable_gpu_data());
-    caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, num_ * channels_,
-        height_ * width_, 1, Dtype(1),
-        spatial_statistic_.gpu_data(), spatial_sum_multiplier_.gpu_data(),
-        Dtype(0), broadcast_buffer_.mutable_gpu_data());
-    // Multiply r
-    caffe_gpu_mul(broadcast_buffer_.count(), const_top_data,
-        broadcast_buffer_.gpu_data(), top_data);
-
-
-    // Broadcast the d
-   caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, num_, channels_, 1,
-          Dtype(1), batch_sum_multiplier_.gpu_data(), d_.gpu_data(),
-          Dtype(0), spatial_statistic_.mutable_gpu_data());
-    caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, num_ * channels_,
-        height_ * width_, 1, Dtype(1),
-        spatial_statistic_.gpu_data(), spatial_sum_multiplier_.gpu_data(),
-        Dtype(0), broadcast_buffer_.mutable_gpu_data());
-    // Add d
-    caffe_gpu_add(broadcast_buffer_.count(), const_top_data,
-        broadcast_buffer_.gpu_data(), top_data); 
-  }
 
 
   // Save the normalized inputs and std for backprop
@@ -193,6 +129,66 @@ void BNLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
       Dtype(0), broadcast_buffer_.mutable_gpu_data());
   caffe_gpu_add(broadcast_buffer_.count(), const_top_data,
       broadcast_buffer_.gpu_data(), top_data);
+
+
+  if (!frozen_ && this->phase_ != TEST && rebn_)
+  {
+    for (int i=0; i<channels_; i++)
+    {
+      Dtype s1 = d_.cpu_data()[i] - this->blobs_[2]->cpu_data()[i] , s2 = sqrt(this->blobs_[3]->cpu_data()[i] + bn_eps_);
+
+      if (s2 * this->max_d_ <= s1)
+        this->d_.mutable_cpu_data()[i] = this->max_d_;
+      else if (-s2 * this->max_d_ >= s1)
+        this->d_.mutable_cpu_data()[i] = -this->max_d_;
+      else
+        this->d_.mutable_cpu_data()[i] = s1 / s2;
+
+
+      s1 = sqrt(r_.cpu_data()[i] + bn_eps_) , s2 = sqrt(this->blobs_[3]->cpu_data()[i] + bn_eps_);
+
+      if (s2 * this->max_r_ <= s1)
+        this->r_.mutable_cpu_data()[i] = this->max_r_;
+      else if (s2 / this->max_r_ >= s1)
+        this->r_.mutable_cpu_data()[i] = Dtype(1)/this->max_r_;
+      else
+        this->r_.mutable_cpu_data()[i] = s1 / s2;
+
+      #ifdef USE_MPI
+      static int cnt = 0;
+      if (++cnt == 400000 && Caffe::MPI_my_rank() == 1)
+      {
+        cnt = 0;
+        LOG(ERROR)  << "ddddddddddddd" << ' '<<  s1 << ' '<< s2 << ' '<< s1/s2 << ' ' << -this->max_d_ << ' ' << this->max_d_ << ' ' << this->d_.cpu_data()[i];
+        LOG(ERROR)  << "rrrrrrrrrrrrr" << ' '<<  s1 << ' '<< s2 << ' '<<s1/s2 << ' ' << 1/this->max_r_ << ' ' << this->max_r_ << ' ' << this->r_.cpu_data()[i];
+      }
+      #endif
+    }
+    // Broadcast the r
+    caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, num_, channels_, 1,
+          Dtype(1), batch_sum_multiplier_.gpu_data(), r_.gpu_data(),
+          Dtype(0), spatial_statistic_.mutable_gpu_data());
+    caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, num_ * channels_,
+        height_ * width_, 1, Dtype(1),
+        spatial_statistic_.gpu_data(), spatial_sum_multiplier_.gpu_data(),
+        Dtype(0), broadcast_buffer_.mutable_gpu_data());
+    // Multiply r
+    caffe_gpu_mul(broadcast_buffer_.count(), const_top_data,
+        broadcast_buffer_.gpu_data(), top_data);
+
+
+    // Broadcast the d
+   caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, num_, channels_, 1,
+          Dtype(1), batch_sum_multiplier_.gpu_data(), d_.gpu_data(),
+          Dtype(0), spatial_statistic_.mutable_gpu_data());
+    caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, num_ * channels_,
+        height_ * width_, 1, Dtype(1),
+        spatial_statistic_.gpu_data(), spatial_sum_multiplier_.gpu_data(),
+        Dtype(0), broadcast_buffer_.mutable_gpu_data());
+    // Add d
+    caffe_gpu_add(broadcast_buffer_.count(), const_top_data,
+        broadcast_buffer_.gpu_data(), top_data); 
+  }
 }
 
 template <typename Dtype>
@@ -227,9 +223,28 @@ void BNLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
     return;
   }
 
+  const Dtype* const_top_diff = top[0]->gpu_diff();
+  
+  if (rebn_)
+  {
+    // Broadcast the r
+    caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, num_, channels_, 1,
+          Dtype(1), batch_sum_multiplier_.gpu_data(), r_.gpu_data(),
+          Dtype(0), spatial_statistic_.mutable_gpu_data());
+    caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, num_ * channels_,
+        height_ * width_, 1, Dtype(1),
+        spatial_statistic_.gpu_data(), spatial_sum_multiplier_.gpu_data(),
+        Dtype(0), broadcast_buffer_.mutable_gpu_data());
+    // Multiply r
+    caffe_gpu_mul(broadcast_buffer_.count(), const_top_diff,
+        broadcast_buffer_.gpu_data(), broadcast_buffer_.mutable_gpu_diff());
+
+    const_top_diff = broadcast_buffer_.gpu_diff();
+  }
+
   // gradient w.r.t. slope
   if (this->param_propagate_down_[0]) {
-    const Dtype* const_top_diff = top[0]->gpu_diff();
+    
     Dtype* scale_diff = this->blobs_[0]->mutable_gpu_diff();
     caffe_gpu_mul(broadcast_buffer_.count(), x_norm_.gpu_data(), const_top_diff,
         broadcast_buffer_.mutable_gpu_data());
@@ -244,7 +259,6 @@ void BNLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
 
   // gradient w.r.t. bias
   if (this->param_propagate_down_[1]) {
-    const Dtype* const_top_diff = top[0]->gpu_diff();
     Dtype* shift_diff = this->blobs_[1]->mutable_gpu_diff();
     caffe_gpu_gemv<Dtype>(CblasNoTrans, num_ * channels_, height_ * width_,
         Dtype(1), const_top_diff, spatial_sum_multiplier_.gpu_data(),
@@ -256,7 +270,6 @@ void BNLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
 
   // gradient w.r.t. normalized inputs
   if (propagate_down[0]) {
-    const Dtype* const_top_diff = top[0]->gpu_diff();
     const Dtype* const_bottom_diff = bottom[0]->gpu_diff();
     Dtype* bottom_diff = bottom[0]->mutable_gpu_diff();
     const Dtype* scale_data = this->blobs_[0]->gpu_data();
@@ -309,10 +322,6 @@ void BNLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
     caffe_gpu_axpby(broadcast_buffer_.count(), Dtype(1),
         broadcast_buffer_.gpu_data(), Dtype(-1) / (num_ * height_ * width_),
         bottom_diff);
-
-    // Multiply with the inverse std and r(if rebn)
-    if (rebn_)
-      caffe_gpu_mul(channels_, r_.gpu_data(), x_inv_std_.gpu_data(), x_inv_std_.mutable_gpu_data());
 
     // Multiply with the inverse std
     caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, num_, channels_, 1,
