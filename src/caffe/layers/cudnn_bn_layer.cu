@@ -51,6 +51,43 @@ void CuDNNBNLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
         running_mean_data, running_variance_data,
         epsilon,
         save_mean_data, save_inv_variance_data));
+
+    if (this->rebn_)
+    {
+      update_max_rd();
+      for (int i=0; i<channels_; i++)
+      {
+        Dtype moving_sigma = sqrt(this->blobs_[3]->cpu_data()[i] + this->bn_eps_);
+        this->r_.mutable_cpu_data()[i] = std::max(std::min(Dtype(1) / save_inv_variance_.cpu_data()[i] * moving_sigma, this->max_r_), Dtype(1)/this->max_r_);
+        this->d_.mutable_cpu_data()[i] = std::max(std::min((save_mean_.cpu_data()[i] - this->blobs_[2]->cpu_data()[i])/ moving_sigma, this->max_d_), -this->max_d_);
+      }
+      // Broadcast the r
+      caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, num_, channels_, 1,
+            Dtype(1), this->batch_sum_multiplier_.gpu_data(), this->r_.gpu_data(),
+            Dtype(0), this->spatial_statistic_.mutable_gpu_data());
+      caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, num_ * channels_,
+          height_ * width_, 1, Dtype(1),
+          this->spatial_statistic_.gpu_data(), this->spatial_sum_multiplier_.gpu_data(),
+          Dtype(0), this->broadcast_buffer_.mutable_gpu_data());
+      // Multiply r
+      caffe_gpu_mul(this->broadcast_buffer_.count(), top[0]->gpu_data(),
+          this->broadcast_buffer_.gpu_data(), top_data);
+
+
+      // Broadcast the d
+     caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, num_, channels_, 1,
+            Dtype(1), this->batch_sum_multiplier_.gpu_data(), this->d_.gpu_data(),
+            Dtype(0), this->spatial_statistic_.mutable_gpu_data());
+      caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, num_ * channels_,
+          height_ * width_, 1, Dtype(1),
+          this->spatial_statistic_.gpu_data(), this->spatial_sum_multiplier_.gpu_data(),
+          Dtype(0), this->broadcast_buffer_.mutable_gpu_data());
+      // Add d
+      caffe_gpu_add(this->broadcast_buffer_.count(), top[0]->gpu_data(),
+          this->broadcast_buffer_.gpu_data(), top_data); 
+
+
+    }
   }
 }
 
@@ -64,6 +101,22 @@ void CuDNNBNLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
   if (propagate_down[0] || this->param_propagate_down_[0] ||
       this->param_propagate_down_[1]) {
     const Dtype* top_diff = top[0]->gpu_diff();
+    if (rebn_)
+    {
+      // Broadcast the r
+      caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, num_, channels_, 1,
+            Dtype(1), this->batch_sum_multiplier_.gpu_data(), this->r_.gpu_data(),
+            Dtype(0), this->spatial_statistic_.mutable_gpu_data());
+      caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, num_ * channels_,
+          height_ * width_, 1, Dtype(1),
+          this->spatial_statistic_.gpu_data(), this->spatial_sum_multiplier_.gpu_data(),
+          Dtype(0), this->broadcast_buffer_.mutable_gpu_data());
+      // Multiply r
+      caffe_gpu_mul(this->broadcast_buffer_.count(), top_diff,
+          this->broadcast_buffer_.gpu_data(), broadcast_buffer_.mutable_gpu_diff());
+
+      top_diff = this->broadcast_buffer_.gpu_diff();
+    }
     const Dtype* bottom_data = bottom[0]->gpu_data();
     Dtype* bottom_diff = bottom[0]->mutable_gpu_diff();
     const Dtype* scale_data = this->blobs_[0]->gpu_data();

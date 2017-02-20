@@ -50,7 +50,7 @@ void CuDNNBNLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
   CUDNN_CHECK(cudnnDeriveBNTensorDescriptor(bn_param_desc_,
       bottom_desc_, CUDNN_BATCHNORM_SPATIAL));
 
-  if (this->frozen_){
+  if (this->frozen_ || this->rebn_){
     this->broadcast_buffer_.ReshapeLike(*(bottom[0]));
     this->spatial_statistic_.Reshape(this->num_, this->channels_, 1, 1);
     this->batch_statistic_.Reshape(1, this->channels_, 1, 1);
