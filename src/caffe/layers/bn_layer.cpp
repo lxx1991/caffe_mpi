@@ -266,7 +266,7 @@ void BNLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
         spatial_statistic_.cpu_data(), spatial_sum_multiplier_.cpu_data(),
         Dtype(0), broadcast_buffer_.mutable_cpu_data());
     // Multiply r
-    caffe_mul(broadcast_buffer_.count(), const_bottom_data,
+    caffe_mul(broadcast_buffer_.count(), const_top_data,
         broadcast_buffer_.cpu_data(), top_data);
 
 

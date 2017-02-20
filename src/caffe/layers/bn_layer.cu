@@ -47,6 +47,13 @@ void BNLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
           this->d_.mutable_cpu_data()[i] = -this->max_d_;
         else
           this->d_.mutable_cpu_data()[i] = s1 / s2;
+
+        static int cnt = 0;
+        if (++cnt == 400000 && Caffe::MPI_my_rank() == 1)
+        {
+          cnt = 0;
+          LOG(ERROR)  << "ddddddddddddd" << ' '<<  s1 << ' '<< s2 << ' '<< s1/s2 << ' ' << -this->max_d_ << ' ' << this->max_d_ << ' ' << this->d_.cpu_data()[i];
+        }
       }
 
     // Add to the moving average
@@ -95,6 +102,12 @@ void BNLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
           this->r_.mutable_cpu_data()[i] = Dtype(1)/this->max_r_;
         else
           this->r_.mutable_cpu_data()[i] = s1 / s2;
+        static int cnt = 0;
+        if (++cnt == 400000 && Caffe::MPI_my_rank() == 1)
+        {
+          cnt = 0;
+          LOG(ERROR)  << "rrrrrrrrrrrrr" << ' '<<  s1 << ' '<< s2 << ' '<<s1/s2 << ' ' << 1/this->max_r_ << ' ' << this->max_r_ << ' ' << this->r_.cpu_data()[i];
+        }
       }
 
     // Add to the moving average
@@ -133,12 +146,12 @@ void BNLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
         spatial_statistic_.gpu_data(), spatial_sum_multiplier_.gpu_data(),
         Dtype(0), broadcast_buffer_.mutable_gpu_data());
     // Multiply r
-    caffe_gpu_mul(broadcast_buffer_.count(), const_bottom_data,
+    caffe_gpu_mul(broadcast_buffer_.count(), const_top_data,
         broadcast_buffer_.gpu_data(), top_data);
 
 
     // Broadcast the d
-    caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, num_, channels_, 1,
+   caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, num_, channels_, 1,
           Dtype(1), batch_sum_multiplier_.gpu_data(), d_.gpu_data(),
           Dtype(0), spatial_statistic_.mutable_gpu_data());
     caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, num_ * channels_,
@@ -147,7 +160,7 @@ void BNLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
         Dtype(0), broadcast_buffer_.mutable_gpu_data());
     // Add d
     caffe_gpu_add(broadcast_buffer_.count(), const_top_data,
-        broadcast_buffer_.gpu_data(), top_data);
+        broadcast_buffer_.gpu_data(), top_data); 
   }
 
 
