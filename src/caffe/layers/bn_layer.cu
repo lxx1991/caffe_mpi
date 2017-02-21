@@ -145,6 +145,20 @@ void BNLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
         this->d_.mutable_cpu_data()[i] = s1 / s2;
 
 
+      static int cnt = 0;
+
+      if (++cnt == 400000)
+      {
+        char buff[100];
+        #ifdef USE_MPI
+        if (Caffe::MPI_my_rank() == 1)
+        #endif
+        {
+          sprintf(buff, "d = %5.2f/%5.2f = %5.2f\t(%5.2f, %5.2f)\t%5.2f", s1, s2, s1/s2, -this->max_d_, this->max_d_,  this->d_.cpu_data()[i]);
+          LOG(ERROR) << buff;
+        }
+      }
+
       s1 = sqrt(r_.cpu_data()[i] + bn_eps_) , s2 = sqrt(this->blobs_[3]->cpu_data()[i] + bn_eps_);
 
       if (s2 * this->max_r_ <= s1)
@@ -154,15 +168,19 @@ void BNLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
       else
         this->r_.mutable_cpu_data()[i] = s1 / s2;
 
-      #ifdef USE_MPI
-      static int cnt = 0;
-      if (++cnt == 400000 && Caffe::MPI_my_rank() == 1)
+
+      if (cnt == 400000)
       {
+        char buff[100];
+        #ifdef USE_MPI
+        if (Caffe::MPI_my_rank() == 1)
+        #endif
+        {
+          sprintf(buff, "r = %5.2f/%5.2f = %5.2f\t(%5.2f, %5.2f)\t%5.2f", s1, s2, s1/s2, 1/this->max_r_, this->max_r_,  this->r_.cpu_data()[i]);
+          LOG(ERROR) << buff;
+        }
         cnt = 0;
-        LOG(ERROR)  << "ddddddddddddd" << ' '<<  s1 << ' '<< s2 << ' '<< s1/s2 << ' ' << -this->max_d_ << ' ' << this->max_d_ << ' ' << this->d_.cpu_data()[i];
-        LOG(ERROR)  << "rrrrrrrrrrrrr" << ' '<<  s1 << ' '<< s2 << ' '<<s1/s2 << ' ' << 1/this->max_r_ << ' ' << this->max_r_ << ' ' << this->r_.cpu_data()[i];
       }
-      #endif
     }
     // Broadcast the r
     caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, num_, channels_, 1,

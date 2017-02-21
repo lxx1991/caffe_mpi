@@ -203,8 +203,12 @@ void BNDataLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
         //this->d_.mutable_cpu_data()[i] = 0;
         //LOG(ERROR) << this->d_.cpu_data()[i];
 
-        if (Caffe::MPI_my_rank() == 1 && i == 0)
-          LOG(ERROR)  << "ddddddddddddd" << ' '<< s1/s2 << ' ' << -this->max_d_ << ' ' << this->max_d_;
+        static int cnt = 0;
+        if (++cnt == 400000 && Caffe::MPI_my_rank() == 1)
+        {
+          cnt = 0;
+          LOG(ERROR)  << "ddddddddddddd" << ' '<<  s1 << ' '<< s2 << ' '<< s1/s2 << ' ' << -this->max_d_ << ' ' << this->max_d_ << ' ' << this->d_.cpu_data()[i];
+        }
       }
     }
 
@@ -253,8 +257,12 @@ void BNDataLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
           //LOG(ERROR) << s1 << ' ' << s2 << ' ' << this->max_r_;
           this->r_.mutable_cpu_data()[i] = s1 / s2;
         }
-        if (Caffe::MPI_my_rank() == 1 && i == 0)
-          LOG(ERROR)  << "rrrrrrrrrrrrr" << ' '<< s1/s2 << ' ' <<  Dtype(1) / this->max_r_<< ' ' << this->max_r_;
+        static int cnt = 0;
+        if (++cnt == 400000 && Caffe::MPI_my_rank() == 1)
+        {
+          cnt = 0;
+          LOG(ERROR)  << "rrrrrrrrrrrrr" << ' '<<  s1 << ' '<< s2 << ' '<<s1/s2 << ' ' << 1/this->max_r_ << ' ' << this->max_r_ << ' ' << this->r_.cpu_data()[i];
+        }
       }
       var_statistic_after_allreduce<Dtype><<<this->channels_, THREAD_BLOCK_SIZE>>>(num_, height_ * width_, channels_, Dtype(2),
                  Dtype(1. / (height_ * width_ * num_)), this->bn_eps_, Dtype(0.5),
