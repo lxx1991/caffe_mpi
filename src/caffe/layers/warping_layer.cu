@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <vector>
+#include <cmath>
 
 #include "caffe/layer.hpp"
 #include "caffe/util/math_functions.hpp"
@@ -19,18 +20,18 @@ __global__ void warping_forward(const int nthreads, const Dtype* in_data, const 
     const Dtype dw = flow_data[((n * 2 + 1) * height + h) * width + w];
     out_data[index] = 0;
 
-    int th = int(Dtype(h) + dh), tw = int(Dtype(w)+dw);
+    int th = std::floor(Dtype(h) + dh), tw = std::floor(Dtype(w)+dw);
     Dtype weight = (1 - (Dtype(h-th) + dh)) * (1 - (Dtype(w-tw) + dw));
-  	out_data[index] += (th>=0 && th<height && tw>=0 && tw < width) ? in_data[((n * channels + c) * height + th) * width + tw] * weight : 0;
+  	out_data[index] += (th>=0 && th<height && tw>=0 && tw < width) ? in_data[((n * channels + c) * height + th) * width + tw]  * weight: 0;
 
-  	th = int(Dtype(h) + dh + 1), tw = int(Dtype(w)+dw), weight =  (1 - (Dtype(th-h) - dh)) * (1 - (Dtype(w-tw) + dw));
-  	out_data[index] += (th>=0 && th<height && tw>=0 && tw < width) ? in_data[((n * channels + c) * height + th) * width + tw] * weight : 0;
+  	th = th + 1, weight =  (1 - (Dtype(th-h) - dh)) * (1 - (Dtype(w-tw) + dw));
+  	out_data[index] += (th>=0 && th<height && tw>=0 && tw < width) ? in_data[((n * channels + c) * height + th) * width + tw]  * weight: 0;
 
-  	th = int(Dtype(h) + dh), tw = int(Dtype(w)+dw + 1), weight =  (1 - (Dtype(h-th) + dh)) * (1 - (Dtype(tw-w) - dw));
-  	out_data[index] += (th>=0 && th<height && tw>=0 && tw < width) ? in_data[((n * channels + c) * height + th) * width + tw] * weight : 0;
+  	th = th - 1, tw = tw + 1, weight =  (1 - (Dtype(h-th) + dh)) * (1 - (Dtype(tw-w) - dw));
+  	out_data[index] += (th>=0 && th<height && tw>=0 && tw < width) ? in_data[((n * channels + c) * height + th) * width + tw]  * weight: 0;
 
-  	th = int(Dtype(h) + dh + 1), tw = int(Dtype(w)+dw + 1), weight = (1 - (Dtype(th-h) - dh)) * (1 - (Dtype(tw-w) - dw));
-  	out_data[index] += (th>=0 && th<height && tw>=0 && tw < width) ? in_data[((n * channels + c) * height + th) * width + tw] * weight : 0;
+  	th = th + 1, weight = (1 - (Dtype(th-h) - dh)) * (1 - (Dtype(tw-w) - dw));
+  	out_data[index] += (th>=0 && th<height && tw>=0 && tw < width) ? in_data[((n * channels + c) * height + th) * width + tw]  * weight: 0;
   }
 }
 
@@ -76,39 +77,42 @@ __global__ void warping_backward_flow(const int nthreads, const Dtype* in_data, 
     const int h = (index / width) % height;
     const int n = index / width / height;
 
-    out_data[index] = 0;
-    out_data[index + spatial_dim] = 0;
+    const int index_h = ((n * 2 + 0) * height + h) * width + w;
+    const int index_w = index_h + spatial_dim;
 
-    const Dtype dh = flow_data[index];
-    const Dtype dw = flow_data[index + spatial_dim];
+    out_data[index_h] = 0;
+    out_data[index_w] = 0;
 
-   const Dtype* top_diff = in_data + n * channels * spatial_dim + index;
+    const Dtype dh = flow_data[index_h];
+    const Dtype dw = flow_data[index_w];
+
+    const Dtype* top_diff = in_data + n * channels * spatial_dim +  h * width + w;
 
     for (int c=0; c<channels; c++)
     {
-    	int th = int(Dtype(h) + dh), tw = int(Dtype(w)+dw);
+    	int th = std::floor(Dtype(h) + dh), tw = std::floor(Dtype(w)+dw);
     	if (th>=0 && th<height && tw>=0 && tw < width)
     	{
-    		out_data[index] -= (1 - (Dtype(w-tw) + dw)) * bottom_data[((n * channels + c) * height + th) * width + tw] * (*top_diff);
-    		out_data[index + spatial_dim] -= (1 - (Dtype(h-th) + dh)) * bottom_data[((n * channels + c) * height + th) * width + tw] * (*top_diff);
+    		out_data[index_h] -= (1 - (Dtype(w-tw) + dw)) * bottom_data[((n * channels + c) * height + th) * width + tw] * (*top_diff);
+    		out_data[index_w] -= (1 - (Dtype(h-th) + dh)) * bottom_data[((n * channels + c) * height + th) * width + tw] * (*top_diff);
     	}
-  		th = int(Dtype(h) + dh + 1), tw = int(Dtype(w)+dw);
+  		th = th + 1;
   		if (th>=0 && th<height && tw>=0 && tw < width)
     	{
-    		out_data[index] += (1 - (Dtype(w-tw) + dw)) * bottom_data[((n * channels + c) * height + th) * width + tw] * (*top_diff);
-    		out_data[index + spatial_dim] -= (1 - (Dtype(th-h) - dh)) * bottom_data[((n * channels + c) * height + th) * width + tw] * (*top_diff);
+    		out_data[index_h] += (1 - (Dtype(w-tw) + dw)) * bottom_data[((n * channels + c) * height + th) * width + tw] * (*top_diff);
+    		out_data[index_w] -= (1 - (Dtype(th-h) - dh)) * bottom_data[((n * channels + c) * height + th) * width + tw] * (*top_diff);
     	}
-  		th = int(Dtype(h) + dh), tw = int(Dtype(w)+dw + 1);
+  		th = th - 1, tw = tw + 1;
   		if (th>=0 && th<height && tw>=0 && tw < width)
     	{
-    		out_data[index] -= (1 - (Dtype(tw-w) - dw)) * bottom_data[((n * channels + c) * height + th) * width + tw] * (*top_diff);
-    		out_data[index + spatial_dim] += (1 - (Dtype(h-th) + dh)) * bottom_data[((n * channels + c) * height + th) * width + tw] * (*top_diff);
+    		out_data[index_h] -= (1 - (Dtype(tw-w) - dw)) * bottom_data[((n * channels + c) * height + th) * width + tw] * (*top_diff);
+    		out_data[index_w] += (1 - (Dtype(h-th) + dh)) * bottom_data[((n * channels + c) * height + th) * width + tw] * (*top_diff);
     	}
-  		th = int(Dtype(h) + dh + 1), tw = int(Dtype(w)+dw + 1);
+  		th = th + 1;
   		if (th>=0 && th<height && tw>=0 && tw < width)
     	{
-    		out_data[index] += (1 - (Dtype(tw-w) - dw)) * bottom_data[((n * channels + c) * height + th) * width + tw] * (*top_diff);
-    		out_data[index + spatial_dim] += (1 - (Dtype(th-h) - dh)) * bottom_data[((n * channels + c) * height + th) * width + tw] * (*top_diff);
+    		out_data[index_h] += (1 - (Dtype(tw-w) - dw)) * bottom_data[((n * channels + c) * height + th) * width + tw] * (*top_diff);
+    		out_data[index_w] += (1 - (Dtype(th-h) - dh)) * bottom_data[((n * channels + c) * height + th) * width + tw] * (*top_diff);
     	}
     	top_diff += spatial_dim;
     }
@@ -122,7 +126,6 @@ void  WarpingLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
   const Dtype* top_diff = top[0]->gpu_diff();
   const Dtype* flow_data = bottom[1]->gpu_data();
   const Dtype* flow_data_cpu = bottom[1]->cpu_data();
-  LOG(ERROR) << "start";
 
   Dtype* edge = edge_.mutable_cpu_data();
   edge_cnt_ = 0;
@@ -139,7 +142,7 @@ void  WarpingLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
   			for (int i=0; i<2; i++)
   				for (int j=0; j<2; j++)
   				{
-  					int th = int(Dtype(h) + dh + i), tw = int(Dtype(w) + dw + j);
+  					int th = std::floor(Dtype(h) + dh) + i, tw = std::floor(Dtype(w) + dw) + j;
   					Dtype weight = (1 - abs(Dtype(h + dh - th))) * (1 - abs(Dtype(w+ dw - tw)));
 
   					if (th>=0 && th<height_ && tw>=0 && tw < width_)
@@ -155,21 +158,18 @@ void  WarpingLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
   				}
   		}
 
-  LOG(ERROR) << "edge";
   if (propagate_down[0])
   {
 	  int nthreads = bottom[0]->count();
 	  warping_backward_data<Dtype><<<CAFFE_GET_BLOCKS(nthreads), CAFFE_CUDA_NUM_THREADS>>>(
 	    nthreads, top_diff, head_.gpu_data(), edge_.gpu_data(), channels_, height_, width_, bottom[0]->mutable_gpu_diff());
   }
-  LOG(ERROR) << "bp1";
   if (propagate_down[1])
   {
 	  int nthreads = bottom[1]->num() * spatial_dim_;
 	  warping_backward_flow<Dtype><<<CAFFE_GET_BLOCKS(nthreads), CAFFE_CUDA_NUM_THREADS>>>(
 	    nthreads, top_diff, bottom[0]->gpu_data(), bottom[1]->gpu_data(), channels_, height_, width_, spatial_dim_, bottom[1]->mutable_gpu_diff());	
   }
-  LOG(ERROR) << "bp2";
 }
 
 

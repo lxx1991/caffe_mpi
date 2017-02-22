@@ -517,6 +517,9 @@ void Net<Dtype>::AppendParam(const NetParameter& param, const int layer_id,
     if (param_name.size()) {
       param_names_index_[param_name] = net_param_id;
     }
+    const int learnable_param_id = learnable_params_.size();
+    learnable_params_.push_back(params_[net_param_id].get());
+    learnable_param_ids_.push_back(learnable_param_id);
   } else {
     // Named param blob with name we've seen before: share params
     const int owner_net_param_id = param_names_index_[param_name];

@@ -144,8 +144,12 @@ class Net {
   inline const vector<shared_ptr<Blob<Dtype> > >& params() const {
     return params_;
   }
+  inline const vector<Blob<Dtype>*>& learnable_params() const {
+    return learnable_params_;
+  }
   /// @brief returns the parameter learning rate multipliers
   inline const vector<float>& params_lr() const { return params_lr_; }
+
   inline const vector<float>& params_weight_decay() const {
     return params_weight_decay_;
   }
@@ -263,6 +267,15 @@ class Net {
   vector<Blob<Dtype>*> net_output_blobs_;
   /// The parameters in the network.
   vector<shared_ptr<Blob<Dtype> > > params_;
+  vector<Blob<Dtype>*> learnable_params_;
+  /**
+   * The mapping from params_ -> learnable_params_: we have
+   * learnable_param_ids_.size() == params_.size(),
+   * and learnable_params_[learnable_param_ids_[i]] == params_[i].get()
+   * if and only if params_[i] is an "owner"; otherwise, params_[i] is a sharer
+   * and learnable_params_[learnable_param_ids_[i]] gives its owner.
+   */
+  vector<int> learnable_param_ids_;
   /// the learning rate multipliers
   vector<float> params_lr_;
   /// the weight decay multipliers
