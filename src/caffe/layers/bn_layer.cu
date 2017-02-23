@@ -5,6 +5,7 @@
 #include "caffe/filler.hpp"
 #include "caffe/layer.hpp"
 #include "caffe/util/math_functions.hpp"
+#include "caffe/util/mpi_functions.hpp"
 
 namespace caffe {
 
@@ -154,7 +155,7 @@ void BNLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
         if (Caffe::MPI_my_rank() == 1)
         #endif
         {
-          sprintf(buff, "d = %5.2f/%5.2f = %5.2f\t(%5.2f, %5.2f)\t%5.2f", s1, s2, s1/s2, -this->max_d_, this->max_d_,  this->d_.cpu_data()[i]);
+          sprintf(buff, "d = %.2f/%.2f = %.2f\t(%.2f, %.2f)\t%.2f", s1, s2, s1/s2, -this->max_d_, this->max_d_,  this->d_.cpu_data()[i]);
           LOG(ERROR) << buff;
         }
       }
@@ -176,7 +177,7 @@ void BNLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
         if (Caffe::MPI_my_rank() == 1)
         #endif
         {
-          sprintf(buff, "r = %5.2f/%5.2f = %5.2f\t(%5.2f, %5.2f)\t%5.2f", s1, s2, s1/s2, 1/this->max_r_, this->max_r_,  this->r_.cpu_data()[i]);
+          sprintf(buff, "r = %.2f/%.2f = %.2f\t(%.2f, %.2f)\t%.2f", s1, s2, s1/s2, 1/this->max_r_, this->max_r_,  this->r_.cpu_data()[i]);
           LOG(ERROR) << buff;
         }
         cnt = 0;
@@ -352,6 +353,14 @@ void BNLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
     caffe_gpu_mul(broadcast_buffer_.count(), const_bottom_diff,
         broadcast_buffer_.gpu_data(), bottom_diff);
   }
+    // scale mean and variance
+  caffe_gpu_scal(this->channels_, Dtype(1) / Caffe::MPI_all_rank(), this->blobs_[2]->mutable_gpu_data());
+  caffe_gpu_scal(this->channels_, Dtype(1) / Caffe::MPI_all_rank(), this->blobs_[3]->mutable_gpu_data());
+  cudaDeviceSynchronize();
+  mpi_force_synchronize();
+  caffe_iallreduce(this->blobs_[2]->mutable_cpu_data(), this->channels_);
+  caffe_iallreduce(this->blobs_[3]->mutable_cpu_data(), this->channels_);
+  mpi_force_synchronize();
 }
 
 INSTANTIATE_LAYER_GPU_FUNCS(BNLayer);
