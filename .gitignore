@@ -66,6 +66,7 @@ models/*
 *leveldb
 *lmdb
 layer_cascade_matlab/*
+flownet_matlab/*
 
 # build, distribute, and bins (+ python proto bindings)
 build
