@@ -16,8 +16,8 @@ __global__ void warping_forward(const int nthreads, const Dtype* in_data, const 
     const int h = (index / width) % height;
     const int c = (index / width / height) % channels;
     const int n = index / width / height / channels;
-    const Dtype dh = flow_data[((n * 2 + 0) * height + h) * width + w];
-    const Dtype dw = flow_data[((n * 2 + 1) * height + h) * width + w];
+    const Dtype dh = flow_data[((n * 2 + 1) * height + h) * width + w];
+    const Dtype dw = flow_data[((n * 2 + 0) * height + h) * width + w];
     out_data[index] = 0;
 
     int th = std::floor(Dtype(h) + dh), tw = std::floor(Dtype(w)+dw);
@@ -77,8 +77,8 @@ __global__ void warping_backward_flow(const int nthreads, const Dtype* in_data, 
     const int h = (index / width) % height;
     const int n = index / width / height;
 
-    const int index_h = ((n * 2 + 0) * height + h) * width + w;
-    const int index_w = index_h + spatial_dim;
+    const int index_w = ((n * 2 + 0) * height + h) * width + w;
+    const int index_h = index_w + spatial_dim;
 
     out_data[index_h] = 0;
     out_data[index_w] = 0;
@@ -137,8 +137,8 @@ void  WarpingLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
   	for (int h=0; h<bottom[1]->height(); h++)
   		for (int w=0; w<bottom[1]->width(); w++)
   		{
-  			Dtype dh = flow_data_cpu[((n * 2 + 0) * height_ + h) * width_ + w];
-  			Dtype dw = flow_data_cpu[((n * 2 + 1) * height_ + h) * width_ + w];
+  			Dtype dh = flow_data_cpu[((n * 2 + 1) * height_ + h) * width_ + w];
+  			Dtype dw = flow_data_cpu[((n * 2 + 0) * height_ + h) * width_ + w];
   			for (int i=0; i<2; i++)
   				for (int j=0; j<2; j++)
   				{

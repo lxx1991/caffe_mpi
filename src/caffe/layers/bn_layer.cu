@@ -354,6 +354,7 @@ void BNLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
         broadcast_buffer_.gpu_data(), bottom_diff);
   }
     // scale mean and variance
+  #ifdef USE_MPI
   caffe_gpu_scal(this->channels_, Dtype(1) / Caffe::MPI_all_rank(), this->blobs_[2]->mutable_gpu_data());
   caffe_gpu_scal(this->channels_, Dtype(1) / Caffe::MPI_all_rank(), this->blobs_[3]->mutable_gpu_data());
   cudaDeviceSynchronize();
@@ -361,6 +362,7 @@ void BNLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
   caffe_iallreduce(this->blobs_[2]->mutable_cpu_data(), this->channels_);
   caffe_iallreduce(this->blobs_[3]->mutable_cpu_data(), this->channels_);
   mpi_force_synchronize();
+  #endif
 }
 
 INSTANTIATE_LAYER_GPU_FUNCS(BNLayer);
