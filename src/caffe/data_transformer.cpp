@@ -350,14 +350,13 @@ void DataTransformer<Dtype>::Transform(const Datum& datum_data, const Datum& dat
     NOT_IMPLEMENTED;
   }
   if (has_mean_values) {
-    CHECK(mean_values_.size() == 1 || mean_values_.size() == datum_channels) <<
+    CHECK(mean_values_.size() == 1 || mean_values_.size() == datum_channels || datum_channels % mean_values_.size() == 0) <<
      "Specify either 1 mean_value or as many as channels: " << datum_channels;
-    if (datum_channels > 1 && mean_values_.size() == 1) {
-      // Replicate the mean_value for simplicity
-      for (int c = 1; c < datum_channels; ++c) {
-        mean_values_.push_back(mean_values_[0]);
-      }
-    }
+     int temp_size = mean_values_.size();
+     for (int c = temp_size; c < datum_channels; ++c)
+     {
+        mean_values_.push_back(mean_values_[(c - temp_size) % temp_size]);
+     }
   }
 
   float scale_ratios = std::max(Rand(int((upper_scale - lower_scale) * 1000.0) + 1) / 1000.0, 0.0) + lower_scale;

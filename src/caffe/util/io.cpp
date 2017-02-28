@@ -312,9 +312,12 @@ bool ReadSegDataToDatum(const string& img_filename, const string& label_filename
 
 
   cv::Mat cv_img = cv::imread(img_filename, cv_read_flag);
-  cv::Mat cv_label = cv::imread(label_filename, CV_LOAD_IMAGE_GRAYSCALE);
 
-  if (!cv_img.data || !cv_label.data){
+  cv::Mat cv_label;
+  if (label_filename.length() > 0)
+    cv_label = cv::imread(label_filename, CV_LOAD_IMAGE_GRAYSCALE);
+
+  if (!cv_img.data || (!cv_label.data && label_filename.length() > 0)){
     LOG(ERROR) << "Could not load file " << label_filename;
     return false;
   }
@@ -328,12 +331,15 @@ bool ReadSegDataToDatum(const string& img_filename, const string& label_filename
   datum_data->clear_float_data();
   datum_data_string = datum_data->mutable_data();
 
-  datum_label->set_channels(1);
-  datum_label->set_height(cv_label.rows);
-  datum_label->set_width(cv_label.cols);
-  datum_label->clear_data();
-  datum_label->clear_float_data();
-  datum_label_string = datum_label->mutable_data();
+  if (label_filename.length() > 0)
+  {
+    datum_label->set_channels(1);
+    datum_label->set_height(cv_label.rows);
+    datum_label->set_width(cv_label.cols);
+    datum_label->clear_data();
+    datum_label->clear_float_data();
+    datum_label_string = datum_label->mutable_data();
+  }
 
 
   if (is_color) {
@@ -353,13 +359,13 @@ bool ReadSegDataToDatum(const string& img_filename, const string& label_filename
           }
         }
     }
-
-  for (int h = 0; h < cv_label.rows; ++h) {
-    for (int w = 0; w < cv_label.cols; ++w) {
-      datum_label_string->push_back(
-        static_cast<char>(cv_label.at<uchar>(h, w)));
+  if (label_filename.length() > 0)
+    for (int h = 0; h < cv_label.rows; ++h) {
+      for (int w = 0; w < cv_label.cols; ++w) {
+        datum_label_string->push_back(
+          static_cast<char>(cv_label.at<uchar>(h, w)));
+        }
       }
-    }
   return true;
 }
 
