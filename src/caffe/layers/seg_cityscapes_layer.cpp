@@ -115,7 +115,7 @@ void SegCityscapesLayer<Dtype>::InternalThreadEntry(){
 		char buf_1[100], buf_2[100], buf_4[100], buf[100];
 		int buf_3;
 		sscanf(lines_[lines_id_].first.c_str(), "%[^0]%[^_]_%d_%s", buf_1, buf_2, &buf_3, buf_4);
-		buf_3 = buf_3 + rand() % 17 - 8;
+		buf_3 = buf_3 + rand() % 11 - 5;
 		sprintf(buf, "%s%s_%06d_%s", buf_1, buf_2, buf_3, buf_4);
 		CHECK(ReadSegDataToDatum(string(buf), "", &datum_data2, NULL, true));
 
@@ -164,7 +164,7 @@ void SegCityscapesLayer<Dtype>::InternalThreadEntry(){
 		  			max_label_cnt = std::max(max_label_cnt, cnt[i]);
 
 		  		if (max_label_cnt > 0.8 * this->prefetch_label_.count())
-		  			this->data_transformer_->Transform(datum_data, datum_label, &this->prefetch_data_, &this->prefetch_label_, batch_iter);
+		  			this->data_transformer_->Transform(datum_data3, datum_label, &this->prefetch_data_, &this->prefetch_label_, batch_iter);
 	  			else
 	  				break;
 			}
@@ -196,11 +196,11 @@ void SegCityscapesLayer<Dtype>::InternalThreadEntry(){
 	  	  			im_label.at<uchar>(p1, p2) = this->prefetch_label_.data_at(0, 0, p1, p2);
 		  	int tot = rand() * 10000 + rand() + lines_id_;
 		  	char temp_path[200];
-		  	sprintf(temp_path, "temp/%d_0_%s.jpg", tot, lines_[lines_id_].first.substr(18+16,3).c_str());
+		  	sprintf(temp_path, "temp/%d_0.jpg", tot);
 		  	imwrite(temp_path, im_data);
-		  	sprintf(temp_path, "temp/%d_1_%s.jpg", tot, lines_[lines_id_].first.substr(18+16,3).c_str());
+		  	sprintf(temp_path, "temp/%d_1.jpg", tot);
 		  	imwrite(temp_path, im_data2);
-		  	sprintf(temp_path, "temp/%d_2_%s.jpg", tot, lines_[lines_id_].first.substr(18+16,3).c_str());
+		  	sprintf(temp_path, "temp/%d_2.jpg", tot);
 		  	imwrite(temp_path, im_label);
 		}
 
