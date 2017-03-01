@@ -374,6 +374,11 @@ void DataTransformer<Dtype>::Transform(const Datum& datum_data, const Datum& dat
     crop_height = param_.crop_size();
     crop_width = param_.crop_size();
   }
+  else if (param_.has_crop_height() && param_.has_crop_width())
+  {
+    crop_height = param_.crop_height();
+    crop_width = param_.crop_width();
+  }
   else if (param_.has_upper_size())
   {
     crop_height = std::min(crop_height, param_.upper_size());

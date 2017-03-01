@@ -66,6 +66,11 @@ void SegDataLayer<Dtype>:: DataLayerSetUp(const vector<Blob<Dtype>*>& bottom, co
 		crop_height = this->layer_param_.transform_param().crop_size();
 		crop_width = this->layer_param_.transform_param().crop_size();
 	}
+	else if (this->layer_param_.transform_param().has_crop_height() && this->layer_param_.transform_param().has_crop_width())
+	{
+		crop_height = this->layer_param_.transform_param().crop_height();
+		crop_width = this->layer_param_.transform_param().crop_width();
+	}
 	else if (this->layer_param_.transform_param().has_upper_size())
 	{
 		crop_height = std::min(crop_height, this->layer_param_.transform_param().upper_size());
@@ -79,7 +84,7 @@ void SegDataLayer<Dtype>:: DataLayerSetUp(const vector<Blob<Dtype>*>& bottom, co
 	batch_size_ = this->layer_param_.seg_data_param().batch_size();
 
 	if (batch_size_ != 1)
-		CHECK(this->layer_param_.transform_param().has_crop_size());
+		CHECK(this->layer_param_.transform_param().has_crop_size() || (this->layer_param_.transform_param().has_crop_height() && this->layer_param_.transform_param().has_crop_width()));
 
 	top[0]->Reshape(batch_size_, datum_data.channels(), crop_height, crop_width);
 	this->prefetch_data_.Reshape(batch_size_, datum_data.channels(), crop_height, crop_width);
