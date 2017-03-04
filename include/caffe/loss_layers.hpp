@@ -806,6 +806,53 @@ protected:
     bool has_weights_;
 };
 
+
+
+template <typename Dtype>
+class MatchLossLayer : public LossLayer<Dtype> {
+public:
+    explicit MatchLossLayer(const LayerParameter& param)
+        : LossLayer<Dtype>(param) {}
+    virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
+                            const vector<Blob<Dtype>*>& top);
+    virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
+                         const vector<Blob<Dtype>*>& top);
+
+    virtual inline const char* type() const { return "MatchLoss"; }
+
+    virtual inline int ExactNumBottomBlobs() const { return 3; }
+    virtual inline int MinBottomBlobs() const { return -1; }
+    virtual inline int MaxBottomBlobs() const { return -1; }
+
+    /**
+    * Unlike most loss layers, in the MatchLoss we can backpropagate
+    * to both inputs -- override to return true and always allow force_backward.
+    */
+    virtual inline bool AllowForceBackward(const int bottom_index) const {
+      return true;
+    }
+
+protected:
+    virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+                             const vector<Blob<Dtype>*>& top);
+    virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+                             const vector<Blob<Dtype>*>& top)
+    {
+      NOT_IMPLEMENTED;
+    };
+
+    virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
+                              const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+    virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
+                              const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom)
+    {
+      NOT_IMPLEMENTED;
+    };
+    bool has_ignore_label_;
+    int ignore_label_;
+    Dtype lambda_, eps_, penalize_;
+};
+
 }  // namespace caffe
 
 #endif  // CAFFE_LOSS_LAYERS_HPP_

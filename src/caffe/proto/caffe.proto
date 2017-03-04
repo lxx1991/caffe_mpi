@@ -280,7 +280,7 @@ message ParamSpec {
 // NOTE
 // Update the next available ID when you add a new LayerParameter field.
 //
-// LayerParameter next available layer-specific ID: 167 (last added: interp_param)
+// LayerParameter next available layer-specific ID: 168 (last added: match_loss_param)
 message LayerParameter {
   optional string name = 1; // the layer name
   optional string type = 2; // the layer type
@@ -349,6 +349,7 @@ message LayerParameter {
   optional LogParameter log_param = 134;
   optional LRNParameter lrn_param = 118;
   optional MaskParameter mask_param = 163;
+  optional MatchLossParameter match_loss_param = 167;
   optional MemoryDataParameter memory_data_param = 119;
   optional MVNParameter mvn_param = 120;
   optional PoolingParameter pooling_param = 121;
@@ -786,6 +787,12 @@ message MaskParameter {
   optional float threshold = 1 [default = 1.0];
   optional bool prev_mask = 2 [default = false];
   optional uint32 ignore_label = 3 [default = 255];
+}
+
+message MatchLossParameter {
+  optional float lambda = 1 [default = 0.1];
+  optional float eps = 2 [default = 0.001];
+  optional float penalize = 3 [default = 1];
 }
 
 message MemoryDataParameter {
