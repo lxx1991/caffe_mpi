@@ -11,7 +11,6 @@ namespace caffe {
 template <typename Dtype>
 void BNDataLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
     const vector<Blob<Dtype>*>& top) {
-#ifdef USE_MPI
   this->x_norm_gpu_data_ = NULL;
   this->x_norm_cpu_data_ = NULL;
 
@@ -96,13 +95,11 @@ void BNDataLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
     CHECK_EQ(this->max_ds_.size(), this->relax_iter_.size());
   }
 
-#endif
 }
 
 template <typename Dtype>
 void BNDataLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
     const vector<Blob<Dtype>*>& top) {
-#ifdef USE_MPI
   // Figure out the dimensions
   this->num_ = bottom[0]->num();
   if (this->axis_ == 2)
@@ -118,7 +115,6 @@ void BNDataLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
   top[0]->ReshapeLike(*bottom[0]);
   this->x_norm_.ReshapeLike(*bottom[0]);
   this->x_std_.Reshape(1, this->channels_, 1, 1);
-#endif
 }
 
 template <typename Dtype>

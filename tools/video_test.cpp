@@ -26,6 +26,13 @@
 #include "caffe/util/MogControl.h"
 #endif
 
+#define FLOW
+#define WARP
+
+#include "OF_DIS/gen_flow.h"
+
+
+
 using caffe::Blob;
 using caffe::Caffe;
 using caffe::Net;
@@ -34,6 +41,12 @@ using caffe::shared_ptr;
 using caffe::Timer;
 using caffe::vector;
 using namespace cv;
+
+
+const float flow_th = 1.0f;
+const float rgb_th = 0.002f;
+const int grid_size = 20;
+const float momentum_value = 0.95f;
 
 // DEFINE_int32(gpu, 0,
 //     "Run in GPU mode on given device ID.");
@@ -46,7 +59,7 @@ DEFINE_int32(shrink, 8,
     "Optional; Supported interp shrink ratio.");
 DEFINE_int32(show_channel, 1,
     "Optional; Mask input with channel id #showchannel.");
-DEFINE_string(output_blob, "fc9_zoom",
+DEFINE_string(output_blob, "prob",
     "Optional; The blob name for the output probability in network proto.");
 DEFINE_string(video_input, "",
     "Optional; Input video path, or from camera.");
@@ -61,7 +74,8 @@ public:
   ~HumanPredictor() {};
   bool Init(const std::string &net_file, const std::string &model_file, const bool is_GPU,
    const float* mean_ptr,  const std::string &output_blob, int shrink);
-  bool PredictProb(const cv::Mat& input_frame, std::vector<cv::Mat>& human_prob_mat, cv::Mat& human_mask_mat, cv::Mat *history_human_prob_mat) const;
+  bool PredictProb(const cv::Mat& input_frame, std::vector<cv::Mat>& human_prob_mat, cv::Mat& human_mask_mat) const;
+  bool PredictProb(const cv::Mat& input_frame, std::vector<cv::Mat>& human_prob_mat, cv::Mat& human_mask_mat, std::vector<cv::Mat>& history_human_prob_mat, cv::Mat &delta_flow, cv::Mat &delta_rgb, cv::Mat &momentum, cv::Mat &orig_human_mask_mat) const;
   vector<int> PadParam(int video_cols, int video_rows);
   Mat show_mask(const cv::Mat&  img_ori, const cv::Mat& prob_mat, int show_channel);
   inline int get_height_in() { return height_network_input; }
@@ -148,7 +162,7 @@ vector<int> HumanPredictor::PadParam(int video_cols, int video_rows){
   return pad_vector;
 }
 
-bool HumanPredictor::PredictProb(const cv::Mat& input_frame, std::vector<cv::Mat>& human_prob_mat, cv::Mat& human_mask_mat, cv::Mat *history_human_prob_mat) const
+bool HumanPredictor::PredictProb(const cv::Mat& input_frame, std::vector<cv::Mat>& human_prob_mat, cv::Mat& human_mask_mat) const
 {
   boost::shared_ptr<caffe::Blob<float> > data_blob = model->blob_by_name("data");
   boost::shared_ptr<caffe::Blob<float> > prob_blob = model->blob_by_name(output_blob_name);
@@ -192,17 +206,92 @@ bool HumanPredictor::PredictProb(const cv::Mat& input_frame, std::vector<cv::Mat
 
   human_mask_mat = Mat(height_network_prob, width_network_prob, CV_32FC1, Scalar(0));
   for (int i = 0; i < height_network_prob * width_network_prob; i++){
-    int index = 0; int prob = human_prob_mat[0].at<float>(i);
-    if (!history_human_prob_mat)
-    {
-      if (history_human_prob_mat[0].at<float>(i) <0.5)
-        prob = 0.97;
-      else
-        prob = 0.5; 
-    }
+    int index = 0; float prob = human_prob_mat[0].at<float>(i);
     for (int c = 1; c < output_channels; c++){
       if (human_prob_mat[c].at<float>(i) > prob){
         prob = human_prob_mat[c].at<float>(i);
+        index = c;
+      }
+    }
+    human_mask_mat.at<float>(i) = (int)(index * 255 / (output_channels - 1));
+  }
+  return true;
+}
+
+bool HumanPredictor::PredictProb(const cv::Mat& input_frame, std::vector<cv::Mat>& human_prob_mat, cv::Mat& human_mask_mat, std::vector<cv::Mat>& history_human_prob_mat, cv::Mat &delta_flow, cv::Mat &delta_rgb, cv::Mat &momentum, cv::Mat &orig_human_mask_mat) const
+{
+  boost::shared_ptr<caffe::Blob<float> > data_blob = model->blob_by_name("data");
+  boost::shared_ptr<caffe::Blob<float> > prob_blob = model->blob_by_name(output_blob_name);
+
+  CHECK_EQ(input_frame.rows, height_network_input);
+  CHECK_EQ(input_frame.cols, width_network_input);
+  CHECK_EQ(input_frame.channels(), 3);
+
+  int output_channels = prob_blob->channels();
+  human_prob_mat.resize(output_channels);
+  for (int i = 0; i < output_channels; i++) {
+    human_prob_mat[i] = Mat(height_network_prob, width_network_prob, CV_32FC1);
+  }
+
+  Mat bgrFrame[3];
+  split(input_frame, bgrFrame);
+  for (size_t c = 0; c < 3; c++) {
+    bgrFrame[c].convertTo(bgrFrame[c], CV_32F);
+    bgrFrame[c] = bgrFrame[c] - mean[c];
+  }
+
+  float* data_blob_data = data_blob->mutable_cpu_data();
+  for (size_t c = 0; c < 3; c++) {
+    memcpy(data_blob_data + c * height_network_input * width_network_input,
+        bgrFrame[c].data, sizeof(float) * height_network_input * width_network_input);
+  }
+
+  Timer forward_timer;
+  forward_timer.Start();
+  model->ForwardPrefilled();
+  forward_timer.Stop();
+  LOG(INFO) << "Forward Time: " << forward_timer.MilliSeconds() << " ms.";
+
+  const float* prob_blob_data = prob_blob->cpu_data();
+
+  for (int c = 0; c < output_channels; c++) {
+    memcpy(human_prob_mat[c].data, prob_blob_data + 
+      c * height_network_prob * width_network_prob, 
+      sizeof(float) * height_network_prob * width_network_prob);
+  }
+
+  orig_human_mask_mat = Mat(height_network_prob, width_network_prob, CV_32FC1, Scalar(0));
+  for (int i = 0; i < height_network_prob * width_network_prob; i++){
+    int index = 0; float prob = human_prob_mat[0].at<float>(i);
+    for (int c = 1; c < output_channels; c++){
+      if (human_prob_mat[c].at<float>(i) > prob){
+        prob = human_prob_mat[c].at<float>(i);
+        index = c;
+      }
+    }
+    orig_human_mask_mat.at<float>(i) = (int)(index * 255 / (output_channels - 1));
+  }
+
+
+  for (int i = 0; i < height_network_prob * width_network_prob; i++){
+#ifdef FLOW
+    if (delta_flow.at<float>(i)>0 && delta_rgb.at<float>(i)>0)
+#else
+    if (delta_rgb.at<float>(i)>0)
+#endif
+      momentum.at<float>(i) /= 2;
+    
+    for (int j=0; j<output_channels; j++)
+      history_human_prob_mat[j].at<float>(i) = history_human_prob_mat[j].at<float>(i) * momentum.at<float>(i) + human_prob_mat[j].at<float>(i) * (1 - momentum.at<float>(i));
+    momentum.at<float>(i) =  min(momentum_value, momentum.at<float>(i)  + 0.2f);
+  }
+
+  human_mask_mat = Mat(height_network_prob, width_network_prob, CV_32FC1, Scalar(0));
+  for (int i = 0; i < height_network_prob * width_network_prob; i++){
+    int index = 0; float prob = history_human_prob_mat[0].at<float>(i);
+    for (int c = 1; c < output_channels; c++){
+      if (history_human_prob_mat[c].at<float>(i) > prob){
+        prob = history_human_prob_mat[c].at<float>(i);
         index = c;
       }
     }
@@ -284,6 +373,8 @@ int main(int argc, char** argv) {
   int video_cols = 640;
   int video_rows = 480;
 
+  //std::swap(video_cols, video_rows);
+
   HumanPredictor predictor;
   CHECK(predictor.Init(proto_model, weights, 0, mean, FLAGS_output_blob, FLAGS_shrink));
   vector<int> pad = predictor.PadParam(video_cols, video_rows);
@@ -314,10 +405,19 @@ int main(int argc, char** argv) {
   capture.set(CV_CAP_PROP_FRAME_WIDTH, video_cols);
   capture.set(CV_CAP_PROP_FRAME_HEIGHT, video_rows);
 
-  Mat read_frame, temp_frame;
-  Mat history_human_prob_mat; bool flag = false;
+  Mat read_frame, temp_frame, prev_frame, flow(predictor.get_height_in(), predictor.get_width_in(), CV_32FC2), delta_flow(predictor.get_height_in(), predictor.get_width_in(), CV_32FC1), delta_rgb(predictor.get_height_in(), predictor.get_width_in(), CV_32FC1);
+
+#ifdef WARP
+  int frame_cnt = 0, fame_total = 3;
+  vector <Mat> prev_frames(fame_total);
+  Mat warp_history;
+#endif
+
+  Mat momentum(predictor.get_height_in(), predictor.get_width_in(), CV_32FC1, Scalar(0.00)), history_rgb, history_flow; int flag = 0;
+  vector<Mat> history_human_prob_mat;
   while (capture.read(read_frame)) {
     // Prepare Input
+    resize(read_frame, read_frame, Size(video_cols, video_rows));
     read_frame.copyTo(temp_frame);
     resize(temp_frame, temp_frame, Size(predictor.get_resize_width(), predictor.get_resize_height()));
     copyMakeBorder(temp_frame, temp_frame, pad[0], pad[1], pad[2], pad[3], 
@@ -325,32 +425,116 @@ int main(int argc, char** argv) {
 
     // Predict by CNN
     vector<Mat> human_prob_mat;
-    Mat human_mask_mat;
+    Mat human_mask_mat, orig_human_mask_mat;
 
     if (!flag)
     {
-      flag = true;
-      predictor.PredictProb(temp_frame, human_prob_mat, human_mask_mat, NULL);
+      predictor.PredictProb(temp_frame, human_prob_mat, human_mask_mat);
+      history_human_prob_mat.resize(human_prob_mat.size());
+      human_prob_mat[0].copyTo(history_human_prob_mat[0]);
+      human_prob_mat[1].copyTo(history_human_prob_mat[1]);
     }
     else
-      predictor.PredictProb(temp_frame, human_prob_mat, human_mask_mat, &history_human_prob_mat);
+    {
 
-    human_mask_mat.copyTo(history_human_prob_mat);
+#ifdef FLOW
+      Timer flow_timer;
+      flow_timer.Start();
+      gen_flow( temp_frame, prev_frame, &flow, 2);
+      flow_timer.Stop();
+      LOG(INFO) << "Flow Time: " << flow_timer.MilliSeconds() << " ms.";
+      for (int i=0; i <predictor.get_height_in(); i++)
+        for (int j=0; j<predictor.get_width_in(); j++)
+        {
+          delta_flow.at<float>(i,j) = 0;
+          for (int k=0; k<2; k++)
+            delta_flow.at<float>(i,j) += flow.at<Vec2f>(i,j)[k] * flow.at<Vec2f>(i,j)[k];
+        }
+      if (flag == 1)
+        delta_flow.copyTo(history_flow);
+      cv::swap(delta_flow, history_flow);
+      delta_flow = (delta_flow + history_flow) / 2.0f;
+      cv::medianBlur(delta_flow, delta_flow, 5);
+#endif
+      
+      for (int i=0; i <predictor.get_height_in(); i++)
+        for (int j=0; j<predictor.get_width_in(); j++)
+        {
+          delta_rgb.at<float>(i,j) = 0;
+          for (int k=0; k<3; k++)
+            delta_rgb.at<float>(i,j) += (float)(temp_frame.at<Vec3b>(i,j)[k] - prev_frame.at<Vec3b>(i,j)[k])*(temp_frame.at<Vec3b>(i,j)[k] - prev_frame.at<Vec3b>(i,j)[k]) / (255.0 * 255.0);
+        }
+      if (flag == 1)
+        delta_rgb.copyTo(history_rgb);
+      cv::swap(delta_rgb, history_rgb);
+      delta_rgb = (delta_rgb + history_rgb) / 2.0f;
+      cv::medianBlur(delta_rgb, delta_rgb, 5);
+
+      
+      for (int i=0; i <predictor.get_height_in(); i++)
+        for (int j=0; j<predictor.get_width_in(); j++)
+        {
+          delta_rgb.at<float>(i,j) = delta_rgb.at<float>(i,j) > rgb_th;
+          delta_flow.at<float>(i,j) = delta_flow.at<float>(i,j) > flow_th;
+        }
+      
+      Mat newImage, newImage1, newImage2;
+      cv::blur(delta_flow, newImage1, Size(grid_size, grid_size));
+      cv::blur(delta_rgb, newImage2, Size(grid_size, grid_size));
+      
+      predictor.PredictProb(temp_frame, human_prob_mat, human_mask_mat, history_human_prob_mat, newImage1, newImage2, momentum, orig_human_mask_mat);
+
+      cv::hconcat(delta_flow, delta_rgb, newImage);
+      cv::hconcat(newImage, momentum, newImage);
+      cv::imshow("diff", newImage);
+    }
+
+
+#ifdef WARP
+      //float warp_m = 0.66;
+      Mat warp_frame, mask, warp_flow = flow;
+      //gen_flow(temp_frame, prev_frame, &warp_flow, 2);
+      prev_frames[frame_cnt % fame_total] = temp_frame / fame_total;
+      warp_history = temp_frame / fame_total;
+
+
+      for (int i=1; i<fame_total; i++)
+        if (frame_cnt + i >= fame_total)
+        {
+          image_warp(prev_frames[(frame_cnt+i) % fame_total], warp_flow, warp_frame, mask);
+          warp_frame.copyTo(prev_frames[(frame_cnt+i) % fame_total]);
+          warp_history = warp_history + warp_frame;
+        }
+      if (frame_cnt + 1>= fame_total)
+      imshow("warp", prev_frames[(frame_cnt+1) % fame_total] * fame_total);
+      frame_cnt++;
+#endif
+    temp_frame.copyTo(prev_frame);
+
+    if (!flag)
+      human_mask_mat.copyTo(orig_human_mask_mat);
+
+    cv::Rect ROI(pad[2], pad[0], predictor.get_resize_width(), predictor.get_resize_height());
+    human_mask_mat = human_mask_mat(ROI);
+    orig_human_mask_mat = orig_human_mask_mat(ROI);
+
     // Visualization and Output
     Mat masked_img = predictor.show_mask(read_frame, human_mask_mat, FLAGS_show_channel);
     Mat newImage;
 
-
+    cv::hconcat(human_mask_mat, orig_human_mask_mat, human_mask_mat);
+    cv::imshow("Masked Input and Mask", human_mask_mat);
     cv::cvtColor(human_mask_mat, human_mask_mat, cv::COLOR_GRAY2BGR);
     human_mask_mat.convertTo(human_mask_mat, CV_8UC3);
-    resize(human_mask_mat, human_mask_mat, Size(video_cols, video_rows));
+    
+    resize(human_mask_mat, human_mask_mat, Size(video_cols*2, video_rows));
 
     cv::hconcat(masked_img, human_mask_mat, newImage);
     cv::imshow("Masked Input and Mask", newImage);
 
-    Mat prob_concat = human_prob_mat[0];
+    Mat prob_concat = history_human_prob_mat[0];
     for (int i = 1; i < predictor.get_channel_network_prob(); i++){
-      cv::hconcat(prob_concat, human_prob_mat[1], prob_concat);
+      cv::hconcat(prob_concat, history_human_prob_mat[1], prob_concat);
     }
     cv::imshow("Channel Probilities", prob_concat);
 
@@ -362,6 +546,7 @@ int main(int argc, char** argv) {
 
     if (waitKey(1) != -1)
       break;
+    flag++;
   }
   LOG(INFO) << "Finished!";
   caffe::GlobalFinalize();

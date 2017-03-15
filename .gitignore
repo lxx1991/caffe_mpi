@@ -61,6 +61,7 @@ Makefile.config
 data/*
 models/*
 *.caffemodel
+*.model
 *.solverstate
 *.binaryproto
 *leveldb
