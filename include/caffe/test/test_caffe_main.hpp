@@ -71,6 +71,9 @@ typedef ::testing::Types<CPUDevice<float>, CPUDevice<double>,
                          GPUDevice<float>, GPUDevice<double> >
                          TestDtypesAndDevices;
 
+typedef ::testing::Types<GPUDevice<float>, GPUDevice<double> >
+                         TestDtypesAndGPU;
+
 #endif
 
 }  // namespace caffe

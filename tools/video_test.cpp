@@ -408,7 +408,7 @@ int main(int argc, char** argv) {
   Mat read_frame, temp_frame, prev_frame, flow(predictor.get_height_in(), predictor.get_width_in(), CV_32FC2), delta_flow(predictor.get_height_in(), predictor.get_width_in(), CV_32FC1), delta_rgb(predictor.get_height_in(), predictor.get_width_in(), CV_32FC1);
 
 #ifdef WARP
-  int frame_cnt = 0, fame_total = 3;
+  int frame_cnt = 0, fame_total = 5;
   vector <Mat> prev_frames(fame_total);
   Mat warp_history;
 #endif
@@ -494,8 +494,8 @@ int main(int argc, char** argv) {
       //float warp_m = 0.66;
       Mat warp_frame, mask, warp_flow = flow;
       //gen_flow(temp_frame, prev_frame, &warp_flow, 2);
-      prev_frames[frame_cnt % fame_total] = temp_frame / fame_total;
-      warp_history = temp_frame / fame_total;
+      prev_frames[frame_cnt % fame_total] = human_prob_mat[0] / fame_total;
+      warp_history = human_prob_mat[0] / fame_total;
 
 
       for (int i=1; i<fame_total; i++)
