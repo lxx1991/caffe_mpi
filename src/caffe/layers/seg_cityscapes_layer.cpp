@@ -66,6 +66,11 @@ void SegCityscapesLayer<Dtype>:: DataLayerSetUp(const vector<Blob<Dtype>*>& bott
 		crop_height = this->layer_param_.transform_param().crop_size();
 		crop_width = this->layer_param_.transform_param().crop_size();
 	}
+	else if (this->layer_param_.transform_param().has_crop_height() && this->layer_param_.transform_param().has_crop_width())
+	{
+		crop_height = this->layer_param_.transform_param().crop_height();
+		crop_width = this->layer_param_.transform_param().crop_width();
+	}
 	else if (this->layer_param_.transform_param().has_upper_size())
 	{
 		crop_height = std::min(crop_height, this->layer_param_.transform_param().upper_size());
@@ -79,7 +84,7 @@ void SegCityscapesLayer<Dtype>:: DataLayerSetUp(const vector<Blob<Dtype>*>& bott
 	batch_size_ = this->layer_param_.seg_data_param().batch_size();
 
 	if (batch_size_ != 1)
-		CHECK(this->layer_param_.transform_param().has_crop_size());
+		CHECK(this->layer_param_.transform_param().has_crop_size() || (this->layer_param_.transform_param().has_crop_height() && this->layer_param_.transform_param().has_crop_width()));
 
 	top[0]->Reshape(batch_size_, datum_data.channels(), crop_height, crop_width);
 	this->prefetch_data_.Reshape(batch_size_, datum_data.channels(), crop_height, crop_width);
@@ -113,6 +118,7 @@ void SegCityscapesLayer<Dtype>::InternalThreadEntry(){
 		char buf_1[100], buf_2[100], buf_4[100], buf[100];
 		int buf_3, buf_3n;
 		sscanf(lines_[lines_id_].first.c_str(), "%[^0]%[^_]_%d_%s", buf_1, buf_2, &buf_3, buf_4);
+
 		buf_3 = (buf_3-19) + rand() % 29;
 		buf_3n = buf_3 + 1;
 
@@ -121,10 +127,8 @@ void SegCityscapesLayer<Dtype>::InternalThreadEntry(){
 		sprintf(buf, "%s%s_%06d_%s", buf_1, buf_2, buf_3, buf_4);
 		CHECK(ReadSegDataToDatum(string(buf), "", &datum_data, NULL, true));
 
-
 		sprintf(buf, "%s%s_%06d_%s", buf_1, buf_2, buf_3n, buf_4);
 		CHECK(ReadSegDataToDatum(string(buf), "", &datum_data2, NULL, true));
-
 
 		this->data_transformer_->Transform(datum_data, datum_data2, &this->prefetch_data_, &this->prefetch_label_, batch_iter);
 
@@ -154,20 +158,22 @@ void SegCityscapesLayer<Dtype>::InternalThreadEntry(){
 		  	cv::Mat im_data(this->prefetch_data_.height(), this->prefetch_data_.width(), CV_8UC3);
 		  	cv::Mat im_data2(this->prefetch_data_.height(), this->prefetch_data_.width(), CV_8UC3);
 
+		  	Dtype scale = this->layer_param_.transform_param().scale();
+
 		  	for (int p1 = 0; p1 < this->prefetch_data_.height(); p1 ++)
 		  		for (int p2 = 0; p2 < this->prefetch_data_.width(); p2 ++)
 		  		{
-		  			im_data.at<uchar>(p1, p2*3+0) = (uchar)(this->prefetch_data_.data_at(0, 0, p1, p2)+104);
-		  			im_data.at<uchar>(p1, p2*3+1) = (uchar)(this->prefetch_data_.data_at(0, 1, p1, p2)+117);
-		  			im_data.at<uchar>(p1, p2*3+2) = (uchar)(this->prefetch_data_.data_at(0, 2, p1, p2)+123);	
+		  			im_data.at<uchar>(p1, p2*3+0) = (uchar)(this->prefetch_data_.data_at(0, 0, p1, p2)/scale+104);
+		  			im_data.at<uchar>(p1, p2*3+1) = (uchar)(this->prefetch_data_.data_at(0, 1, p1, p2)/scale+117);
+		  			im_data.at<uchar>(p1, p2*3+2) = (uchar)(this->prefetch_data_.data_at(0, 2, p1, p2)/scale+123);	
 		  		}
 
 		  	for (int p1 = 0; p1 < this->prefetch_data_.height(); p1 ++)
 		  		for (int p2 = 0; p2 < this->prefetch_data_.width(); p2 ++)
 		  		{
-		  			im_data2.at<uchar>(p1, p2*3+0) = (uchar)(this->prefetch_label_.data_at(0, 0, p1, p2)+104);
-		  			im_data2.at<uchar>(p1, p2*3+1) = (uchar)(this->prefetch_label_.data_at(0, 1, p1, p2)+117);
-		  			im_data2.at<uchar>(p1, p2*3+2) = (uchar)(this->prefetch_label_.data_at(0, 2, p1, p2)+123);	
+		  			im_data2.at<uchar>(p1, p2*3+0) = (uchar)(this->prefetch_label_.data_at(0, 0, p1, p2)/scale+104);
+		  			im_data2.at<uchar>(p1, p2*3+1) = (uchar)(this->prefetch_label_.data_at(0, 1, p1, p2)/scale+117);
+		  			im_data2.at<uchar>(p1, p2*3+2) = (uchar)(this->prefetch_label_.data_at(0, 2, p1, p2)/scale+123);	
 		  		}
 		  	int tot = rand() * 10000 + rand() + lines_id_;
 		  	char temp_path[200];
