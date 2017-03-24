@@ -7,6 +7,7 @@
 #include "caffe/util/math_functions.hpp"
 #include "caffe/vision_layers.hpp"
 
+
 namespace caffe {
 
 template <typename Dtype>
@@ -48,6 +49,8 @@ void SoftmaxWithLossLayer<Dtype>::Reshape(
     // softmax output
     top[1]->ReshapeLike(*bottom[0]);
   }
+  if (temp.size() < inner_num_)
+    temp.resize(inner_num_);
 }
 
 template <typename Dtype>

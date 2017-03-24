@@ -764,7 +764,9 @@ class SoftmaxWithLossLayer : public LossLayer<Dtype> {
   bool normalize_;
 
   int softmax_axis_, outer_num_, inner_num_;
+  vector<Dtype> temp;
 };
+
 
 template <typename Dtype>
 class SmoothL1LossLayer : public LossLayer<Dtype> {

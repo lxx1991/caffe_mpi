@@ -350,13 +350,13 @@ void DataTransformer<Dtype>::Transform(const Datum& datum_data, const Datum& dat
     NOT_IMPLEMENTED;
   }
   if (has_mean_values) {
-    CHECK(mean_values_.size() == 1 || mean_values_.size() == datum_channels || datum_channels % mean_values_.size() == 0) <<
+    CHECK(mean_values_.size() == 1 || mean_values_.size() == datum_channels || datum_channels == 3+19) <<
      "Specify either 1 mean_value or as many as channels: " << datum_channels;
-     int temp_size = mean_values_.size();
+     /*int temp_size = mean_values_.size();
      for (int c = temp_size; c < datum_channels; ++c)
      {
         mean_values_.push_back(mean_values_[(c - temp_size) % temp_size]);
-     }
+     }*/
   }
 
   float scale_ratios = std::max(Rand(int((upper_scale - lower_scale) * 1000.0) + 1) / 1000.0, 0.0) + lower_scale;
@@ -463,7 +463,7 @@ void DataTransformer<Dtype>::Transform(const Datum& datum_data, const Datum& dat
         {
             NOT_IMPLEMENTED;
         } 
-        else if (has_mean_values)
+        else if (has_mean_values && c < mean_values_.size())
         {
           ptr[top_index] = ((h+h_off)>=0) && ((h+h_off)<height) && ((w+w_off)>=0) && ((w+w_off)<width) ? (static_cast<Dtype>(M.at<uint8_t>(h+h_off, w+w_off)) - mean_values_[c]) * scale : 0;
         }

@@ -86,11 +86,11 @@ void SegCityscapesLayer<Dtype>:: DataLayerSetUp(const vector<Blob<Dtype>*>& bott
 	if (batch_size_ != 1)
 		CHECK(this->layer_param_.transform_param().has_crop_size() || (this->layer_param_.transform_param().has_crop_height() && this->layer_param_.transform_param().has_crop_width()));
 
-	top[0]->Reshape(batch_size_, datum_data.channels(), crop_height, crop_width);
-	this->prefetch_data_.Reshape(batch_size_, datum_data.channels(), crop_height, crop_width);
+	top[0]->Reshape(batch_size_, datum_data.channels()+19, crop_height, crop_width);
+	this->prefetch_data_.Reshape(batch_size_, datum_data.channels()+19, crop_height, crop_width);
 
-	top[1]->Reshape(batch_size_, datum_data.channels(), crop_height, crop_width);
-	this->prefetch_label_.Reshape(batch_size_, datum_data.channels(), crop_height, crop_width);
+	top[1]->Reshape(batch_size_, 1, crop_height, crop_width);
+	this->prefetch_label_.Reshape(batch_size_, 1, crop_height, crop_width);
 
 	LOG(INFO) << "output data1 size: " << top[0]->num() << "," << top[0]->channels() << "," << top[0]->height() << "," << top[0]->width();
 	LOG(INFO) << "output data2 size: " << top[1]->num() << "," << top[1]->channels() << "," << top[1]->height() << "," << top[1]->width();
@@ -105,7 +105,7 @@ void SegCityscapesLayer<Dtype>::ShuffleImages(){
 template <typename Dtype>
 void SegCityscapesLayer<Dtype>::InternalThreadEntry(){
 
-	Datum datum_data, datum_data2;
+	Datum datum_data, datum_data2, datum_data3;
 	CHECK(this->prefetch_data_.count());
 	
 	const int lines_size = lines_.size();
@@ -115,12 +115,13 @@ void SegCityscapesLayer<Dtype>::InternalThreadEntry(){
 
 		CHECK_GT(lines_size, lines_id_);
 
+		/*
 		char buf_1[100], buf_2[100], buf_4[100], buf[100];
 		int buf_3, buf_3n;
 		sscanf(lines_[lines_id_].first.c_str(), "%[^0]%[^_]_%d_%s", buf_1, buf_2, &buf_3, buf_4);
 
-		buf_3 = (buf_3-19) + rand() % 29;
-		buf_3n = buf_3 + 1;
+		buf_3 = (buf_3-19) + rand() % 28;
+		buf_3n = buf_3 + 1 + (rand() % 2);
 
 		if (rand()&1) std::swap(buf_3, buf_3n);
 
@@ -129,10 +130,49 @@ void SegCityscapesLayer<Dtype>::InternalThreadEntry(){
 
 		sprintf(buf, "%s%s_%06d_%s", buf_1, buf_2, buf_3n, buf_4);
 		CHECK(ReadSegDataToDatum(string(buf), "", &datum_data2, NULL, true));
+		*/
+		CHECK(ReadSegDataToDatum(lines_[lines_id_].first, lines_[lines_id_].second, &datum_data, &datum_data2, true));
 
-		this->data_transformer_->Transform(datum_data, datum_data2, &this->prefetch_data_, &this->prefetch_label_, batch_iter);
+		char df = '1'+ (rand()%3);
 
-/*		if (this->layer_param_.seg_data_param().balance())
+		FILE* fid = fopen((lines_[lines_id_].second + ".bin" + df).c_str(), "rb");
+
+
+		datum_data3.set_channels(datum_data.channels() + 19);
+		datum_data3.set_height(datum_data.height());
+		datum_data3.set_width(datum_data.width());
+		datum_data3.clear_data();
+		datum_data3.clear_float_data();
+		string *datum_data_string = datum_data3.mutable_data();
+		int data_index = 0;
+
+        for (int c = 0; c < datum_data.channels(); ++c) {
+          for (int h = 0; h < datum_data3.height(); ++h) {
+            for (int w = 0; w < datum_data3.width(); ++w) {
+              datum_data_string->push_back(
+                static_cast<uint8_t>(datum_data.data()[data_index++]));
+            }
+          }
+        }
+        data_index = 0;
+        for (int c = 0; c < 19; ++c) {
+          for (int h = 0; h < datum_data3.height(); ++h) {
+            for (int w = 0; w < datum_data3.width(); ++w) {
+              uint8_t x=0;
+              CHECK(fread(&x, sizeof(uint8_t), 1, fid) == 1);
+              datum_data_string->push_back(
+                static_cast<uint8_t>(x));
+            }
+          }
+        }
+        fclose(fid);
+
+
+
+
+		this->data_transformer_->Transform(datum_data3, datum_data2, &this->prefetch_data_, &this->prefetch_label_, batch_iter);
+
+		if (this->layer_param_.seg_data_param().balance())
 		{
 			for (int t = 0; t < 10; t++)
 			{
@@ -147,16 +187,17 @@ void SegCityscapesLayer<Dtype>::InternalThreadEntry(){
 		  			max_label_cnt = std::max(max_label_cnt, cnt[i]);
 
 		  		if (max_label_cnt > 0.8 * this->prefetch_label_.count())
-		  			this->data_transformer_->Transform(datum_data, datum_data2, &this->prefetch_data_, &this->prefetch_label_, batch_iter);
+		  			this->data_transformer_->Transform(datum_data3, datum_data2, &this->prefetch_data_, &this->prefetch_label_, batch_iter);
 	  			else
 	  				break;
 			}
-		}*/
+		}
 		
 		if (false)
 		{
 		  	cv::Mat im_data(this->prefetch_data_.height(), this->prefetch_data_.width(), CV_8UC3);
-		  	cv::Mat im_data2(this->prefetch_data_.height(), this->prefetch_data_.width(), CV_8UC3);
+		  	cv::Mat im_label1(this->prefetch_label_.height(), this->prefetch_label_.width(), CV_8UC1);
+		  	cv::Mat im_label2(this->prefetch_label_.height(), this->prefetch_label_.width(), CV_8UC1);
 
 		  	Dtype scale = this->layer_param_.transform_param().scale();
 
@@ -167,20 +208,29 @@ void SegCityscapesLayer<Dtype>::InternalThreadEntry(){
 		  			im_data.at<uchar>(p1, p2*3+1) = (uchar)(this->prefetch_data_.data_at(0, 1, p1, p2)/scale+117);
 		  			im_data.at<uchar>(p1, p2*3+2) = (uchar)(this->prefetch_data_.data_at(0, 2, p1, p2)/scale+123);	
 		  		}
-
 		  	for (int p1 = 0; p1 < this->prefetch_data_.height(); p1 ++)
 		  		for (int p2 = 0; p2 < this->prefetch_data_.width(); p2 ++)
 		  		{
-		  			im_data2.at<uchar>(p1, p2*3+0) = (uchar)(this->prefetch_label_.data_at(0, 0, p1, p2)/scale+104);
-		  			im_data2.at<uchar>(p1, p2*3+1) = (uchar)(this->prefetch_label_.data_at(0, 1, p1, p2)/scale+117);
-		  			im_data2.at<uchar>(p1, p2*3+2) = (uchar)(this->prefetch_label_.data_at(0, 2, p1, p2)/scale+123);	
+		  			int l = 0, k =0;
+		  			for (int p3 = 3; p3 < 22; p3++)
+		  				if (this->prefetch_data_.data_at(0, p3, p1, p2) > k)
+		  				{
+		  					k = this->prefetch_data_.data_at(0, p3, p1, p2);
+		  					l = p3 - 3;
+		  				}
+	  				im_label1.at<uchar>(p1, p2) = (uchar)l * 10;
 		  		}
+			for (int p1 = 0; p1 < this->prefetch_label_.height(); p1 ++)
+	  	  		for (int p2 = 0; p2 < this->prefetch_label_.width(); p2 ++)
+	  	  			im_label2.at<uchar>(p1, p2) = (this->prefetch_label_.data_at(0, 0, p1, p2) == 255 ? 0 : this->prefetch_label_.data_at(0, 0, p1, p2)* 10);
 		  	int tot = rand() * 10000 + rand() + lines_id_;
 		  	char temp_path[200];
 		  	sprintf(temp_path, "temp/%d_0.jpg", tot);
 		  	imwrite(temp_path, im_data);
-		  	sprintf(temp_path, "temp/%d_1.jpg", tot);
-		  	imwrite(temp_path, im_data2);
+		  	sprintf(temp_path, "temp/%d_1.png", tot);
+		  	imwrite(temp_path, im_label1);
+		  	sprintf(temp_path, "temp/%d_2.png", tot);
+		  	imwrite(temp_path, im_label2);
 		}
 
 		//next iteration

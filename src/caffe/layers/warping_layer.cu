@@ -22,16 +22,22 @@ __global__ void warping_forward(const int nthreads, const Dtype* in_data, const 
 
     int th = std::floor(Dtype(h) + dh), tw = std::floor(Dtype(w)+dw);
     Dtype weight = (1 - (Dtype(h-th) + dh)) * (1 - (Dtype(w-tw) + dw));
-  	out_data[index] += (th>=0 && th<height && tw>=0 && tw < width) ? in_data[((n * channels + c) * height + th) * width + tw]  * weight: 0;
+    int nth = (th >= 0) ? (th < height ? th : height - 1) : 0;
+    int ntw = (tw >= 0) ? (tw < width ? tw : width - 1) : 0;
+  	out_data[index] += in_data[((n * channels + c) * height + nth) * width + ntw]  * weight;
 
   	th = th + 1, weight =  (1 - (Dtype(th-h) - dh)) * (1 - (Dtype(w-tw) + dw));
-  	out_data[index] += (th>=0 && th<height && tw>=0 && tw < width) ? in_data[((n * channels + c) * height + th) * width + tw]  * weight: 0;
+    nth = (th >= 0) ? (th < height ? th : height - 1) : 0;
+  	out_data[index] += in_data[((n * channels + c) * height + nth) * width + ntw]  * weight;
 
   	th = th - 1, tw = tw + 1, weight =  (1 - (Dtype(h-th) + dh)) * (1 - (Dtype(tw-w) - dw));
-  	out_data[index] += (th>=0 && th<height && tw>=0 && tw < width) ? in_data[((n * channels + c) * height + th) * width + tw]  * weight: 0;
+    nth = (th >= 0) ? (th < height ? th : height - 1) : 0;
+    ntw = (tw >= 0) ? (tw < width ? tw : width - 1) : 0;
+  	out_data[index] += in_data[((n * channels + c) * height + nth) * width + ntw]  * weight;
 
   	th = th + 1, weight = (1 - (Dtype(th-h) - dh)) * (1 - (Dtype(tw-w) - dw));
-  	out_data[index] += (th>=0 && th<height && tw>=0 && tw < width) ? in_data[((n * channels + c) * height + th) * width + tw]  * weight: 0;
+    nth = (th >= 0) ? (th < height ? th : height - 1) : 0;
+  	out_data[index] += in_data[((n * channels + c) * height + nth) * width + ntw]  * weight;
   }
 }
 
@@ -91,29 +97,35 @@ __global__ void warping_backward_flow(const int nthreads, const Dtype* in_data, 
     for (int c=0; c<channels; c++)
     {
     	int th = std::floor(Dtype(h) + dh), tw = std::floor(Dtype(w)+dw);
-    	if (th>=0 && th<height && tw>=0 && tw < width)
-    	{
-    		out_data[index_h] -= (1 - (Dtype(w-tw) + dw)) * bottom_data[((n * channels + c) * height + th) * width + tw] * (*top_diff);
-    		out_data[index_w] -= (1 - (Dtype(h-th) + dh)) * bottom_data[((n * channels + c) * height + th) * width + tw] * (*top_diff);
-    	}
+
+      int nth = (th >= 0) ? (th < height ? th : height - 1) : 0;
+      int ntw = (tw >= 0) ? (tw < width ? tw : width - 1) : 0;
+
+  		out_data[index_h] -= (1 - (Dtype(w-tw) + dw)) * bottom_data[((n * channels + c) * height + nth) * width + ntw] * (*top_diff);
+  		out_data[index_w] -= (1 - (Dtype(h-th) + dh)) * bottom_data[((n * channels + c) * height + nth) * width + ntw] * (*top_diff);
+
+
   		th = th + 1;
-  		if (th>=0 && th<height && tw>=0 && tw < width)
-    	{
-    		out_data[index_h] += (1 - (Dtype(w-tw) + dw)) * bottom_data[((n * channels + c) * height + th) * width + tw] * (*top_diff);
-    		out_data[index_w] -= (1 - (Dtype(th-h) - dh)) * bottom_data[((n * channels + c) * height + th) * width + tw] * (*top_diff);
-    	}
+      nth = (th >= 0) ? (th < height ? th : height - 1) : 0;
+
+  		out_data[index_h] += (1 - (Dtype(w-tw) + dw)) * bottom_data[((n * channels + c) * height + nth) * width + ntw] * (*top_diff);
+  		out_data[index_w] -= (1 - (Dtype(th-h) - dh)) * bottom_data[((n * channels + c) * height + nth) * width + ntw] * (*top_diff);
+
+
   		th = th - 1, tw = tw + 1;
-  		if (th>=0 && th<height && tw>=0 && tw < width)
-    	{
-    		out_data[index_h] -= (1 - (Dtype(tw-w) - dw)) * bottom_data[((n * channels + c) * height + th) * width + tw] * (*top_diff);
-    		out_data[index_w] += (1 - (Dtype(h-th) + dh)) * bottom_data[((n * channels + c) * height + th) * width + tw] * (*top_diff);
-    	}
+      nth = (th >= 0) ? (th < height ? th : height - 1) : 0;
+      ntw = (tw >= 0) ? (tw < width ? tw : width - 1) : 0;
+
+  		out_data[index_h] -= (1 - (Dtype(tw-w) - dw)) * bottom_data[((n * channels + c) * height + nth) * width + ntw] * (*top_diff);
+  		out_data[index_w] += (1 - (Dtype(h-th) + dh)) * bottom_data[((n * channels + c) * height + nth) * width + ntw] * (*top_diff);
+    	
+
   		th = th + 1;
-  		if (th>=0 && th<height && tw>=0 && tw < width)
-    	{
-    		out_data[index_h] += (1 - (Dtype(tw-w) - dw)) * bottom_data[((n * channels + c) * height + th) * width + tw] * (*top_diff);
-    		out_data[index_w] += (1 - (Dtype(th-h) - dh)) * bottom_data[((n * channels + c) * height + th) * width + tw] * (*top_diff);
-    	}
+      nth = (th >= 0) ? (th < height ? th : height - 1) : 0;
+
+  		out_data[index_h] += (1 - (Dtype(tw-w) - dw)) * bottom_data[((n * channels + c) * height + nth) * width + ntw] * (*top_diff);
+  		out_data[index_w] += (1 - (Dtype(th-h) - dh)) * bottom_data[((n * channels + c) * height + nth) * width + ntw] * (*top_diff);
+
     	top_diff += spatial_dim;
     }
   }
@@ -145,16 +157,15 @@ void  WarpingLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
   					int th = std::floor(Dtype(h) + dh) + i, tw = std::floor(Dtype(w) + dw) + j;
   					Dtype weight = (1 - abs(Dtype(h + dh - th))) * (1 - abs(Dtype(w+ dw - tw)));
 
-  					if (th>=0 && th<height_ && tw>=0 && tw < width_)
-  					{
-  						int offset = (n * height_ + th) * width_ + tw;
-  						edge[edge_cnt_] = head[offset];
-  						head[offset] = static_cast<Dtype>(edge_cnt_);
-  						edge[edge_cnt_ + 1] = static_cast<Dtype>(h);
-  						edge[edge_cnt_ + 2] = static_cast<Dtype>(w);
-  						edge[edge_cnt_ + 3] = weight;
-  						edge_cnt_ += 4;
-  					}
+            th = (th >= 0) ? (th < height_ ? th : height_ - 1) : 0;
+            tw = (tw >= 0) ? (tw < width_ ? tw : width_ - 1) : 0;
+						int offset = (n * height_ + th) * width_ + tw;
+						edge[edge_cnt_] = head[offset];
+						head[offset] = static_cast<Dtype>(edge_cnt_);
+						edge[edge_cnt_ + 1] = static_cast<Dtype>(h);
+						edge[edge_cnt_ + 2] = static_cast<Dtype>(w);
+						edge[edge_cnt_ + 3] = weight;
+						edge_cnt_ += 4;
   				}
   		}
 
