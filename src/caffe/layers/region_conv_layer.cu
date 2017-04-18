@@ -157,7 +157,6 @@ void RegionConvolutionLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top
       compression_region_im2col_gpu(bottom_data, bottom[1]->gpu_data(), index_1, index_2, mask_cnt_, conv_in_channels_, conv_in_height_, conv_in_width_,
             kernel_h_, kernel_w_, pad_h_, pad_w_, dilation_h_, dilation_w_, col_buffer_->mutable_gpu_data());
     }
-
     caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasTrans, conv_out_channels_,
         kernel_dim_, mask_cnt_,
         (Dtype)1., top_buffer_->gpu_diff() , col_buffer_->gpu_data(),

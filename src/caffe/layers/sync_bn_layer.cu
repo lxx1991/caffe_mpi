@@ -154,10 +154,10 @@ void SyncBNLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
                   top[0]->mutable_gpu_data());  // reuse the top buffer
     caffe_gpu_sub(channels_, var_buffer_.gpu_data(), top[0]->gpu_data(),
                   var_buffer_.mutable_gpu_data());
-    if (m > 1) {
-      caffe_gpu_scal(channels_, Dtype(m) / (m-1),
-                     var_buffer_.mutable_gpu_data());
-    }
+    // if (m > 1) {
+    //   caffe_gpu_scal(channels_, Dtype(m) / (m-1),
+    //                  var_buffer_.mutable_gpu_data());
+    // }
     // update running mean and var
     caffe_gpu_axpby(mean_buffer_.count(),
         Dtype(1) - bn_momentum_, mean_buffer_.gpu_data(),
@@ -232,6 +232,10 @@ void SyncBNLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
       bottom[0]->gpu_data(),
       bottom[0]->mutable_gpu_diff()
     );
+    mpi_force_synchronize();
+    caffe_iallreduce(this->blobs_[2]->mutable_cpu_data(), this->channels_);
+    caffe_iallreduce(this->blobs_[3]->mutable_cpu_data(), this->channels_);
+    mpi_force_synchronize();
   }
 }
 

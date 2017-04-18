@@ -183,7 +183,6 @@ void BNDataLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
     cudaDeviceSynchronize();
 
 
-
     if (this->rebn_)
     {
       //Dtype temp_scale = Dtype(1) / Caffe::MPI_all_rank();

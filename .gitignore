@@ -67,6 +67,7 @@ models/*
 *lmdb
 layer_cascade_matlab/*
 flownet_matlab/*
+video_matlab/*
 
 # build, distribute, and bins (+ python proto bindings)
 build

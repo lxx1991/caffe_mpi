@@ -350,13 +350,13 @@ void DataTransformer<Dtype>::Transform(const Datum& datum_data, const Datum& dat
     NOT_IMPLEMENTED;
   }
   if (has_mean_values) {
-    CHECK(mean_values_.size() == 1 || mean_values_.size() == datum_channels || datum_channels == 3+19) <<
+    CHECK(mean_values_.size() == 1 || mean_values_.size() == datum_channels) <<
      "Specify either 1 mean_value or as many as channels: " << datum_channels;
-     /*int temp_size = mean_values_.size();
+     int temp_size = mean_values_.size();
      for (int c = temp_size; c < datum_channels; ++c)
      {
         mean_values_.push_back(mean_values_[(c - temp_size) % temp_size]);
-     }*/
+     }
   }
 
   float scale_ratios = std::max(Rand(int((upper_scale - lower_scale) * 1000.0) + 1) / 1000.0, 0.0) + lower_scale;
@@ -443,7 +443,7 @@ void DataTransformer<Dtype>::Transform(const Datum& datum_data, const Datum& dat
 
 
     if (angl != 0)
-       Rotation(M, angl, 0);
+       Rotation(M, angl, 0, uint8_t(mean_values_[c]));
     if (rand_sigma != 0)
        cv::GaussianBlur(M, M, cv::Size( 5, 5 ), rand_sigma, rand_sigma);
     cv::resize(M, M, cv::Size(width, height));
@@ -487,7 +487,7 @@ void DataTransformer<Dtype>::Transform(const Datum& datum_data, const Datum& dat
         M.at<uint8_t>(h, w) = static_cast<uint8_t>(label[data_index]);
       }
     if (angl != 0)
-     Rotation(M, angl, 1);
+     Rotation(M, angl, 1, 0);
     cv::resize(M, M, cv::Size(width, height), 0, 0, CV_INTER_NN);
     for (int h = 0; h < crop_height; ++h)
       for (int w = 0; w < crop_width; ++w) 
@@ -516,7 +516,7 @@ void DataTransformer<Dtype>::Transform(const Datum& datum_data, const Datum& dat
 
 
       if (angl != 0)
-         Rotation(M, angl, 0);
+         Rotation(M, angl, 0, uint8_t(mean_values_[c]));
       if (rand_sigma != 0)
          cv::GaussianBlur(M, M, cv::Size( 5, 5 ), rand_sigma, rand_sigma);
       cv::resize(M, M, cv::Size(width, height));
@@ -1042,16 +1042,16 @@ int DataTransformer<Dtype>::Rand(int n) {
 }
 
 template <typename Dtype>
-void DataTransformer<Dtype>::Rotation(cv::Mat& src, int degree, bool islabel){
+void DataTransformer<Dtype>::Rotation(cv::Mat& src, int degree, bool islabel, uint8_t mean_v){
   int height = src.size().height;
   int width = src.size().width;
 
   cv::Point2f center = cv::Point2f(width / 2, height / 2);
   cv::Mat map_matrix = cv::getRotationMatrix2D(center, degree, 1.0);
   if (islabel){
-    cv::warpAffine(src, src, map_matrix, src.size(), cv::INTER_NEAREST);
+    cv::warpAffine(src, src, map_matrix, src.size(), cv::INTER_NEAREST, cv::BORDER_CONSTANT, cv::Scalar(mean_v));
   } else{
-    cv::warpAffine(src, src, map_matrix, src.size());
+    cv::warpAffine(src, src, map_matrix, src.size(), cv::INTER_LINEAR, cv::BORDER_CONSTANT, cv::Scalar(mean_v));
   }
 }
 
