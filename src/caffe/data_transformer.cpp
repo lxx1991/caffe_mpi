@@ -487,7 +487,7 @@ void DataTransformer<Dtype>::Transform(const Datum& datum_data, const Datum& dat
         M.at<uint8_t>(h, w) = static_cast<uint8_t>(label[data_index]);
       }
     if (angl != 0)
-     Rotation(M, angl, 1, 0);
+     Rotation(M, angl, 1, param_.ignore_label());
     cv::resize(M, M, cv::Size(width, height), 0, 0, CV_INTER_NN);
     for (int h = 0; h < crop_height; ++h)
       for (int w = 0; w < crop_width; ++w) 

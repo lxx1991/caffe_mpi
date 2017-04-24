@@ -115,19 +115,39 @@ void SegCityscapesLayer<Dtype>::InternalThreadEntry(){
 
 		CHECK_GT(lines_size, lines_id_);
 
-		char buf_1[225], buf_2[225], buf_4[225], buf[225];
+		char buf_1[225], buf[225];
 		int buf_3, buf_3n;
-		sscanf(lines_[lines_id_].first.c_str(), "%[^0]%[^_]_%d_%s", buf_1, buf_2, &buf_3, buf_4);
+		//cityscape
+		// char buf_2[225], buf_4[225];
+		//sscanf(lines_[lines_id_].first.c_str(), "%[^0]%[^_]_%d_%s", buf_1, buf_2, &buf_3, buf_4);
+		// buf_3 = (buf_3-19) + rand() % 29;
+		// buf_3n = buf_3 + 1;
 
-		buf_3 = (buf_3-19) + rand() % 29;
+		// if (rand()&1) std::swap(buf_3, buf_3n);
+
+		// sprintf(buf, "%s%s_%06d_%s", buf_1, buf_2, buf_3, buf_4);
+		// CHECK(ReadSegDataToDatum(string(buf), "", &datum_data, NULL, true));
+
+		// sprintf(buf, "%s%s_%06d_%s", buf_1, buf_2, buf_3n, buf_4);
+		// CHECK(ReadSegDataToDatum(string(buf), "", &datum_data2, NULL, true));
+
+
+		//camvid
+		sscanf(lines_[lines_id_].first.c_str(), "%s_%d.jpg", buf_1, &buf_3);
 		buf_3n = buf_3 + 1;
+
+		sprintf(buf, "%s_%06d.jpg", buf_1, buf_3n);
+		if (!access(buf, F_OK))
+		{
+			buf_3n = buf_3 - 1;
+		}
 
 		if (rand()&1) std::swap(buf_3, buf_3n);
 
-		sprintf(buf, "%s%s_%06d_%s", buf_1, buf_2, buf_3, buf_4);
+		sprintf(buf, "%s_%06d.jpg", buf_1, buf_3);
 		CHECK(ReadSegDataToDatum(string(buf), "", &datum_data, NULL, true));
 
-		sprintf(buf, "%s%s_%06d_%s", buf_1, buf_2, buf_3n, buf_4);
+		sprintf(buf, "%s_%06d.jpg", buf_1, buf_3n);
 		CHECK(ReadSegDataToDatum(string(buf), "", &datum_data2, NULL, true));
 		
 		/*CHECK(ReadSegDataToDatum(lines_[lines_id_].first, lines_[lines_id_].second, &datum_data, &datum_data2, true));
