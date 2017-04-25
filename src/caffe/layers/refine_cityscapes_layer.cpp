@@ -23,6 +23,8 @@
 using namespace boost::filesystem;
 #endif
 
+#define CLASS_NUM 11 //camvid
+
 namespace caffe{
 template <typename Dtype>
 RefineCityscapesLayer<Dtype>:: ~RefineCityscapesLayer<Dtype>(){
@@ -87,8 +89,8 @@ void RefineCityscapesLayer<Dtype>:: DataLayerSetUp(const vector<Blob<Dtype>*>& b
 	if (batch_size_ != 1)
 		CHECK(this->layer_param_.transform_param().has_crop_size() || (this->layer_param_.transform_param().has_crop_height() && this->layer_param_.transform_param().has_crop_width()));
 
-	top[0]->Reshape(batch_size_, datum_data.channels() + 19, crop_height, crop_width);
-	this->prefetch_data_.Reshape(batch_size_, datum_data.channels() + 19, crop_height, crop_width);
+	top[0]->Reshape(batch_size_, datum_data.channels() + CLASS_NUM, crop_height, crop_width);
+	this->prefetch_data_.Reshape(batch_size_, datum_data.channels() + CLASS_NUM, crop_height, crop_width);
 
 	top[1]->Reshape(batch_size_, 1, crop_height, crop_width);
 	this->prefetch_label_.Reshape(batch_size_, 1, crop_height, crop_width);
@@ -124,7 +126,7 @@ void RefineCityscapesLayer<Dtype>::InternalThreadEntry(){
 		FILE* fid;
 		CHECK(fid = fopen((root_dir+ "label/" + lines_[lines_id_].second + ".bin" + df).c_str(), "rb"));
 
-		datum_data3.set_channels(datum_data.channels() + 19);
+		datum_data3.set_channels(datum_data.channels() + CLASS_NUM);
 		datum_data3.set_height(datum_data.height());
 		datum_data3.set_width(datum_data.width());
 		datum_data3.clear_data();
@@ -141,7 +143,7 @@ void RefineCityscapesLayer<Dtype>::InternalThreadEntry(){
           }
         }
 
-        for (int c = 0; c < 19; ++c) {
+        for (int c = 0; c < CLASS_NUM; ++c) {
           for (int h = 0; h < datum_data3.height(); ++h) {
             for (int w = 0; w < datum_data3.width(); ++w) {
               uint8_t x=0;
@@ -195,7 +197,7 @@ void RefineCityscapesLayer<Dtype>::InternalThreadEntry(){
 		  		for (int p2 = 0; p2 < this->prefetch_data_.width(); p2 ++)
 		  		{
 		  			int l = 0, k =0;
-		  			for (int p3 = 3; p3 < 22; p3++)
+		  			for (int p3 = 3; p3 < CLASS_NUM + 3; p3++)
 		  				if (this->prefetch_data_.data_at(0, p3, p1, p2) > k)
 		  				{
 		  					k = this->prefetch_data_.data_at(0, p3, p1, p2);
