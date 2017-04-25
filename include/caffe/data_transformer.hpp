@@ -37,6 +37,11 @@ class DataTransformer {
    */
   void Transform(const Datum& datum, Blob<Dtype>* transformed_blob);
 
+
+  
+  void Transform(const Datum& datum_data, const Datum& datum_label, 
+               Blob<Dtype>* transformed_data, Blob<Dtype>* transformed_label);
+
   /**
    * @brief Applies the transformation defined in the data layer's
    * transform_param block to a vector of Datum.
@@ -123,6 +128,7 @@ class DataTransformer {
    */
   vector<int> InferBlobShape(const cv::Mat& cv_img);
 
+
  protected:
    /**
    * @brief Generates a random integer from Uniform({0, 1, ..., n-1}).
@@ -146,6 +152,8 @@ class DataTransformer {
 
   vector<float> custom_scale_ratios_;
   int max_distort_;
+
+  bool org_size_proc_;
 };
 
 }  // namespace caffe

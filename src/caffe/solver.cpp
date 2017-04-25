@@ -267,6 +267,15 @@ void Solver<Dtype>::Step(int iters) {
     // Save a snapshot if needed.
     if (param_.snapshot() && iter_ % param_.snapshot() == 0) {
       Snapshot();
+#ifdef USE_MPI
+    if (Caffe::parallel_mode() == Caffe::MPI){
+      //Stop the world to wait for the master process to finish snapshot
+      //TODO: Send this to queue in blocking mode
+      MPIComm::Syncrhonize();
+      MPI_Barrier(MPI_COMM_WORLD);
+    }
+#endif
+
     }
   }
 }
