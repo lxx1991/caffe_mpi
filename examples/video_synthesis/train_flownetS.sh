@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 
 GOOGLE_LOG_DIR=models/video_synthesis/log \
-    /usr/local/openmpi/bin/mpirun -np 8 \
+    /usr/local/openmpi/bin/mpirun -np 2 \
     build/install/bin/caffe train \
     --solver=models/video_synthesis/flownetS/flownetS_solver.prototxt \
     --weights=models/video_synthesis/flownetS/flownets.caffemodel

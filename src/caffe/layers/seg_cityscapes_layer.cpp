@@ -133,22 +133,22 @@ void SegCityscapesLayer<Dtype>::InternalThreadEntry(){
 
 
 		//camvid
-		sscanf(lines_[lines_id_].first.c_str(), "%s_%d.jpg", buf_1, &buf_3);
-		buf_3n = buf_3 + 1;
+		sscanf(lines_[lines_id_].first.c_str(), "%[^_]_%d.jpg", buf_1, &buf_3);
+		buf_3n = buf_3 + 1 + (rand()&1);
 
 		sprintf(buf, "%s_%06d.jpg", buf_1, buf_3n);
-		if (!access(buf, F_OK))
+		if (access(buf, F_OK)!=0)
 		{
-			buf_3n = buf_3 - 1;
+			buf_3n = buf_3 - 1 - (rand()&1);
 		}
 
 		if (rand()&1) std::swap(buf_3, buf_3n);
 
 		sprintf(buf, "%s_%06d.jpg", buf_1, buf_3);
-		CHECK(ReadSegDataToDatum(string(buf), "", &datum_data, NULL, true));
+		CHECK(ReadSegDataToDatum(string(buf), "", &datum_data, NULL, true)) << buf;
 
 		sprintf(buf, "%s_%06d.jpg", buf_1, buf_3n);
-		CHECK(ReadSegDataToDatum(string(buf), "", &datum_data2, NULL, true));
+		CHECK(ReadSegDataToDatum(string(buf), "", &datum_data2, NULL, true)) << buf;
 		
 		/*CHECK(ReadSegDataToDatum(lines_[lines_id_].first, lines_[lines_id_].second, &datum_data, &datum_data2, true));
 
