@@ -34,6 +34,26 @@ inline void shuffle(RandomAccessIterator begin, RandomAccessIterator end,
   }
 }
 
+// Fisher–Yates algorithm
+template <class RandomAccessIterator, class RandomAccessIterator2, class RandomGenerator>
+inline void shuffle(RandomAccessIterator begin1, RandomAccessIterator end1,
+                    RandomAccessIterator2 begin2, RandomAccessIterator2 end2,
+                    RandomGenerator* gen) {
+
+  typedef typename boost::uniform_int<int> dist_type;
+
+  CHECK(std::distance(begin1, end1) == std::distance(begin2, end2));
+  int length = std::distance(begin1, end1);
+  if (length <= 0) return;
+
+  for (int i = length - 1; i > 0; --i) {
+    dist_type dist(0, i);
+    int j = dist(*gen);
+    std::iter_swap(begin1 + i, begin1 + j);
+    std::iter_swap(begin2 + i, begin2 + j);
+  }
+}
+
 template <class RandomAccessIterator>
 inline void shuffle(RandomAccessIterator begin, RandomAccessIterator end) {
   shuffle(begin, end, caffe_rng());

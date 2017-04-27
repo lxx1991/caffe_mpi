@@ -40,7 +40,7 @@ class DataTransformer {
 
   
   void Transform(const Datum& datum_data, const Datum& datum_label, 
-               Blob<Dtype>* transformed_data, Blob<Dtype>* transformed_label);
+               Blob<Dtype>* transformed_data, Blob<Dtype>* transformed_label, int batch_iter = 0);
 
   /**
    * @brief Applies the transformation defined in the data layer's
@@ -139,6 +139,8 @@ class DataTransformer {
    *    A uniformly random integer value from ({0, 1, ..., n-1}).
    */
   virtual int Rand(int n);
+
+  virtual void Rotation(cv::Mat& src, int degree, bool islabel, uint8_t mean_v = 0);
 
   void Transform(const Datum& datum, Dtype* transformed_data);
   // Tranformation parameters

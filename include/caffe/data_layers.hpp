@@ -398,6 +398,57 @@ protected:
 };
 
 /**
+ * @brief Provides data to the Net from video files.
+ *
+ * TODO(dox): thorough documentation for Forward and proto params.
+ */
+template <typename Dtype>
+class SegVideoLayer : public BasePrefetchingDataLayer<Dtype> {
+public:
+	explicit SegVideoLayer(const LayerParameter& param)
+	: BasePrefetchingDataLayer<Dtype>(param) {}
+	virtual ~SegVideoLayer();
+	virtual void DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
+			const vector<Blob<Dtype>*>& top);
+
+	virtual inline const char* type() const { return "SegVideo"; }
+	virtual inline int ExactNumBottomBlobs() const { return 0; }
+	virtual inline int ExactNumTopBlobs() const { return 2; }
+
+protected:
+	shared_ptr<Caffe::RNG> prefetch_rng_;
+	virtual void ShuffleImages();
+	virtual void InternalThreadEntry();
+
+#ifdef USE_MPI
+	inline virtual void advance_cursor(){
+		lines_id_++;
+		if (lines_id_ >= lines_.size()) {
+			// We have reached the end. Restart from the first.
+			DLOG(INFO) << "Restarting data prefetching from start.";
+			lines_id_ = 0;
+			if (this->layer_param_.seg_data_param().shuffle()) {
+				ShuffleImages();
+			}
+		}
+	}
+#endif
+
+	vector<std::string > lines_;
+	vector<std::pair<std::string, int> > labels_;
+	int lines_id_;
+	int fr_num_;
+	int batch_size_;
+	vector<int> frame_idx;
+
+	string image_pattern_;
+	string label_pattern_;
+	bool has_video_label_;
+
+	char image_buf[225], label_buf[255];
+};
+
+/**
  * @brief Provides data to the Net from memory.
  *
  * TODO(dox): thorough documentation for Forward and proto params.
