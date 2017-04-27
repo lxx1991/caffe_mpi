@@ -194,7 +194,7 @@ void SegVideoLayer<Dtype>::InternalThreadEntry(){
 		}*/
 
 		
-		if (true)
+		if (false)
 		{
 		  	cv::Mat im_data(this->prefetch_data_.height(), this->prefetch_data_.width(), CV_8UC3);
 		  	cv::Mat im_label(this->prefetch_label_.height(), this->prefetch_label_.width(), CV_8UC1);

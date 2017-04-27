@@ -26,7 +26,7 @@ void FeatureAggregationLayer<Dtype>::Forward_gpu(
 
   const int count = top[0]->count();
   const int spatial_dim = top[0]->count(2);
-  const int chw = top[0]->count(3);
+  const int chw = top[0]->count(1);
 
   caffe_gpu_set(count, Dtype(0), top_data);
 
@@ -63,7 +63,7 @@ void FeatureAggregationLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& to
 
   const int count = top[0]->count();
   const int spatial_dim = top[0]->count(2);
-  const int chw = top[0]->count(3);
+  const int chw = top[0]->count(1);
 
   caffe_gpu_set(bottom[0]->count(), Dtype(0), scale_diff);
 
