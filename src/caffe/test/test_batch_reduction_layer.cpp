@@ -109,46 +109,46 @@ TYPED_TEST(BatchReductionLayerTest, TestMeanForwardBackward) {
   }
 }
 
-TYPED_TEST(BatchReductionLayerTest, TestTopKForwardBackward) {
-  typedef typename TypeParam::Dtype Dtype;
-  LayerParameter layer_param;
-  BatchReductionParameter* batch_reduction_param = layer_param.mutable_batch_reduction_param();
-  batch_reduction_param->mutable_reduction_param()->set_operation(ReductionParameter_ReductionOp_TOPK);
-  batch_reduction_param->mutable_reduction_param()->set_axis(2);
-  batch_reduction_param->mutable_reduction_param()->set_k(3);
-  BatchReductionLayer<Dtype> layer(layer_param);
+// TYPED_TEST(BatchReductionLayerTest, TestTopKForwardBackward) {
+//   typedef typename TypeParam::Dtype Dtype;
+//   LayerParameter layer_param;
+//   BatchReductionParameter* batch_reduction_param = layer_param.mutable_batch_reduction_param();
+//   batch_reduction_param->mutable_reduction_param()->set_operation(ReductionParameter_ReductionOp_TOPK);
+//   batch_reduction_param->mutable_reduction_param()->set_axis(2);
+//   batch_reduction_param->mutable_reduction_param()->set_k(3);
+//   BatchReductionLayer<Dtype> layer(layer_param);
 
-  layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
-  layer.Reshape(this->blob_bottom_vec_, this->blob_top_vec_);
+//   layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
+//   layer.Reshape(this->blob_bottom_vec_, this->blob_top_vec_);
 
-  EXPECT_EQ(3, this->blob_top_data_->num_axes());
-  EXPECT_EQ(2, this->blob_top_data_->shape(2));
+//   EXPECT_EQ(3, this->blob_top_data_->num_axes());
+//   EXPECT_EQ(2, this->blob_top_data_->shape(2));
 
-  layer.Forward(this->blob_bottom_vec_, this->blob_top_vec_);
+//   layer.Forward(this->blob_bottom_vec_, this->blob_top_vec_);
 
-  const Dtype* top_data = this->blob_top_data_->cpu_data();
+//   const Dtype* top_data = this->blob_top_data_->cpu_data();
 
-  EXPECT_NEAR(7.0/3.0, top_data[0], 0.001);
-  EXPECT_NEAR(10.0/3.0, top_data[1], 0.001);
+//   EXPECT_NEAR(7.0/3.0, top_data[0], 0.001);
+//   EXPECT_NEAR(10.0/3.0, top_data[1], 0.001);
 
-  Dtype* top_diff = this->blob_top_data_->mutable_cpu_diff();
+//   Dtype* top_diff = this->blob_top_data_->mutable_cpu_diff();
 
-  top_diff[0] = 0.6;
-  top_diff[1] = 1.8;
+//   top_diff[0] = 0.6;
+//   top_diff[1] = 1.8;
 
-  vector<bool> propagate_down(1, true);
-  layer.Backward(this->blob_top_vec_, propagate_down, this->blob_bottom_vec_);
+//   vector<bool> propagate_down(1, true);
+//   layer.Backward(this->blob_top_vec_, propagate_down, this->blob_bottom_vec_);
 
-  const Dtype* bottom_diff = this->blob_bottom_data_->cpu_diff();
+//   const Dtype* bottom_diff = this->blob_bottom_data_->cpu_diff();
 
-  for (int r = 0; r < 2; ++r){
-    for (int i = 1; i < 4; ++i){
-      EXPECT_NEAR(bottom_diff[i * 2 + r], 0.2 + 0.4 * r, 0.0001);
-    }
-    EXPECT_NEAR(bottom_diff[0 * 2 + r], 0.0, 0.0001);
-    EXPECT_NEAR(bottom_diff[5 * 2 + r], 0.0, 0.0001);
-  }
-}
+//   for (int r = 0; r < 2; ++r){
+//     for (int i = 1; i < 4; ++i){
+//       EXPECT_NEAR(bottom_diff[i * 2 + r], 0.2 + 0.4 * r, 0.0001);
+//     }
+//     EXPECT_NEAR(bottom_diff[0 * 2 + r], 0.0, 0.0001);
+//     EXPECT_NEAR(bottom_diff[5 * 2 + r], 0.0, 0.0001);
+//   }
+// }
 
 //TYPED_TEST(BatchReductionLayerTest, TestGradient) {
 //  typedef typename TypeParam::Dtype Dtype;
