@@ -172,7 +172,7 @@ void SegVideoLayer<Dtype>::InternalThreadEntry(){
 
 		this->data_transformer_->Transform(datum_data, datum_label, &this->prefetch_data_, &this->prefetch_label_, batch_iter);
 
-		/*if (this->layer_param_.seg_video_param().balance())
+		if (this->layer_param_.seg_video_param().balance())
 		{
 			for (int t = 0; t < 10; t++)
 			{
@@ -180,7 +180,7 @@ void SegVideoLayer<Dtype>::InternalThreadEntry(){
 				for (int p1 = 0; p1 < this->prefetch_label_.height(); p1 ++)
 		  	  		for (int p2 = 0; p2 < this->prefetch_label_.width(); p2 ++)
 		  	  		{
-		  	  			int label_value = (int)this->prefetch_label_.data_at(0, 0, p1, p2);
+		  	  			int label_value = (int)this->prefetch_label_.data_at(batch_iter, 0, p1, p2);
 		  	  			cnt[label_value]++;
 		  	  		}
 		  	  	for (int i = 0; i<cnt.size(); i++)
@@ -190,8 +190,10 @@ void SegVideoLayer<Dtype>::InternalThreadEntry(){
 		  			this->data_transformer_->Transform(datum_data, datum_label, &this->prefetch_data_, &this->prefetch_label_);
 	  			else
 	  				break;
+	  			if (t == 10)
+	  				LOG(INFO) << "Balance Fail";
 			}
-		}*/
+		}
 
 		
 		if (false)
