@@ -1363,7 +1363,7 @@ message MemoryOptimizationParameter {
   optional bool optimize_train = 1 [default = true];
 
   // whether to optimize for all nets specified in test phase
-  optional bool optimize_test = 2 [default = false];
+  optional bool optimize_test = 2 [default = true];
 
   // By default, all blobs for input and output are excluded from the optimization for safety.
   // However, one can also claim a few blobs to be excluded.

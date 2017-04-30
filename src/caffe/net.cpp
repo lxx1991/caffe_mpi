@@ -1164,7 +1164,7 @@ void Net<Dtype>::MemoryOptimize_v2(){
   // Dry run to determine dependencies.
 
   vector<SlotMeta> slots;
-  boost::unordered_map<string, int> slot_index;
+  std::map<string, int> slot_index;
 
   int direction = 1;
   string str_direction = "forward";
