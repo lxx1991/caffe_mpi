@@ -483,7 +483,7 @@ void DataTransformer<Dtype>::Transform(const Datum& datum_data, const Datum& dat
     for (int h = 0; h < datum_height; ++h)
       for (int w = 0; w < datum_width; ++w)
       {
-        int data_index = h * datum_width + w;
+        int data_index = (c * datum_height + h) * datum_width + w;
         M.at<uchar>(h, w) = static_cast<uint8_t>(label[data_index]);
       }
     cv::resize(M, M, cv::Size(width, height), 0, 0, CV_INTER_NN);
@@ -496,14 +496,117 @@ void DataTransformer<Dtype>::Transform(const Datum& datum_data, const Datum& dat
       {
 
         if (do_mirror) 
-          top_index = h * crop_width + (crop_width - 1 - w);
+          top_index = (c * crop_height + h) * crop_width + (crop_width - 1 - w);
         else 
-          top_index = h * crop_width + w;
+          top_index = (c * crop_height + h) * crop_width + w;
 
         ptr[top_index] = ((h+h_off)>=0) && ((h+h_off)<height) && ((w+w_off)>=0) && ((w+w_off)<width) ? static_cast<Dtype>(M.at<uint8_t>(h+h_off, w+w_off)) : param_.ignore_label();
       }
     M.release();
   }
+}
+
+
+template<typename Dtype>
+void DataTransformer<Dtype>::Transform_aug(Datum& datum_label) {
+
+  string* label = datum_label.mutable_data();
+
+  const int datum_height = datum_label.height();
+  const int datum_width = datum_label.width();
+
+  int max_idx = 0;
+  cv::Mat orig_inst(datum_height, datum_width, CV_8UC1);
+
+  for (int c = 2; c < datum_label.channels(); ++c)
+    for (int h = 0; h < datum_height; ++h)
+      for (int w = 0; w < datum_width; ++w)
+      {
+        int data_index = (c * datum_height + h) * datum_width + w;
+        orig_inst.at<uchar>(h, w) = (uint8_t)(*label)[data_index];
+        max_idx = std::max(max_idx, (int)orig_inst.at<uchar>(h, w));
+      }
+  cv::Mat inst = cv::Mat::zeros(orig_inst.size(), orig_inst.type());
+
+  int choose_idx = Rand(max_idx) + 1;
+  for (int c = 1; c <= 1; ++c)
+    for (int h = 0; h < datum_height; ++h)
+      for (int w = 0; w < datum_width; ++w)
+      {
+        int data_index = (c * datum_height + h) * datum_width + w;
+        (*label)[data_index] = ((uint8_t)(*label)[data_index] == choose_idx) ? 1 : 0;
+      }
+
+  for (int h = 0; h < datum_height; ++h)
+      for (int w = 0; w < datum_width; ++w)
+        inst.at<uchar>(h, w) = (orig_inst.at<uchar>(h, w) == choose_idx) ? 1 : 0;
+
+  //rotation -5~5
+  double angl = -10 + Rand(int((10 - (-10)) * 1000.0) + 1) / 1000.0;
+  Rotation(inst, angl, false, 0);
+
+  //thin-plate splines
+
+  //resize 95%~105%
+  cv::resize(inst, inst, cv::Size(datum_width / 8, datum_height / 8), 0, 0);
+  cv::resize(inst, inst, cv::Size(datum_width, datum_height), 0, 0);
+
+  float scale_ratios = std::max(Rand(int((1.10 - 0.90) * 1000.0) + 1) / 1000.0, 0.0) + 0.90;
+
+  cv::resize(inst, inst, cv::Size(int(datum_width * scale_ratios), int(datum_height * scale_ratios)), 0, 0);
+
+
+  double tot_h = 0, tot_w = 0, tot = 0, tot_h2 = 0, tot_w2 = 0, tot2 = 0;
+  for (int h = 0; h < datum_height; ++h)
+    for (int w = 0; w < datum_width; ++w)
+      if (orig_inst.at<uchar>(h, w) == choose_idx)
+      {
+        tot_h = tot_h + h;
+        tot_w = tot_w + w;
+        tot++;
+      }
+
+  int min_h = inst.rows, max_h = 0, min_w = inst.cols, max_w = 0;
+  double th = Rand(1000) / 1000.0;
+  for (int h = 0; h < inst.rows; ++h)
+    for (int w = 0; w < inst.cols; ++w)
+      if (inst.at<uchar>(h, w) > th)
+      {
+        min_h = std::min(min_h, h);
+        max_h = std::max(max_h, h);
+        min_w = std::min(min_w, w);
+        max_w = std::max(max_w, w);
+
+        tot_h2 = tot_h2 + h;
+        tot_w2 = tot_w2 + w;
+        tot2++;
+      }
+
+  if (tot2>=1)
+  {
+    int shift_h = (Rand(1000) / 1000.0 * 0.2 - 0.1) * (max_h - min_h);
+    int shift_w = (Rand(1000) / 1000.0 * 0.2 - 0.1) * (max_w - min_w);
+
+    shift_h += int(tot_h / tot - tot_h2 / tot2);
+    shift_w += int(tot_w / tot - tot_w2 / tot2);
+
+    
+
+    orig_inst = cv::Mat::zeros(orig_inst.size(), orig_inst.type());
+    for (int h = 0; h < inst.rows; ++h)
+      for (int w = 0; w < inst.cols; ++w)
+        if (inst.at<uchar>(h, w) > th &&  h+shift_h>=0 && h+shift_h<orig_inst.rows && w+shift_w>=0 && w+shift_w<orig_inst.cols)
+          orig_inst.at<uchar>(h+shift_h, w+shift_w) = 1;
+  }
+  for (int c = 2; c < datum_label.channels(); ++c)
+    for (int h = 0; h < datum_height; ++h)
+      for (int w = 0; w < datum_width; ++w)
+      {
+        int data_index = (c * datum_height + h) * datum_width + w;
+        (*label)[data_index] = static_cast<char>(orig_inst.at<uchar>(h, w));
+      }
+  inst.release();
+  orig_inst.release();
 }
 
 
