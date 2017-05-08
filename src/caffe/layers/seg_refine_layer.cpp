@@ -154,7 +154,7 @@ void SegRefineLayer<Dtype>::InternalThreadEntry(){
 		  			max_label_cnt = std::max(max_label_cnt, cnt[i]);
 
 		  		if (max_label_cnt > 0.8 * this->prefetch_label_.count())
-		  			this->data_transformer_->Transform(datum_data, datum_label, &this->prefetch_data_, &this->prefetch_label_);
+		  			this->data_transformer_->Transform(datum_data, datum_label, &this->prefetch_data_, &this->prefetch_label_, batch_iter);
 	  			else
 	  				break;
 	  			if (t == 10)
