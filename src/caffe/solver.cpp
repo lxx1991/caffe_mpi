@@ -12,6 +12,7 @@
 #include "caffe/util/upgrade_proto.hpp"
 #include "caffe/util/mpi_functions.hpp"
 #include "caffe/util/channel.hpp"
+#include "caffe/util/pavi_log.hpp"
 
 namespace caffe {
 
@@ -45,6 +46,12 @@ void Solver<Dtype>::Init(const SolverParameter& param) {
   InitTrainNet();
   InitTestNets();
   LOG(INFO) << "Solver scaffolding done.";
+
+  if (param_.pavi_log())
+  {
+    pavi_init(this->param_, this->net()->name());
+    LOG(INFO) << "Pavi init done.";
+  }
   iter_ = 0;
   current_step_ = 0;
 }
@@ -238,6 +245,8 @@ void Solver<Dtype>::Step(int iters) {
     }
     if (display) {
       LOG(INFO) << "Iteration " << iter_ << ", loss = " << smoothed_loss;
+      if (param_.pavi_log())
+        pavi_send_log("", "Smoothed loss", (float)smoothed_loss, "Train", iter_);
       const vector<Blob<Dtype>*>& result = net_->output_blobs();
       int score_index = 0;
       for (int j = 0; j < result.size(); ++j) {
@@ -255,6 +264,8 @@ void Solver<Dtype>::Step(int iters) {
           LOG(INFO) << "    Train net output #"
               << score_index++ << ": " << output_name << " = "
               << result_vec[k] << loss_msg_stream.str();
+          if (param_.pavi_log())
+            pavi_send_log("", output_name, (float)result_vec[k], "Train", iter_);
         }
       }
     }
@@ -489,6 +500,8 @@ void Solver<Dtype>::Test(const int test_net_id) {
     }
     LOG(INFO) << "    Test net output #" << i << ": " << output_name << " = "
         << mean_score << loss_msg_stream.str();
+    if (param_.pavi_log())
+      pavi_send_log("", output_name, (float)mean_score, string("Test ").append(1, char('0' + test_net_id)), iter_);
   }
 }
 

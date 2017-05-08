@@ -99,7 +99,7 @@ message NetParameter {
 // NOTE
 // Update the next available ID when you add a new SolverParameter field.
 //
-// SolverParameter next available ID: 39 (last added: group_id)
+// SolverParameter next available ID: 45 (last added: workdir)
 message SolverParameter {
   //////////////////////////////////////////////////////////////////////////////
   // Specifying the train and test networks
@@ -210,6 +210,13 @@ message SolverParameter {
   // Total memory allowed to be used for workspaces in cudnn's convolution, in MBs. default is 300MB.
   // The framework will try to find the fastest setup given this limit.
   optional int32 richness = 37 [default = 300];
+
+  optional bool pavi_log = 39 [default = false];
+  optional string pavi_server_host = 40 [default = ""];
+  optional string pavi_username = 41 [default = ""];
+  optional string pavi_password = 42 [default = ""];
+  optional string session = 43 [default = ""];
+  optional string workdir = 44 [default = ""];
 }
 
 // A message that stores the solver snapshots
