@@ -63,6 +63,7 @@ void SegRefineLayer<Dtype>:: DataLayerSetUp(const vector<Blob<Dtype>*>& bottom, 
 	img_vec.push_back(lines_[lines_id_]);
 	label_vec.push_back(labels_[lines_id_].first);
 	label_vec.push_back(labels_[lines_id_].second);
+	label_vec.push_back(labels_[lines_id_].second);
 
 	CHECK(ReadSegVideoToDatum(img_vec, label_vec, &datum_data, &datum_label, true));
 
