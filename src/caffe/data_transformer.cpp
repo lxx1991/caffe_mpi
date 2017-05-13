@@ -508,105 +508,139 @@ void DataTransformer<Dtype>::Transform(const Datum& datum_data, const Datum& dat
 
 
 template<typename Dtype>
-void DataTransformer<Dtype>::Transform_aug(Datum& datum_label) {
+void DataTransformer<Dtype>::Transform_aug(Datum& datum_label, bool aug_data) {
 
   string* label = datum_label.mutable_data();
 
   const int datum_height = datum_label.height();
   const int datum_width = datum_label.width();
 
-  int max_idx = 0;
-  cv::Mat orig_inst(datum_height, datum_width, CV_8UC1);
+  
 
-  for (int c = 2; c < datum_label.channels(); ++c)
-    for (int h = 0; h < datum_height; ++h)
-      for (int w = 0; w < datum_width; ++w)
-      {
-        int data_index = (c * datum_height + h) * datum_width + w;
-        orig_inst.at<uchar>(h, w) = (uint8_t)(*label)[data_index];
-        max_idx = std::max(max_idx, (int)orig_inst.at<uchar>(h, w));
-      }
-  cv::Mat inst = cv::Mat::zeros(orig_inst.size(), orig_inst.type());
-
-  int choose_idx = Rand(max_idx) + 1;
-  for (int c = 1; c <= 1; ++c)
-    for (int h = 0; h < datum_height; ++h)
-      for (int w = 0; w < datum_width; ++w)
-      {
-        int data_index = (c * datum_height + h) * datum_width + w;
-        (*label)[data_index] = ((uint8_t)(*label)[data_index] == choose_idx) ? 1 : 0;
-      }
-
-  for (int h = 0; h < datum_height; ++h)
-      for (int w = 0; w < datum_width; ++w)
-        inst.at<uchar>(h, w) = (orig_inst.at<uchar>(h, w) == choose_idx) ? 1 : 0;
-
-  //rotation -5~5
-  double angl = -10 + Rand(int((10 - (-10)) * 1000.0) + 1) / 1000.0;
-  Rotation(inst, angl, false, 0);
-
-  //thin-plate splines
-
-  //resize 95%~105%
-  cv::resize(inst, inst, cv::Size(datum_width / 8, datum_height / 8), 0, 0);
-  cv::resize(inst, inst, cv::Size(datum_width, datum_height), 0, 0);
-
-  float scale_ratios = std::max(Rand(int((1.10 - 0.90) * 1000.0) + 1) / 1000.0, 0.0) + 0.90;
-
-  cv::resize(inst, inst, cv::Size(int(datum_width * scale_ratios), int(datum_height * scale_ratios)), 0, 0);
-
-
-  double tot_h = 0, tot_w = 0, tot = 0, tot_h2 = 0, tot_w2 = 0, tot2 = 0;
-  for (int h = 0; h < datum_height; ++h)
-    for (int w = 0; w < datum_width; ++w)
-      if (orig_inst.at<uchar>(h, w) == choose_idx)
-      {
-        tot_h = tot_h + h;
-        tot_w = tot_w + w;
-        tot++;
-      }
-
-  int min_h = inst.rows, max_h = 0, min_w = inst.cols, max_w = 0;
-  double th = Rand(1000) / 1000.0;
-  for (int h = 0; h < inst.rows; ++h)
-    for (int w = 0; w < inst.cols; ++w)
-      if (inst.at<uchar>(h, w) > th)
-      {
-        min_h = std::min(min_h, h);
-        max_h = std::max(max_h, h);
-        min_w = std::min(min_w, w);
-        max_w = std::max(max_w, w);
-
-        tot_h2 = tot_h2 + h;
-        tot_w2 = tot_w2 + w;
-        tot2++;
-      }
-
-  if (tot2>=1)
+  if (!aug_data)
   {
-    int shift_h = (Rand(1000) / 1000.0 * 0.2 - 0.1) * (max_h - min_h);
-    int shift_w = (Rand(1000) / 1000.0 * 0.2 - 0.1) * (max_w - min_w);
+    int max_idx = 0;
+    for (int c = 1; c <=1; ++c)
+      for (int h = 0; h < datum_height; ++h)
+        for (int w = 0; w < datum_width; ++w)
+        {
+          int data_index = (c * datum_height + h) * datum_width + w;
+          if ((int)(*label)[data_index] != param_.ignore_label())
+            max_idx = std::max(max_idx, (int)(*label)[data_index]);
+        }
+    if (max_idx == 0)
+      return;
+    int choose_idx = Rand(max_idx) + 1;
 
-    shift_h += int(tot_h / tot - tot_h2 / tot2);
-    shift_w += int(tot_w / tot - tot_w2 / tot2);
+    for (int c = 0; c <datum_label.channels(); ++c)
+      for (int h = 0; h < datum_height; ++h)
+        for (int w = 0; w < datum_width; ++w)
+        {
+          int data_index = (c * datum_height + h) * datum_width + w;
+          (*label)[data_index] = ((uint8_t)(*label)[data_index] == choose_idx) ? 1 : 0;
+        }
+  }
+  else
+  {
+    int max_idx = 0;
+    cv::Mat orig_inst(datum_height, datum_width, CV_8UC1);
 
-    
+    for (int c = 2; c < datum_label.channels(); ++c)
+      for (int h = 0; h < datum_height; ++h)
+        for (int w = 0; w < datum_width; ++w)
+        {
+          int data_index = (c * datum_height + h) * datum_width + w;
+          orig_inst.at<uchar>(h, w) = (uint8_t)(*label)[data_index];
+          if ((int)orig_inst.at<uchar>(h, w) != param_.ignore_label())
+            max_idx = std::max(max_idx, (int)orig_inst.at<uchar>(h, w));
+        }
+    if (max_idx == 0)
+    {
+      orig_inst.release();
+      return;
+    }
+    cv::Mat inst = cv::Mat::zeros(orig_inst.size(), orig_inst.type());
 
-    orig_inst = cv::Mat::zeros(orig_inst.size(), orig_inst.type());
+    int choose_idx = Rand(max_idx) + 1;
+    for (int c = 1; c <= 1; ++c)
+      for (int h = 0; h < datum_height; ++h)
+        for (int w = 0; w < datum_width; ++w)
+        {
+          int data_index = (c * datum_height + h) * datum_width + w;
+          (*label)[data_index] = ((uint8_t)(*label)[data_index] == choose_idx) ? 1 : 0;
+        }
+
+    for (int h = 0; h < datum_height; ++h)
+        for (int w = 0; w < datum_width; ++w)
+          inst.at<uchar>(h, w) = (orig_inst.at<uchar>(h, w) == choose_idx) ? 1 : 0;
+
+    //rotation -5~5
+    double angl = -10 + Rand(int((10 - (-10)) * 1000.0) + 1) / 1000.0;
+    Rotation(inst, angl, false, 0);
+
+    //thin-plate splines
+
+    //resize 95%~105%
+    cv::resize(inst, inst, cv::Size(datum_width / 8, datum_height / 8), 0, 0);
+    cv::resize(inst, inst, cv::Size(datum_width, datum_height), 0, 0);
+
+    float scale_ratios = std::max(Rand(int((1.10 - 0.90) * 1000.0) + 1) / 1000.0, 0.0) + 0.90;
+
+    cv::resize(inst, inst, cv::Size(int(datum_width * scale_ratios), int(datum_height * scale_ratios)), 0, 0);
+
+
+    double tot_h = 0, tot_w = 0, tot = 0, tot_h2 = 0, tot_w2 = 0, tot2 = 0;
+    for (int h = 0; h < datum_height; ++h)
+      for (int w = 0; w < datum_width; ++w)
+        if (orig_inst.at<uchar>(h, w) == choose_idx)
+        {
+          tot_h = tot_h + h;
+          tot_w = tot_w + w;
+          tot++;
+        }
+
+    int min_h = inst.rows, max_h = 0, min_w = inst.cols, max_w = 0;
+    double th = Rand(1000) / 1000.0;
     for (int h = 0; h < inst.rows; ++h)
       for (int w = 0; w < inst.cols; ++w)
-        if (inst.at<uchar>(h, w) > th &&  h+shift_h>=0 && h+shift_h<orig_inst.rows && w+shift_w>=0 && w+shift_w<orig_inst.cols)
-          orig_inst.at<uchar>(h+shift_h, w+shift_w) = 1;
+        if (inst.at<uchar>(h, w) > th)
+        {
+          min_h = std::min(min_h, h);
+          max_h = std::max(max_h, h);
+          min_w = std::min(min_w, w);
+          max_w = std::max(max_w, w);
+
+          tot_h2 = tot_h2 + h;
+          tot_w2 = tot_w2 + w;
+          tot2++;
+        }
+
+    if (tot2>=1)
+    {
+      int shift_h = (Rand(1000) / 1000.0 * 0.2 - 0.1) * (max_h - min_h);
+      int shift_w = (Rand(1000) / 1000.0 * 0.2 - 0.1) * (max_w - min_w);
+
+      shift_h += int(tot_h / tot - tot_h2 / tot2);
+      shift_w += int(tot_w / tot - tot_w2 / tot2);
+
+      
+
+      orig_inst = cv::Mat::zeros(orig_inst.size(), orig_inst.type());
+      for (int h = 0; h < inst.rows; ++h)
+        for (int w = 0; w < inst.cols; ++w)
+          if (inst.at<uchar>(h, w) > th &&  h+shift_h>=0 && h+shift_h<orig_inst.rows && w+shift_w>=0 && w+shift_w<orig_inst.cols)
+            orig_inst.at<uchar>(h+shift_h, w+shift_w) = 1;
+    }
+    for (int c = 2; c < datum_label.channels(); ++c)
+      for (int h = 0; h < datum_height; ++h)
+        for (int w = 0; w < datum_width; ++w)
+        {
+          int data_index = (c * datum_height + h) * datum_width + w;
+          (*label)[data_index] = static_cast<char>(orig_inst.at<uchar>(h, w));
+        }
+    inst.release();
+    orig_inst.release();
   }
-  for (int c = 2; c < datum_label.channels(); ++c)
-    for (int h = 0; h < datum_height; ++h)
-      for (int w = 0; w < datum_width; ++w)
-      {
-        int data_index = (c * datum_height + h) * datum_width + w;
-        (*label)[data_index] = static_cast<char>(orig_inst.at<uchar>(h, w));
-      }
-  inst.release();
-  orig_inst.release();
 }
 
 

@@ -36,6 +36,7 @@ void SegRefineLayer<Dtype>:: DataLayerSetUp(const vector<Blob<Dtype>*>& bottom, 
 	const int stride = this->layer_param_.transform_param().stride();
 	const string& source = this->layer_param_.seg_refine_param().source();
 	const string& root_dir = this->layer_param_.seg_refine_param().root_dir();
+	const bool aug_data = this->layer_param_.seg_refine_param().aug_data();
 
 	LOG(INFO) << "Opening file: " << source;
 	std::ifstream infile(source.c_str());
@@ -63,7 +64,8 @@ void SegRefineLayer<Dtype>:: DataLayerSetUp(const vector<Blob<Dtype>*>& bottom, 
 	img_vec.push_back(lines_[lines_id_]);
 	label_vec.push_back(labels_[lines_id_].first);
 	label_vec.push_back(labels_[lines_id_].second);
-	label_vec.push_back(labels_[lines_id_].second);
+	if (aug_data)
+		label_vec.push_back(labels_[lines_id_].second);
 
 	CHECK(ReadSegVideoToDatum(img_vec, label_vec, &datum_data, &datum_label, true));
 
@@ -116,6 +118,7 @@ void SegRefineLayer<Dtype>::ShuffleImages(){
 template <typename Dtype>
 void SegRefineLayer<Dtype>::InternalThreadEntry(){
 
+	const bool aug_data = this->layer_param_.seg_refine_param().aug_data();
 	Datum datum_data, datum_label;
 	CHECK(this->prefetch_data_.count());
 	
@@ -131,11 +134,12 @@ void SegRefineLayer<Dtype>::InternalThreadEntry(){
 		img_vec.push_back(lines_[lines_id_]);
 		label_vec.push_back(labels_[lines_id_].first);
 		label_vec.push_back(labels_[lines_id_].second);
-		label_vec.push_back(labels_[lines_id_].second);
+		if (aug_data)
+			label_vec.push_back(labels_[lines_id_].second);
 
 		CHECK(ReadSegVideoToDatum(img_vec, label_vec, &datum_data, &datum_label, true));
 
-		this->data_transformer_->Transform_aug(datum_label);
+		this->data_transformer_->Transform_aug(datum_label, aug_data);
 
 		this->data_transformer_->Transform(datum_data, datum_label, &this->prefetch_data_, &this->prefetch_label_, batch_iter);
 
@@ -184,8 +188,8 @@ void SegRefineLayer<Dtype>::InternalThreadEntry(){
 		  		}
 		  	sprintf(temp_path, "temp/%d/image.png", tot);
   			imwrite(temp_path, im_data);
-  			int color_map[100]; color_map[0] = 0;
-  			for (int i=1; i<100; i++)
+  			int color_map[256]; color_map[0] = 0;
+  			for (int i=1; i<256; i++)
   				color_map[i] = (color_map[i-1] + 50) % 255;
 		  	for (int i=0; i < this->prefetch_label_.channels(); i++)
 		  	{
