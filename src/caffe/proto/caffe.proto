@@ -284,7 +284,7 @@ message ParamSpec {
 // NOTE
 // Update the next available ID when you add a new LayerParameter field.
 //
-// LayerParameter next available layer-specific ID: 164 (last added: interp_param)
+// LayerParameter next available layer-specific ID: 165 (last added: roi_warping_param)
 message LayerParameter {
   optional string name = 1; // the layer name
   optional string type = 2; // the layer type
@@ -373,6 +373,7 @@ message LayerParameter {
   optional WindowDataParameter window_data_param = 129;
   optional VideoDataParameter video_data_param = 140;
   optional ROIPoolingParameter roi_pooling_param = 150;
+  optional ROIWarpingParameter roi_warping_param = 164;
   optional ScaleParameter scale_param = 160;
   optional BiasParameter bias_param = 161;
   optional BatchReductionParameter batch_reduction_param = 162;
@@ -1103,6 +1104,15 @@ message ROIPoolingParameter {
   optional float spatial_scale = 3 [default = 1];
 }
 
+message ROIWarpingParameter {
+  // Pad, kernel size, and stride are all given as a single value for equal
+  // dimensions in height and width or as Y, X pairs.
+  optional uint32 pooled_h = 1 [default = 0]; // The pooled output height
+  optional uint32 pooled_w = 2 [default = 0]; // The pooled output width
+  // Multiplicative spatial scale factor to translate ROI coords from their
+  // input scale to the scale used when pooling
+  optional float spatial_scale = 3 [default = 1];
+}
 
 // DEPRECATED: use LayerParameter.
 message V1LayerParameter {
