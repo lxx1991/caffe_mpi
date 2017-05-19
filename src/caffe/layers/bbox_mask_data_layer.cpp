@@ -38,8 +38,8 @@ void BBoxMaskDataLayer<Dtype>:: DataLayerSetUp(const vector<Blob<Dtype>*>& botto
 	batch_size_ = this->layer_param_.bbox_mask_data_param().batch_size();
 	const string& source = this->layer_param_.bbox_mask_data_param().source();
 	const string& root_dir = this->layer_param_.bbox_mask_data_param().root_dir();
-	const bool bbox_height = this->layer_param_.bbox_mask_data_param().bbox_height();
-	const bool bbox_width = this->layer_param_.bbox_mask_data_param().bbox_width();
+	const int bbox_height = this->layer_param_.bbox_mask_data_param().bbox_height();
+	const int bbox_width = this->layer_param_.bbox_mask_data_param().bbox_width();
 
 	LOG(INFO) << "Opening file: " << source;
 
@@ -127,8 +127,8 @@ template <typename Dtype>
 void BBoxMaskDataLayer<Dtype>::InternalThreadEntry(){
 
 	const bool bbox_aug = this->layer_param_.bbox_mask_data_param().bbox_aug();
-	const bool bbox_height = this->layer_param_.bbox_mask_data_param().bbox_height();
-	const bool bbox_width = this->layer_param_.bbox_mask_data_param().bbox_width();
+	const int bbox_height = this->layer_param_.bbox_mask_data_param().bbox_height();
+	const int bbox_width = this->layer_param_.bbox_mask_data_param().bbox_width();
 	const int stride = this->layer_param_.transform_param().stride();
 
 	const int lines_size = lines_.size();
@@ -155,6 +155,32 @@ void BBoxMaskDataLayer<Dtype>::InternalThreadEntry(){
 
 		this->data_transformer_->Transform(datum_data, datum_label, &this->prefetch_data_, &label_buff, batch_iter);
 
+
+		if (this->layer_param_.bbox_mask_data_param().balance())
+		{
+			for (int t = 0; t < 10; t++)
+			{
+				std::vector<int> cnt(256, 0); int max_label_cnt = 0;
+				for (int p1 = 0; p1 < label_buff.height(); p1 ++)
+		  	  		for (int p2 = 0; p2 < label_buff.width(); p2 ++)
+		  	  		{
+		  	  			int label_value = (int)label_buff.data_at(batch_iter, 1, p1, p2);
+		  	  			cnt[label_value]++;
+		  	  		}
+		  	  	for (int i = 0; i<cnt.size(); i++)
+		  	  		if (i!=this->layer_param_.transform_param().ignore_label())
+		  				max_label_cnt = std::max(max_label_cnt, cnt[i]);
+
+		  		if (max_label_cnt > 0.8 * (label_buff.height() * label_buff.width() - cnt[this->layer_param_.transform_param().ignore_label()]))
+		  			this->data_transformer_->Transform(datum_data, datum_label, &this->prefetch_data_, &label_buff, batch_iter);
+	  			else
+	  				break;
+	  			if (t == 10)
+	  				LOG(INFO) << "Balance Fail";
+			}
+		}
+
+
 		memset(vis, 255, sizeof(vis));
 		const Dtype *ptr = label_buff.cpu_data() + label_buff.offset(batch_iter, 1);
 		for (int i = 0; i<label_buff.height(); i++)
@@ -170,9 +196,19 @@ void BBoxMaskDataLayer<Dtype>::InternalThreadEntry(){
 				ptr++;
 			}
 		tot_instance_num += instance_num[batch_iter];
+
+
+		//next iteration
+		lines_id_++;
+		if (lines_id_ >= lines_.size()) {
+			// We have reached the end. Restart from the first.
+			DLOG(INFO) << "Restarting data prefetching from start.";
+			lines_id_ = 0;
+			if (this->layer_param_.bbox_mask_data_param().shuffle()) {
+				ShuffleImages();
+			}
+		}
 	}
-
-
 
 	this->prefetch_label_.Reshape(batch_size_, 1, label_buff.height(), label_buff.width());
 	for (int batch_iter = 0; batch_iter < batch_size_; batch_iter++)
@@ -197,7 +233,6 @@ void BBoxMaskDataLayer<Dtype>::InternalThreadEntry(){
 		memset(vis, 255, sizeof(vis));
 		for (int i = 0; i < instance_num[batch_iter]; i++)
 		{
-			ptr_bbox[i*5 + 0] = batch_iter;
 			ptr_bbox[i*5 + 1] = label_buff.width() - 1;			//start w
 			ptr_bbox[i*5 + 2] = label_buff.height() - 1;		//start h
 			ptr_bbox[i*5 + 3] = 0;								//end w
@@ -205,7 +240,9 @@ void BBoxMaskDataLayer<Dtype>::InternalThreadEntry(){
 			vis[instance_ids[batch_iter][i]] = i;
 		}
 
-		vector <cv::Mat> temp(instance_num[batch_iter], cv::Mat::zeros(label_buff.height(), label_buff.width(), CV_32F));
+		vector <cv::Mat> temp;
+		for (int i=0; i<instance_num[batch_iter]; i++)
+			temp.push_back(cv::Mat::zeros(label_buff.height(), label_buff.width(), CV_8U));
 
 		const Dtype *ptr = label_buff.cpu_data() + label_buff.offset(batch_iter, 1);
 
@@ -219,7 +256,7 @@ void BBoxMaskDataLayer<Dtype>::InternalThreadEntry(){
 					ptr_bbox[vis[ptr_v]*5 + 2] = std::min(Dtype(i), ptr_bbox[vis[ptr_v]*5 + 2]);			//start h
 					ptr_bbox[vis[ptr_v]*5 + 3] = std::max(Dtype(j), ptr_bbox[vis[ptr_v]*5 + 3]);			//end w
 					ptr_bbox[vis[ptr_v]*5 + 4] = std::max(Dtype(i), ptr_bbox[vis[ptr_v]*5 + 4]);			//end h
-					temp[vis[ptr_v]].at<float>(i, j) = 1.0f;
+					temp[vis[ptr_v]].at<uchar>(i, j) = 1;
 				}
 				ptr++;
 			}
@@ -236,38 +273,28 @@ void BBoxMaskDataLayer<Dtype>::InternalThreadEntry(){
 				ptr_bbox[3] += this->data_transformer_->Rand(-bbox_w * 0.05, bbox_w * 0.05);								//end w
 				ptr_bbox[4] += this->data_transformer_->Rand(-bbox_h * 0.05, bbox_h * 0.05);								//end h
 
+
+				ptr_bbox[0] = batch_iter;
 				ptr_bbox[1] = std::min(std::max(0.0, round(ptr_bbox[1] / stride) * stride), label_buff.width() - 1.0);								//start w
-				ptr_bbox[2] = std::min(std::max(0.0, round(ptr_bbox[1] / stride) * stride), label_buff.height() - 1.0);								//start h
-				ptr_bbox[3] = std::min(std::max(0.0, round(ptr_bbox[1] / stride) * stride), label_buff.width() - 1.0);								//end w
-				ptr_bbox[4] = std::min(std::max(0.0, round(ptr_bbox[1] / stride) * stride), label_buff.height() - 1.0);								//end h
+				ptr_bbox[2] = std::min(std::max(0.0, round(ptr_bbox[2] / stride) * stride), label_buff.height() - 1.0);								//start h
+				ptr_bbox[3] = std::min(std::max(0.0, round(ptr_bbox[3] / stride) * stride), label_buff.width() - 1.0);								//end w
+				ptr_bbox[4] = std::min(std::max(0.0, round(ptr_bbox[4] / stride) * stride), label_buff.height() - 1.0);								//end h
 			}
-			LOG(ERROR) <<ptr_bbox[1] << ' ' <<ptr_bbox[2]<< ' '<< ptr_bbox[3] << ' ' << ptr_bbox[4];
 			cv::Mat M(temp[i], cv::Rect(ptr_bbox[1], ptr_bbox[2], ptr_bbox[3] - ptr_bbox[1] + 1, ptr_bbox[4] - ptr_bbox[2] + 1));
+			
 			cv::resize(M, M, cv::Size(bbox_width, bbox_height), 0, 0, CV_INTER_NN);
 
 			for (int j=0; j<bbox_width * bbox_height; j++)
-				ptr_mask[j] = *(M.data + j);
+				ptr_mask[j] = (Dtype)*(M.data + j);
 			
 			ptr_bbox += 5;
 			ptr_mask += bbox_width * bbox_height;
-		}
-		
-
-		//next iteration
-		lines_id_++;
-		if (lines_id_ >= lines_.size()) {
-			// We have reached the end. Restart from the first.
-			DLOG(INFO) << "Restarting data prefetching from start.";
-			lines_id_ = 0;
-			if (this->layer_param_.bbox_mask_data_param().shuffle()) {
-				ShuffleImages();
-			}
 		}
 	}
 
 
 
-	if (true)
+	if (false)
 	{
 	  	cv::Mat im_data(this->prefetch_data_.height(), this->prefetch_data_.width(), CV_8UC3);
 
@@ -307,6 +334,17 @@ void BBoxMaskDataLayer<Dtype>::InternalThreadEntry(){
 					}
 			sprintf(temp_path, "temp/%d/label_%d.png", tot, batch_iter);
 			imwrite(temp_path, im_data);
+
+
+			for (int p1 = 0; p1 < this->prefetch_label_.height(); p1 ++)
+				for (int p2 = 0; p2 < this->prefetch_label_.width(); p2 ++)
+				{
+					im_data.at<uchar>(p1, p2*3+0) = color_map[(int)label_buff.data_at(batch_iter, 1, p1, p2)][0];
+					im_data.at<uchar>(p1, p2*3+1) = color_map[(int)label_buff.data_at(batch_iter, 1, p1, p2)][1];
+					im_data.at<uchar>(p1, p2*3+2) = color_map[(int)label_buff.data_at(batch_iter, 1, p1, p2)][2];
+					}
+			sprintf(temp_path, "temp/%d/instance_label_%d.png", tot, batch_iter);
+			imwrite(temp_path, im_data);
 		}
 
 
@@ -316,9 +354,9 @@ void BBoxMaskDataLayer<Dtype>::InternalThreadEntry(){
   			for (int p1 = 0; p1 < this->prefetch_others_[1]->height(); p1 ++)
 	  	  		for (int p2 = 0; p2 < this->prefetch_others_[1]->width(); p2 ++)
 	  	  		{
-	  	  			im_data.at<uchar>(p1, p2*3+0) = color_map[(int)this->prefetch_others_[1]->data_at(i, 0, p1, p2)][0];
-	  	  			im_data.at<uchar>(p1, p2*3+1) = color_map[(int)this->prefetch_others_[1]->data_at(i, 0, p1, p2)][1];
-	  	  			im_data.at<uchar>(p1, p2*3+2) = color_map[(int)this->prefetch_others_[1]->data_at(i, 0, p1, p2)][2];
+	  	  			im_data.at<uchar>(p1, p2*3+0) = color_map[(int)this->prefetch_others_[1]->data_at(i, 0, p1, p2) == 0 ? 0 : i+1][0];
+	  	  			im_data.at<uchar>(p1, p2*3+1) = color_map[(int)this->prefetch_others_[1]->data_at(i, 0, p1, p2) == 0 ? 0 : i+1][1];
+	  	  			im_data.at<uchar>(p1, p2*3+2) = color_map[(int)this->prefetch_others_[1]->data_at(i, 0, p1, p2) == 0 ? 0 : i+1][2];
 	  	  		}
 		  	sprintf(temp_path, "temp/%d/instance_%d.png", tot, i);
 		  	imwrite(temp_path, im_data);

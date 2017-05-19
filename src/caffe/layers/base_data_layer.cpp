@@ -39,7 +39,6 @@ void BasePrefetchingDataLayer<Dtype>::LayerSetUp(
   if (this->output_labels_) {
     this->prefetch_label_.mutable_cpu_data();
 
-    LOG(ERROR) << "hahahahaha";
     if (top.size() > 2)
       for (int i=2; i<top.size(); i++)
           this->prefetch_others_[i-2]->mutable_cpu_data();
@@ -51,7 +50,6 @@ void BasePrefetchingDataLayer<Dtype>::LayerSetUp(
   DLOG(INFO) << "Initializing prefetch";
   this->CreatePrefetchThread();
   DLOG(INFO) << "Prefetch initialized.";
-  LOG(ERROR) << "hahahahaha";
 }
 
 template <typename Dtype>

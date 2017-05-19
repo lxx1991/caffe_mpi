@@ -374,7 +374,12 @@ void CuDNNConvolutionLayer<Dtype>::Reshape(
     layer_perf_.bwd_data_perf[i] = vector<cudnnConvolutionBwdDataAlgoPerf_t>(bwd_data_perf.begin(),
                                                                              bwd_data_perf.begin() + returnedAlgoCount);
 
-    need_optimize_ = true;
+    static bool first_reshape = true;
+    if (first_reshape)
+    {
+      need_optimize_ = true;
+      first_reshape = false;
+    }
   }
 
 
