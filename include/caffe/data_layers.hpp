@@ -99,6 +99,7 @@ class BasePrefetchingDataLayer :
 		protected:
 	Blob<Dtype> prefetch_data_;
 	Blob<Dtype> prefetch_label_;
+	vector<Blob<Dtype>*> prefetch_others_;
 	Blob<Dtype> transformed_data_;
 };
 
@@ -487,6 +488,51 @@ protected:
 	}
 #endif
 
+	vector<std::string > lines_;
+	vector<std::pair<std::string, std::string> > labels_;
+	int lines_id_;
+	int batch_size_;
+};
+
+
+
+/**
+ * @brief Provides data to the Net from video files.
+ *
+ * TODO(dox): thorough documentation for Forward and proto params.
+ */
+template <typename Dtype>
+class BBoxMaskDataLayer : public BasePrefetchingDataLayer<Dtype> {
+public:
+	explicit BBoxMaskDataLayer(const LayerParameter& param)
+	: BasePrefetchingDataLayer<Dtype>(param) {}
+	virtual ~BBoxMaskDataLayer();
+	virtual void DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
+			const vector<Blob<Dtype>*>& top);
+
+	virtual inline const char* type() const { return "BBoxMaskData"; }
+	virtual inline int ExactNumBottomBlobs() const { return 0; }
+	virtual inline int ExactNumTopBlobs() const { return 4; }
+
+protected:
+	shared_ptr<Caffe::RNG> prefetch_rng_;
+	virtual void ShuffleImages();
+	virtual void InternalThreadEntry();
+
+#ifdef USE_MPI
+	inline virtual void advance_cursor(){
+		lines_id_++;
+		if (lines_id_ >= lines_.size()) {
+			// We have reached the end. Restart from the first.
+			DLOG(INFO) << "Restarting data prefetching from start.";
+			lines_id_ = 0;
+			if (this->layer_param_.bbox_mask_data_param().shuffle()) {
+				ShuffleImages();
+			}
+		}
+	}
+#endif
+	
 	vector<std::string > lines_;
 	vector<std::pair<std::string, std::string> > labels_;
 	int lines_id_;

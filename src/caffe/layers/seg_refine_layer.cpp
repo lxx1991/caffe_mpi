@@ -83,16 +83,6 @@ void SegRefineLayer<Dtype>:: DataLayerSetUp(const vector<Blob<Dtype>*>& bottom, 
 		crop_height = this->layer_param_.transform_param().crop_height();
 		crop_width = this->layer_param_.transform_param().crop_width();
 	}
-  	else if (this->layer_param_.transform_param().has_upper_size())
-	{
-		crop_height = std::min(crop_height, this->layer_param_.transform_param().upper_size());
-		crop_width = std::min(crop_width, this->layer_param_.transform_param().upper_size());
-	}
-	else if (this->layer_param_.transform_param().has_upper_height() && this->layer_param_.transform_param().has_upper_width())
-	{
-		crop_height = std::min(crop_height, this->layer_param_.transform_param().upper_height());
-		crop_width = std::min(crop_width, this->layer_param_.transform_param().upper_width());
-	}
 
 	batch_size_ = this->layer_param_.seg_refine_param().batch_size();
 	if (batch_size_ != 1)

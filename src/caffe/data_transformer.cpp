@@ -325,11 +325,9 @@ void DataTransformer<Dtype>::Transform(const Datum& datum,
   multi_scale_bufferM.release();
 }
 
-
 template<typename Dtype>
 void DataTransformer<Dtype>::Transform(const Datum& datum_data, const Datum& datum_label, 
                                        Blob<Dtype>* transformed_data, Blob<Dtype>* transformed_label, int batch_iter) {
-
 
   CHECK_EQ(datum_data.height(), datum_label.height());
   CHECK_EQ(datum_data.width(), datum_label.width());
@@ -346,17 +344,15 @@ void DataTransformer<Dtype>::Transform(const Datum& datum_data, const Datum& dat
     lower_scale = param_.scale_ratios(0);
     upper_scale = param_.scale_ratios(1);
   }
+
   const Dtype scale = param_.scale();
   const bool do_mirror = param_.mirror() && Rand(2);
-  const bool has_mean_file = param_.has_mean_file();
   const bool has_mean_values = mean_values_.size() > 0;
-  const int stride = param_.stride();
-
-  CHECK_GT(datum_channels, 0);
-
-  if (has_mean_file) {
+  if (param_.has_mean_file()) {
     NOT_IMPLEMENTED;
   }
+  const int stride = param_.stride();
+
   if (has_mean_values) {
     CHECK(mean_values_.size() == 1 || mean_values_.size() == datum_channels || datum_channels % mean_values_.size() == 0) <<
      "Specify either 1 mean_value or as many as channels: " << datum_channels;
@@ -369,12 +365,9 @@ void DataTransformer<Dtype>::Transform(const Datum& datum_data, const Datum& dat
     }
   }
 
-  float scale_ratios = std::max(Rand(int((upper_scale - lower_scale) * 1000.0) + 1) / 1000.0, 0.0) + lower_scale;
-
+  float scale_ratios = Rand(lower_scale, upper_scale);
   int height = int(datum_height * scale_ratios + 0.5);
   int width = int(datum_width * scale_ratios + 0.5);
-
-
   int crop_height = height / stride * stride;
   int crop_width = width / stride * stride;
   
@@ -388,17 +381,6 @@ void DataTransformer<Dtype>::Transform(const Datum& datum_data, const Datum& dat
     crop_height = param_.crop_height();
     crop_width = param_.crop_width();
   }
-  else if (param_.has_upper_size())
-  {
-    crop_height = std::min(crop_height, param_.upper_size());
-    crop_width = std::min(crop_width, param_.upper_size());
-  }
-  else if (param_.has_upper_height() && param_.has_upper_width())
-  {
-    crop_height = std::min(crop_height, param_.upper_height());
-    crop_width = std::min(crop_width, param_.upper_width());
-  }
-
 
   int h_off, w_off;
   if (height < crop_height)
@@ -420,15 +402,12 @@ void DataTransformer<Dtype>::Transform(const Datum& datum_data, const Datum& dat
   float angl = 0; 
   if (param_.rand_rotate_size() > 0 && Rand(2)){
     CHECK_EQ(this->param_.rand_rotate_size(), 2) << "Exactly two rand_rotate param required";
-    const float rand_rotate_small = param_.rand_rotate(0);
-    const float rand_rotate_large = param_.rand_rotate(1);
-    CHECK_LT(rand_rotate_small, rand_rotate_large) << "first rand_ratate should be smaller than the second rand_rotate";
-    angl = rand_rotate_small + Rand(int((rand_rotate_large - rand_rotate_small) * 1000.0) + 1) / 1000.0;
+    angl = Rand(param_.rand_rotate(0), param_.rand_rotate(1));
   }
 
   float rand_sigma = 0;
   if (param_.gaussian_blur() && Rand(2)) {
-    rand_sigma = Rand(1000) / 1000.0 * 0.6;
+    rand_sigma = Rand(0.0, 0.6);
   }
 
   //for image data
@@ -451,23 +430,15 @@ void DataTransformer<Dtype>::Transform(const Datum& datum_data, const Datum& dat
     if (rand_sigma != 0)
        cv::GaussianBlur(M, M, cv::Size( 5, 5 ), rand_sigma, rand_sigma);
     
-    
-    //cv::Mat cropM(M, cv::Rect(w_off, h_off, crop_width, crop_height));
-
     for (int h = 0; h < crop_height; ++h)
       for (int w = 0; w < crop_width; ++w)
       {
-
         if (do_mirror) 
           top_index = (c * crop_height + h) * crop_width + (crop_width - 1 - w);
         else 
           top_index = (c * crop_height + h) * crop_width + w;
 
-        if (has_mean_file) 
-        {
-            NOT_IMPLEMENTED;
-        } 
-        else if (has_mean_values) 
+        if (has_mean_values) 
           ptr[top_index] =((h+h_off)>=0) && ((h+h_off)<height) && ((w+w_off)>=0) && ((w+w_off)<width) ? (static_cast<Dtype>(M.at<uint8_t>(h+h_off, w+w_off)) - mean_values_[c]) * scale : 0;
         else 
           ptr[top_index] = ((h+h_off)>=0) && ((h+h_off)<height) && ((w+w_off)>=0) && ((w+w_off)<width) ? static_cast<Dtype>(M.at<uint8_t>(h+h_off, w+w_off)) * scale : 0;
@@ -486,15 +457,15 @@ void DataTransformer<Dtype>::Transform(const Datum& datum_data, const Datum& dat
         int data_index = (c * datum_height + h) * datum_width + w;
         M.at<uchar>(h, w) = static_cast<uint8_t>(label[data_index]);
       }
+
     cv::resize(M, M, cv::Size(width, height), 0, 0, CV_INTER_NN);
 
     if (angl != 0)
        Rotation(M, angl, true, param_.ignore_label());
-    //cv::Mat cropM(M, cv::Rect(w_off, h_off, crop_width, crop_height));
+
     for (int h = 0; h < crop_height; ++h)
       for (int w = 0; w < crop_width; ++w) 
       {
-
         if (do_mirror) 
           top_index = (c * crop_height + h) * crop_width + (crop_width - 1 - w);
         else 
@@ -505,7 +476,6 @@ void DataTransformer<Dtype>::Transform(const Datum& datum_data, const Datum& dat
     M.release();
   }
 }
-
 
 template<typename Dtype>
 void DataTransformer<Dtype>::Transform_aug(Datum& datum_label, bool aug_data) {
@@ -1117,8 +1087,7 @@ vector<int> DataTransformer<Dtype>::InferBlobShape(
 
 template <typename Dtype>
 void DataTransformer<Dtype>::InitRand() {
-  const bool needs_rand = param_.mirror() ||
-      (phase_ == TRAIN && param_.crop_size());
+  const bool needs_rand = param_.mirror() || (phase_ == TRAIN);
   if (needs_rand) {
     const unsigned int rng_seed =caffe_rng_rand();
     rng_.reset(new Caffe::RNG(rng_seed));
@@ -1136,6 +1105,13 @@ int DataTransformer<Dtype>::Rand(int n) {
   return ((*rng)() % n);
 }
 
+
+template <typename Dtype>
+float DataTransformer<Dtype>::Rand(float l, float r) {
+  CHECK(rng_);
+  CHECK_GE(r, l); 
+  return std::min(std::max(Rand(int((r - l) * 10000.0) + 1) / 10000.0f + l, l), r);
+}
 
 template <typename Dtype>
 void DataTransformer<Dtype>::Rotation(cv::Mat& src, int degree, bool islabel, uint8_t mean_v){

@@ -284,7 +284,7 @@ message ParamSpec {
 // NOTE
 // Update the next available ID when you add a new LayerParameter field.
 //
-// LayerParameter next available layer-specific ID: 165 (last added: roi_warping_param)
+// LayerParameter next available layer-specific ID: 167 (last added: resample_param)
 message LayerParameter {
   optional string name = 1; // the layer name
   optional string type = 2; // the layer type
@@ -334,6 +334,7 @@ message LayerParameter {
   optional AccuracyParameter accuracy_param = 102;
   optional ArgMaxParameter argmax_param = 103;
   optional BNParameter bn_param = 137;
+  optional BBoxMaskDataParameter bbox_mask_data_param = 165;
   optional ConcatParameter concat_param = 104;
   optional ContrastiveLossParameter contrastive_loss_param = 105;
   optional ConvolutionParameter convolution_param = 106;
@@ -361,6 +362,9 @@ message LayerParameter {
   optional ReductionParameter reduction_param = 136;
   optional ReLUParameter relu_param = 123;
   optional ReshapeParameter reshape_param = 133;
+  optional ResampleParameter resample_param = 166;
+  optional ROIPoolingParameter roi_pooling_param = 150;
+  optional ROIWarpingParameter roi_warping_param = 164;
   optional SegDataParameter seg_data_param = 141;
   optional SegVideoParameter seg_video_param = 142;
   optional SegRefineParameter seg_refine_param = 143;
@@ -372,8 +376,6 @@ message LayerParameter {
   optional ThresholdParameter threshold_param = 128;
   optional WindowDataParameter window_data_param = 129;
   optional VideoDataParameter video_data_param = 140;
-  optional ROIPoolingParameter roi_pooling_param = 150;
-  optional ROIWarpingParameter roi_warping_param = 164;
   optional ScaleParameter scale_param = 160;
   optional BiasParameter bias_param = 161;
   optional BatchReductionParameter batch_reduction_param = 162;
@@ -487,6 +489,21 @@ message BNParameter {
   }
   optional Engine engine = 6 [default = DEFAULT];
 }
+
+message BBoxMaskDataParameter {
+  // Specify the data source.
+  optional string source = 1;
+  // Specify the data root_dir.
+  optional string root_dir = 2;
+  // Whether or not ImageLayer should shuffle the list of files at every epoch.
+  optional bool shuffle = 3 [default = false];
+  optional bool balance = 4 [default = false];
+  optional uint32 batch_size = 5  [default = 1];
+  optional bool bbox_aug = 6 [default = false];
+  optional uint32 bbox_height = 7;
+  optional uint32 bbox_width = 8;
+}
+
 
 message ConcatParameter {
   // The axis along which to concatenate -- may be negative to index from the
@@ -954,6 +971,21 @@ message ReshapeParameter {
   optional int32 axis = 2 [default = 0];
   optional int32 num_axes = 3 [default = -1];
 }
+
+
+message ResampleParameter {
+    enum ResampleType {
+        NEAREST = 1;
+        LINEAR = 2;
+        CUBIC = 3;
+        AREA = 4;
+    };
+    optional bool antialias = 4 [ default = true ];
+    optional uint32 width  = 1;
+    optional uint32 height = 2;
+    optional ResampleType type = 3 [ default = LINEAR ];
+}
+
 
 message SegDataParameter{
   // Specify the data source.
