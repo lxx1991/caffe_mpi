@@ -103,12 +103,12 @@ void BBoxMaskDataLayer<Dtype>:: DataLayerSetUp(const vector<Blob<Dtype>*>& botto
 		this->prefetch_others_.push_back(new Blob<Dtype>());
 
 	//bbox
-	top[2]->Reshape(1, 1, 1, 5);
-	this->prefetch_others_[0]->Reshape(1, 1, 1, 5);
+	top[2]->Reshape(5, 1, 1, 5);
+	this->prefetch_others_[0]->Reshape(5, 1, 1, 5);
 
 	//bbox label
-	top[3]->Reshape(1, 1, bbox_height, bbox_width);
-	this->prefetch_others_[1]->Reshape(1, 1, bbox_height, bbox_width);
+	top[3]->Reshape(5, 1, bbox_height, bbox_width);
+	this->prefetch_others_[1]->Reshape(5, 1, bbox_height, bbox_width);
 
 
 	LOG(INFO) << "output data size: " << top[0]->num() << "," << top[0]->channels() << "," << top[0]->height() << "," << top[0]->width();
@@ -138,6 +138,7 @@ void BBoxMaskDataLayer<Dtype>::InternalThreadEntry(){
 	int vis[256], tot_instance_num = 0;
 	Blob<Dtype> label_buff;
 
+	bool balance = false;
 
 	//data_transfor
 	for (int batch_iter = 0; batch_iter < batch_size_; batch_iter++)
@@ -155,10 +156,11 @@ void BBoxMaskDataLayer<Dtype>::InternalThreadEntry(){
 
 		this->data_transformer_->Transform(datum_data, datum_label, &this->prefetch_data_, &label_buff, batch_iter);
 
+		
 
 		if (this->layer_param_.bbox_mask_data_param().balance())
 		{
-			for (int t = 0; t < 10; t++)
+			for (int t = 0; t < 20; t++)
 			{
 				std::vector<int> cnt(256, 0); int max_label_cnt = 0;
 				for (int p1 = 0; p1 < label_buff.height(); p1 ++)
@@ -171,12 +173,13 @@ void BBoxMaskDataLayer<Dtype>::InternalThreadEntry(){
 		  	  		if (i!=this->layer_param_.transform_param().ignore_label())
 		  				max_label_cnt = std::max(max_label_cnt, cnt[i]);
 
-		  		if (max_label_cnt > 0.8 * (label_buff.height() * label_buff.width() - cnt[this->layer_param_.transform_param().ignore_label()]))
+		  		if (max_label_cnt > (t < 10 ? 0.8 : 0.99) * (label_buff.height() * label_buff.width() - cnt[(int)this->layer_param_.transform_param().ignore_label()]))
 		  			this->data_transformer_->Transform(datum_data, datum_label, &this->prefetch_data_, &label_buff, batch_iter);
 	  			else
+	  			{
+	  				balance = true;
 	  				break;
-	  			if (t == 10)
-	  				LOG(INFO) << "Balance Fail";
+	  			}
 			}
 		}
 
@@ -196,7 +199,6 @@ void BBoxMaskDataLayer<Dtype>::InternalThreadEntry(){
 				ptr++;
 			}
 		tot_instance_num += instance_num[batch_iter];
-
 
 		//next iteration
 		lines_id_++;
@@ -221,78 +223,89 @@ void BBoxMaskDataLayer<Dtype>::InternalThreadEntry(){
 				*(ptr2++) = *(ptr1++);
 	}
 
-	this->prefetch_others_[0]->Reshape(tot_instance_num, 1, 1, 5);
-	this->prefetch_others_[1]->Reshape(tot_instance_num, 1, bbox_height, bbox_width);
-
-	//label
-	Dtype* ptr_bbox = this->prefetch_others_[0]->mutable_cpu_data();
-	Dtype* ptr_mask = this->prefetch_others_[1]->mutable_cpu_data();
-
-	for (int batch_iter = 0; batch_iter < batch_size_; batch_iter++)
+	if (tot_instance_num == 0)
 	{
-		memset(vis, 255, sizeof(vis));
-		for (int i = 0; i < instance_num[batch_iter]; i++)
+		LOG(ERROR) << "no instance";
+		this->prefetch_others_[0]->Reshape(1, 1, 1, 5);
+		this->prefetch_others_[1]->Reshape(1, 1, bbox_height, bbox_width);
+		caffe_set(this->prefetch_others_[0]->count(), Dtype(0), this->prefetch_others_[0]->mutable_cpu_data());	
+		caffe_set(this->prefetch_others_[1]->count(), Dtype(0), this->prefetch_others_[1]->mutable_cpu_data());
+	}
+	else
+	{
+		this->prefetch_others_[0]->Reshape(tot_instance_num, 1, 1, 5);
+		this->prefetch_others_[1]->Reshape(tot_instance_num, 1, bbox_height, bbox_width);
+
+		//label
+		Dtype* ptr_bbox = this->prefetch_others_[0]->mutable_cpu_data();
+		Dtype* ptr_mask = this->prefetch_others_[1]->mutable_cpu_data();
+
+		for (int batch_iter = 0; batch_iter < batch_size_; batch_iter++)
 		{
-			ptr_bbox[i*5 + 1] = label_buff.width() - 1;			//start w
-			ptr_bbox[i*5 + 2] = label_buff.height() - 1;		//start h
-			ptr_bbox[i*5 + 3] = 0;								//end w
-			ptr_bbox[i*5 + 4] = 0;								//end h
-			vis[instance_ids[batch_iter][i]] = i;
-		}
-
-		vector <cv::Mat> temp;
-		for (int i=0; i<instance_num[batch_iter]; i++)
-			temp.push_back(cv::Mat::zeros(label_buff.height(), label_buff.width(), CV_8U));
-
-		const Dtype *ptr = label_buff.cpu_data() + label_buff.offset(batch_iter, 1);
-
-		for (int i = 0; i<label_buff.height(); i++)
-			for (int j=0; j<label_buff.width(); j++)
+			memset(vis, 255, sizeof(vis));
+			for (int i = 0; i < instance_num[batch_iter]; i++)
 			{
-				int ptr_v = (int)(*ptr + 0.5);
-				if (vis[ptr_v] != -1)
-				{
-					ptr_bbox[vis[ptr_v]*5 + 1] = std::min(Dtype(j), ptr_bbox[vis[ptr_v]*5 + 1]);			//start w
-					ptr_bbox[vis[ptr_v]*5 + 2] = std::min(Dtype(i), ptr_bbox[vis[ptr_v]*5 + 2]);			//start h
-					ptr_bbox[vis[ptr_v]*5 + 3] = std::max(Dtype(j), ptr_bbox[vis[ptr_v]*5 + 3]);			//end w
-					ptr_bbox[vis[ptr_v]*5 + 4] = std::max(Dtype(i), ptr_bbox[vis[ptr_v]*5 + 4]);			//end h
-					temp[vis[ptr_v]].at<uchar>(i, j) = 1;
-				}
-				ptr++;
+				ptr_bbox[i*5 + 1] = label_buff.width() - 1;			//start w
+				ptr_bbox[i*5 + 2] = label_buff.height() - 1;		//start h
+				ptr_bbox[i*5 + 3] = 0;								//end w
+				ptr_bbox[i*5 + 4] = 0;								//end h
+				vis[instance_ids[batch_iter][i]] = i;
 			}
 
-		for (int i = 0; i < instance_num[batch_iter]; i++)
-		{
-			if (bbox_aug)
+			vector <cv::Mat> temp;
+			for (int i=0; i<instance_num[batch_iter]; i++)
+				temp.push_back(cv::Mat::zeros(label_buff.height(), label_buff.width(), CV_8U));
+
+			const Dtype *ptr = label_buff.cpu_data() + label_buff.offset(batch_iter, 1);
+
+			for (int i = 0; i<label_buff.height(); i++)
+				for (int j=0; j<label_buff.width(); j++)
+				{
+					int ptr_v = (int)(*ptr + 0.5);
+					if (vis[ptr_v] != -1)
+					{
+						ptr_bbox[vis[ptr_v]*5 + 1] = std::min(Dtype(j), ptr_bbox[vis[ptr_v]*5 + 1]);			//start w
+						ptr_bbox[vis[ptr_v]*5 + 2] = std::min(Dtype(i), ptr_bbox[vis[ptr_v]*5 + 2]);			//start h
+						ptr_bbox[vis[ptr_v]*5 + 3] = std::max(Dtype(j), ptr_bbox[vis[ptr_v]*5 + 3]);			//end w
+						ptr_bbox[vis[ptr_v]*5 + 4] = std::max(Dtype(i), ptr_bbox[vis[ptr_v]*5 + 4]);			//end h
+						temp[vis[ptr_v]].at<uchar>(i, j) = 1;
+					}
+					ptr++;
+				}
+
+			for (int i = 0; i < instance_num[batch_iter]; i++)
 			{
-				int bbox_h = ptr_bbox[4] - ptr_bbox[2];
-				int bbox_w = ptr_bbox[3] - ptr_bbox[1];
+				if (bbox_aug)
+				{
+					int bbox_h = ptr_bbox[4] - ptr_bbox[2];
+					int bbox_w = ptr_bbox[3] - ptr_bbox[1];
 
-				ptr_bbox[1] += this->data_transformer_->Rand(-bbox_w * 0.05, bbox_w * 0.05);								//start w
-				ptr_bbox[2] += this->data_transformer_->Rand(-bbox_h * 0.05, bbox_h * 0.05);								//start h
-				ptr_bbox[3] += this->data_transformer_->Rand(-bbox_w * 0.05, bbox_w * 0.05);								//end w
-				ptr_bbox[4] += this->data_transformer_->Rand(-bbox_h * 0.05, bbox_h * 0.05);								//end h
-
-
+					ptr_bbox[1] += this->data_transformer_->Rand(-bbox_w * 0.05, bbox_w * 0.05);								//start w
+					ptr_bbox[2] += this->data_transformer_->Rand(-bbox_h * 0.05, bbox_h * 0.05);								//start h
+					ptr_bbox[3] += this->data_transformer_->Rand(-bbox_w * 0.05, bbox_w * 0.05);								//end w
+					ptr_bbox[4] += this->data_transformer_->Rand(-bbox_h * 0.05, bbox_h * 0.05);								//end h
+				}
 				ptr_bbox[0] = batch_iter;
 				ptr_bbox[1] = std::min(std::max(0.0, round(ptr_bbox[1] / stride) * stride), label_buff.width() - 1.0);								//start w
 				ptr_bbox[2] = std::min(std::max(0.0, round(ptr_bbox[2] / stride) * stride), label_buff.height() - 1.0);								//start h
 				ptr_bbox[3] = std::min(std::max(0.0, round(ptr_bbox[3] / stride) * stride), label_buff.width() - 1.0);								//end w
 				ptr_bbox[4] = std::min(std::max(0.0, round(ptr_bbox[4] / stride) * stride), label_buff.height() - 1.0);								//end h
-			}
-			cv::Mat M(temp[i], cv::Rect(ptr_bbox[1], ptr_bbox[2], ptr_bbox[3] - ptr_bbox[1] + 1, ptr_bbox[4] - ptr_bbox[2] + 1));
-			
-			cv::resize(M, M, cv::Size(bbox_width, bbox_height), 0, 0, CV_INTER_NN);
 
-			for (int j=0; j<bbox_width * bbox_height; j++)
-				ptr_mask[j] = (Dtype)*(M.data + j);
-			
-			ptr_bbox += 5;
-			ptr_mask += bbox_width * bbox_height;
+				cv::Mat M(temp[i], cv::Rect(ptr_bbox[1], ptr_bbox[2], ptr_bbox[3] - ptr_bbox[1] + 1, ptr_bbox[4] - ptr_bbox[2] + 1));
+				
+				cv::resize(M, M, cv::Size(bbox_width, bbox_height), 0, 0, CV_INTER_NN);
+
+				for (int j=0; j<bbox_width * bbox_height; j++)
+					ptr_mask[j] = (Dtype)*(M.data + j);
+				
+				ptr_bbox += 5;
+				ptr_mask += bbox_width * bbox_height;
+			}
 		}
 	}
-
-
+	
+	if (!balance)
+		LOG(ERROR) << "Balance Fail";
 
 	if (false)
 	{
