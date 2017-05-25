@@ -8,9 +8,9 @@ MAKE="make --jobs=$NUM_THREADS"
 # Install apt packages where the Ubuntu 12.04 default and ppa works for Caffe
 
 # This ppa is for gflags and glog
-add-apt-repository -y ppa:tuleu/precise-backports
 apt-get -y update
-apt-get install \
+apt-get install -y --no-install-recommends \
+    build-essential \
     wget git curl \
     python-dev python-numpy \
     libleveldb-dev libsnappy-dev libopencv-dev \
@@ -20,43 +20,49 @@ apt-get install \
     libhdf5-serial-dev libgflags-dev libgoogle-glog-dev \
     bc
 
-# Add a special apt-repository to install CMake 2.8.9 for CMake Caffe build,
-# if needed.  By default, Aptitude in Ubuntu 12.04 installs CMake 2.8.7, but
-# Caffe requires a minimum CMake version of 2.8.8.
 if $WITH_CMAKE; then
-  add-apt-repository -y ppa:ubuntu-sdk-team/ppa
-  apt-get -y update
-  apt-get -y install cmake
+  apt-get -y --no-install-recommends install cmake
 fi
 
 # Install CUDA, if needed
 if $WITH_CUDA; then
-  CUDA_URL=http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1204/x86_64/cuda-repo-ubuntu1204_6.5-14_amd64.deb
-  CUDA_FILE=/tmp/cuda_install.deb
-  curl $CUDA_URL -o $CUDA_FILE
-  dpkg -i $CUDA_FILE
-  rm -f $CUDA_FILE
+  # install repo packages
+  CUDA_REPO_PKG=cuda-repo-ubuntu1404_7.5-18_amd64.deb
+  wget http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1404/x86_64/$CUDA_REPO_PKG
+  dpkg -i $CUDA_REPO_PKG
+  rm $CUDA_REPO_PKG
+
+  if $WITH_CUDNN ; then
+    ML_REPO_PKG=nvidia-machine-learning-repo-ubuntu1404_4.0-2_amd64.deb
+    wget http://developer.download.nvidia.com/compute/machine-learning/repos/ubuntu1404/x86_64/$ML_REPO_PKG
+    dpkg -i $ML_REPO_PKG
+  fi
+
+  # update package lists
   apt-get -y update
-  # Install the minimal CUDA subpackages required to test Caffe build.
-  # For a full CUDA installation, add 'cuda' to the list of packages.
-  apt-get -y install cuda-core-6-5 cuda-cublas-6-5 cuda-cublas-dev-6-5 cuda-cudart-6-5 cuda-cudart-dev-6-5 cuda-curand-6-5 cuda-curand-dev-6-5
-  # Create CUDA symlink at /usr/local/cuda
-  # (This would normally be created by the CUDA installer, but we create it
-  # manually since we did a partial installation.)
-  ln -s /usr/local/cuda-6.5 /usr/local/cuda
+
+  # install packages
+  CUDA_PKG_VERSION="7-5"
+  CUDA_VERSION="7.5"
+  apt-get install -y --no-install-recommends \
+    cuda-core-$CUDA_PKG_VERSION \
+    cuda-cudart-dev-$CUDA_PKG_VERSION \
+    cuda-cublas-dev-$CUDA_PKG_VERSION \
+    cuda-curand-dev-$CUDA_PKG_VERSION
+  # manually create CUDA symlink
+  ln -s /usr/local/cuda-$CUDA_VERSION /usr/local/cuda
+
+  if $WITH_CUDNN ; then
+    apt-get install -y --no-install-recommends libcudnn6-dev
+  fi
 fi
 
 # Install LMDB
-LMDB_URL=https://github.com/LMDB/lmdb/archive/LMDB_0.9.14.tar.gz
-LMDB_FILE=/tmp/lmdb.tar.gz
-pushd .
-wget $LMDB_URL -O $LMDB_FILE
-tar -C /tmp -xzvf $LMDB_FILE
-cd /tmp/lmdb*/libraries/liblmdb/
-$MAKE
-$MAKE install
-popd
-rm -f $LMDB_FILE
+apt-get install -y --no-install-recommends \
+  libleveldb-dev \
+  liblmdb-dev \
+  libopencv-dev \
+  libsnappy-dev
 
 # Install the Python runtime dependencies via miniconda (this is much faster
 # than using pip for everything).
