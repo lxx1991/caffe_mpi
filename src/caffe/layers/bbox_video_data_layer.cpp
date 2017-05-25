@@ -193,8 +193,8 @@ void BBoxVideoDataLayer<Dtype>::gen_bbox_and_mask(Blob<Dtype> &label_data, int c
 	{
 		if (bbox_aug)
 		{
-			int bbox_h = ptr_bbox[4] - ptr_bbox[2];
-			int bbox_w = ptr_bbox[3] - ptr_bbox[1];
+			int bbox_h = std::max(0, int(ptr_bbox[4] - ptr_bbox[2]));
+			int bbox_w = std::max(0, int(ptr_bbox[3] - ptr_bbox[1]));
 
 			ptr_bbox[1] += this->data_transformer_->Rand(-bbox_w * 0.15, bbox_w * 0.15) - bbox_w * 0.15;								//start w
 			ptr_bbox[2] += this->data_transformer_->Rand(-bbox_h * 0.15, bbox_h * 0.15) - bbox_h * 0.15;								//start h
