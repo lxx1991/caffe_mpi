@@ -284,7 +284,7 @@ message ParamSpec {
 // NOTE
 // Update the next available ID when you add a new LayerParameter field.
 //
-// LayerParameter next available layer-specific ID: 167 (last added: resample_param)
+// LayerParameter next available layer-specific ID: 168 (last added: bbox_video_data_param)
 message LayerParameter {
   optional string name = 1; // the layer name
   optional string type = 2; // the layer type
@@ -335,6 +335,7 @@ message LayerParameter {
   optional ArgMaxParameter argmax_param = 103;
   optional BNParameter bn_param = 137;
   optional BBoxMaskDataParameter bbox_mask_data_param = 165;
+  optional BBoxVideoDataParameter bbox_video_data_param = 167;
   optional ConcatParameter concat_param = 104;
   optional ContrastiveLossParameter contrastive_loss_param = 105;
   optional ConvolutionParameter convolution_param = 106;
@@ -504,6 +505,20 @@ message BBoxMaskDataParameter {
   optional uint32 bbox_width = 8;
 }
 
+message BBoxVideoDataParameter {
+  // Specify the data source.
+  optional string source = 1;
+  // Specify the data root_dir.
+  optional string root_dir = 2;
+  // Whether or not ImageLayer should shuffle the list of files at every epoch.
+  optional bool shuffle = 3 [default = false];
+  optional uint32 batch_size = 5  [default = 1];
+  optional bool bbox_aug = 6 [default = false];
+  optional uint32 bbox_height = 7;
+  optional uint32 bbox_width = 8;
+  optional string image_pattern = 9;
+  optional string label_pattern = 10;
+}
 
 message ConcatParameter {
   // The axis along which to concatenate -- may be negative to index from the

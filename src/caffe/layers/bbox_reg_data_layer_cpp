@@ -28,31 +28,60 @@ using namespace boost::filesystem;
 
 namespace caffe{
 template <typename Dtype>
-BBoxMaskDataLayer<Dtype>:: ~BBoxMaskDataLayer<Dtype>(){
+BBoxRegDataLayer<Dtype>:: ~BBoxRegDataLayer<Dtype>(){
 	this->JoinPrefetchThread();
 }
 
 template <typename Dtype>
-void BBoxMaskDataLayer<Dtype>:: DataLayerSetUp(const vector<Blob<Dtype>*>& bottom, const vector<Blob<Dtype>*>& top){
+void BBoxRegDataLayer<Dtype>::bbox_transform(const Dtype* ex_rois, const Dtype* gt_rois, Dtype *targets)
+{
+	Dtype ex_widths = ex_rois[2] - ex_rois[0] + Dtype(1.0);
+    Dtype ex_heights = ex_rois[3] - ex_rois[1] + Dtype(1.0);
+    Dtype ex_ctr_x = ex_rois[0] + Dtype(0.5) * ex_widths;
+    Dtype ex_ctr_y = ex_rois[1] + Dtype(0.5) * ex_heights;
 
-	batch_size_ = this->layer_param_.bbox_mask_data_param().batch_size();
-	const string& source = this->layer_param_.bbox_mask_data_param().source();
-	const string& root_dir = this->layer_param_.bbox_mask_data_param().root_dir();
-	const int bbox_height = this->layer_param_.bbox_mask_data_param().bbox_height();
-	const int bbox_width = this->layer_param_.bbox_mask_data_param().bbox_width();
+
+	Dtype gt_widths = gt_rois[2] - gt_rois[0] + Dtype(1.0);
+    Dtype gt_heights = gt_rois[3] - gt_rois[1] + Dtype(1.0);
+    Dtype gt_ctr_x = gt_rois[0] + Dtype(0.5) * gt_widths;
+    Dtype gt_ctr_y = gt_rois[1] + Dtype(0.5) * gt_heights;
+
+    targets[0] = (gt_ctr_x - ex_ctr_x) / ex_widths;
+    targets[1] = (gt_ctr_y - ex_ctr_y) / ex_heights;
+    targets[2] = log(gt_widths / ex_widths)
+    targets[3] = log(gt_heights / ex_heights)
+}
+
+
+template <typename Dtype>
+void BBoxRegDataLayer<Dtype>:: DataLayerSetUp(const vector<Blob<Dtype>*>& bottom, const vector<Blob<Dtype>*>& top){
+
+	batch_size_ = this->layer_param_.bbox_reg_data_param().batch_size();
+	const string& source = this->layer_param_.bbox_reg_data_param().source();
+	const string& root_dir = this->layer_param_.bbox_reg_data_param().root_dir();
+	const int bbox_num = this->layer_param_.bbox_reg_data_param().bbox_num();
+	const int stride = this->layer_param_.transform_param().stride();
+
+	image_pattern_ = this->layer_param_.bbox_reg_data_param().image_pattern();
+	label_pattern_ = this->layer_param_.bbox_reg_data_param().label_pattern();
+
+
 
 	LOG(INFO) << "Opening file: " << source;
 
 	std::ifstream infile(source.c_str());
 	string img_filename;
 	string label_filename;
-	string instance_filename;
-	while (infile >> img_filename >> label_filename >> instance_filename){
-		lines_.push_back(root_dir + img_filename);
-		labels_.push_back(std::make_pair(root_dir + label_filename, root_dir + instance_filename));
+	int frame_num;
+	while (infile >> img_filename >> label_filename >> frame_num){
+		if (frame_num >= batch_size_ )
+		{
+			lines_.push_back(root_dir + img_filename);
+			labels_.push_back(std::make_pair(root_dir + label_filename, frame_num));
+		}
 	}
 
-	if (this->layer_param_.bbox_mask_data_param().shuffle()){
+	if (this->layer_param_.bbox_reg_data_param().shuffle()){
 		const unsigned int prefectch_rng_seed = 17;//caffe_rng_rand(); // magic number
 		prefetch_rng_.reset(new Caffe::RNG(prefectch_rng_seed));
 		ShuffleImages();
@@ -61,17 +90,20 @@ void BBoxMaskDataLayer<Dtype>:: DataLayerSetUp(const vector<Blob<Dtype>*>& botto
 	LOG(INFO) << "A total of " << lines_.size() << " images.";
 	lines_id_ = 0;	
 
-	Datum datum_data, datum_label;
+
+	Datum datum_data;
 	vector<string> img_vec, label_vec;
-	img_vec.clear(), label_vec.clear();
-	img_vec.push_back(lines_[lines_id_]);
-	label_vec.push_back(labels_[lines_id_].first);
-	label_vec.push_back(labels_[lines_id_].second);
+	img_vec.clear(); label_vec.clear();
 
-	CHECK(ReadSegVideoToDatum(img_vec, label_vec, &datum_data, &datum_label, true));
+	for (int i=0; i<batch_size_; i++)
+	{
+		sprintf(image_buf, image_pattern_.c_str(), i);
+		img_vec.push_back(lines_[lines_id_] + string(image_buf));
+	}
+	CHECK(ReadSegVideoToDatum(img_vec, label_vec, &datum_data, NULL, true));
 
-	int crop_height = datum_data.height();
-	int crop_width = datum_data.width();
+	int crop_height = datum_data.height() / stride * stride;
+	int crop_width = datum_data.width() / stride * stride;
 
 	if (this->layer_param_.transform_param().has_crop_size())
 	{
@@ -84,51 +116,45 @@ void BBoxMaskDataLayer<Dtype>:: DataLayerSetUp(const vector<Blob<Dtype>*>& botto
 		crop_width = this->layer_param_.transform_param().crop_width();
 	}
 
-	if (batch_size_ != 1)
-		CHECK(this->layer_param_.transform_param().has_crop_size() || (this->layer_param_.transform_param().has_crop_height() && this->layer_param_.transform_param().has_crop_width()));
-
 	//image
 	top[0]->Reshape(batch_size_, datum_data.channels(), crop_height, crop_width);
 	this->prefetch_data_.Reshape(batch_size_, datum_data.channels(), crop_height, crop_width);
 
-	//label
-	top[1]->Reshape(batch_size_, 1, crop_height, crop_width);
-	this->prefetch_label_.Reshape(batch_size_, 1, crop_height, crop_width);
-
-
-
+	//roi
+	top[1]->Reshape(bbox_num, 1, 1, 5);
+	this->prefetch_label_.Reshape(bbox_num, 1, 1, 5);
 	this->prefetch_others_.clear();
 
 	for (int i=0; i<2; i++)
 		this->prefetch_others_.push_back(new Blob<Dtype>());
 
-	//bbox
-	top[2]->Reshape(5, 1, 1, 5);
-	this->prefetch_others_[0]->Reshape(5, 1, 1, 5);
+	//prev_bbox
+	top[2]->Reshape(bbox_num, 1, 1, 5);
+	this->prefetch_others_[0]->Reshape(bbox_num, 1, 1, 5);
 
-	//bbox label
-	top[3]->Reshape(5, 1, bbox_height, bbox_width);
-	this->prefetch_others_[1]->Reshape(5, 1, bbox_height, bbox_width);
+	//target
+	top[3]->Reshape(bbox_num, 1, 1, 4);
+	this->prefetch_others_[1]->Reshape(bbox_num, 1, 1, 4);
 
 
 	LOG(INFO) << "output data size: " << top[0]->num() << "," << top[0]->channels() << "," << top[0]->height() << "," << top[0]->width();
-	LOG(INFO) << "output label size: " << top[1]->num() << "," << top[1]->channels() << "," << top[1]->height() << "," << top[1]->width();
-	LOG(INFO) << "output bbox size: " << top[2]->num() << "," << top[2]->channels() << "," << top[2]->height() << "," << top[2]->width();
-	LOG(INFO) << "output bbox label size: " << top[3]->num() << "," << top[3]->channels() << "," << top[3]->height() << "," << top[3]->width();
+	LOG(INFO) << "output roi size: " << top[1]->num() << "," << top[1]->channels() << "," << top[1]->height() << "," << top[1]->width();
+	LOG(INFO) << "output prev bbox size: " << top[2]->num() << "," << top[2]->channels() << "," << top[2]->height() << "," << top[2]->width();
+	LOG(INFO) << "output target size: " << top[3]->num() << "," << top[3]->channels() << "," << top[3]->height() << "," << top[3]->width();
 }
 
 template <typename Dtype>
-void BBoxMaskDataLayer<Dtype>::ShuffleImages(){
+void BBoxRegDataLayer<Dtype>::ShuffleImages(){
 	caffe::rng_t* prefetch_rng = static_cast<caffe::rng_t*>(prefetch_rng_->generator());
 	shuffle(lines_.begin(), lines_.end(), labels_.begin(), labels_.end(), prefetch_rng);
 }
 
 template <typename Dtype>
-void BBoxMaskDataLayer<Dtype>::InternalThreadEntry(){
+void BBoxRegDataLayer<Dtype>::InternalThreadEntry(){
 
-	const bool bbox_aug = this->layer_param_.bbox_mask_data_param().bbox_aug();
-	const int bbox_height = this->layer_param_.bbox_mask_data_param().bbox_height();
-	const int bbox_width = this->layer_param_.bbox_mask_data_param().bbox_width();
+	const bool bbox_aug = this->layer_param_.bbox_reg_data_param().bbox_aug();
+	const int bbox_height = this->layer_param_.bbox_reg_data_param().bbox_height();
+	const int bbox_width = this->layer_param_.bbox_reg_data_param().bbox_width();
 	const int stride = this->layer_param_.transform_param().stride();
 
 	const int lines_size = lines_.size();
@@ -158,7 +184,7 @@ void BBoxMaskDataLayer<Dtype>::InternalThreadEntry(){
 
 		
 
-		if (this->layer_param_.bbox_mask_data_param().balance())
+		if (this->layer_param_.bbox_reg_data_param().balance())
 		{
 			for (int t = 0; t < 20; t++)
 			{
@@ -206,7 +232,7 @@ void BBoxMaskDataLayer<Dtype>::InternalThreadEntry(){
 			// We have reached the end. Restart from the first.
 			DLOG(INFO) << "Restarting data prefetching from start.";
 			lines_id_ = 0;
-			if (this->layer_param_.bbox_mask_data_param().shuffle()) {
+			if (this->layer_param_.bbox_reg_data_param().shuffle()) {
 				ShuffleImages();
 			}
 		}
@@ -238,7 +264,7 @@ void BBoxMaskDataLayer<Dtype>::InternalThreadEntry(){
 
 		//label
 		Dtype* ptr_bbox = this->prefetch_others_[0]->mutable_cpu_data();
-		Dtype* ptr_mask = this->prefetch_others_[1]->mutable_cpu_data();
+		Dtype* ptr_reg = this->prefetch_others_[1]->mutable_cpu_data();
 
 		for (int batch_iter = 0; batch_iter < batch_size_; batch_iter++)
 		{
@@ -296,10 +322,10 @@ void BBoxMaskDataLayer<Dtype>::InternalThreadEntry(){
 				cv::resize(M, M, cv::Size(bbox_width, bbox_height), 0, 0, CV_INTER_NN);
 
 				for (int j=0; j<bbox_width * bbox_height; j++)
-					ptr_mask[j] = (Dtype)*(M.data + j);
+					ptr_reg[j] = (Dtype)*(M.data + j);
 				
 				ptr_bbox += 5;
-				ptr_mask += bbox_width * bbox_height;
+				ptr_reg += bbox_width * bbox_height;
 			}
 		}
 	}
@@ -377,6 +403,6 @@ void BBoxMaskDataLayer<Dtype>::InternalThreadEntry(){
 	}
 }
 
-INSTANTIATE_CLASS(BBoxMaskDataLayer);
-REGISTER_LAYER_CLASS(BBoxMaskData);
+INSTANTIATE_CLASS(BBoxRegDataLayer);
+REGISTER_LAYER_CLASS(BBoxRegData);
 }

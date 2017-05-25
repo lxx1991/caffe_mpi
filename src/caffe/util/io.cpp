@@ -440,6 +440,87 @@ bool ReadSegVideoToDatum(const vector<string>& img_filename, const vector<string
 
 
 
+// bool ReadSegVideoBBoxToDatum(const vector<string>& img_filename, const vector<string>& label_filename, Datum* datum_data, Datum* datum_label, bool is_color) {
+  
+//   string *datum_data_string, *datum_label_string;
+
+//   int cv_read_flag = (is_color ? CV_LOAD_IMAGE_COLOR :
+//       CV_LOAD_IMAGE_GRAYSCALE);
+
+//   for (int i=0; i<img_filename.size(); i++)
+//   {
+//     cv::Mat cv_img = cv::imread(img_filename[i], cv_read_flag);
+
+//     if (!cv_img.data){
+//       LOG(ERROR) << "Could not load file " << img_filename[i];
+//       return false;
+//     }
+
+//     int num_channels = (is_color ? 3 : 1);
+
+//     if (i == 0)
+//     {
+//       datum_data->set_channels(num_channels * img_filename.size());
+//       datum_data->set_height(cv_img.rows);
+//       datum_data->set_width(cv_img.cols);
+//       datum_data->clear_data();
+//       datum_data->clear_float_data();
+//       datum_data_string = datum_data->mutable_data();
+//     }
+//     if (is_color) {
+//         for (int c = 0; c < num_channels; ++c) {
+//           for (int h = 0; h < cv_img.rows; ++h) {
+//             for (int w = 0; w < cv_img.cols; ++w) {
+//               datum_data_string->push_back(
+//                 static_cast<char>(cv_img.at<cv::Vec3b>(h, w)[c]));
+//             }
+//           }
+//         }
+//       } else {  // Faster than repeatedly testing is_color for each pixel w/i loop
+//         for (int h = 0; h < cv_img.rows; ++h) {
+//           for (int w = 0; w < cv_img.cols; ++w) {
+//             datum_data_string->push_back(
+//               static_cast<char>(cv_img.at<uchar>(h, w)));
+//           }
+//         }
+//       }
+//   }
+//   //frame idx x1 y1 x2 y2
+//   std::vector<Dtype> temp;
+//   for (int i=0; i<label_filename.size(); i++)
+//   {
+//     std::ifstream infile(label_filename[i]);
+//     Dtype read_data;
+//     while (infile >> idx)
+//     {
+//       temp
+//     }
+
+
+//   }
+
+//     if (i == 0)
+//     {
+//       datum_label->set_channels(label_filename.size());
+//       datum_label->set_height(1);
+//       datum_label->set_width(6);
+//       datum_label->clear_data();
+//       datum_label->clear_float_data();
+//       datum_label_string = datum_label->mutable_data();
+//     }
+
+//     for (int h = 0; h < cv_label.rows; ++h) {
+//       for (int w = 0; w < cv_label.cols; ++w) {
+//         datum_label_string->push_back(
+//           static_cast<char>(cv_label.at<uchar>(h, w)));
+//       }
+//     }
+//   }
+//   return true;
+// }
+
+
+
 bool ReadSegmentRGBToDatum(const string& filename, const int label,
     const vector<int> offsets, const int height, const int width, const int length, Datum* datum, bool is_color,
     const char* name_pattern ){

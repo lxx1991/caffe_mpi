@@ -134,7 +134,6 @@ class DataTransformer {
   virtual float Rand(float l, float r);
 
 
- protected:
    /**
    * @brief Generates a random integer from Uniform({0, 1, ..., n-1}).
    *
@@ -145,6 +144,7 @@ class DataTransformer {
    */
   virtual int Rand(int n);
 
+ protected:
   
 
   virtual void Rotation(cv::Mat& src, int degree, bool islabel, uint8_t mean_v = 0);

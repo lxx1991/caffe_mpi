@@ -368,8 +368,8 @@ void DataTransformer<Dtype>::Transform(const Datum& datum_data, const Datum& dat
   float scale_ratios = Rand(lower_scale, upper_scale);
   int height = int(datum_height * scale_ratios + 0.5);
   int width = int(datum_width * scale_ratios + 0.5);
-  int crop_height = height / stride * stride;
-  int crop_width = width / stride * stride;
+  int crop_height = ((height - 1) / stride + 1) * stride;
+  int crop_width = ((width - 1) / stride + 1) * stride;
   
   if (param_.has_crop_size())
   {
