@@ -30,6 +30,15 @@ int64_t cluster_seedgen(bool sync) {
 }
 
 
+void Caffe::set_logging(bool value){
+  FLAGS_logtostderr = value ? 0 : 1;
+  FLAGS_alsologtostderr = FLAGS_logtostderr;
+
+  if (!value) FLAGS_minloglevel = 2;
+  else FLAGS_minloglevel = 0;
+};
+
+
 void GlobalInit(int* pargc, char*** pargv) {
 
   // Google flags.
