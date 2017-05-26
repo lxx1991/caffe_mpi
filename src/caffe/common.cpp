@@ -151,7 +151,7 @@ Caffe::Caffe()
   #endif
 
   #ifdef USE_CUDNN
-    cudnn_mem_richness_ = 1;
+    cudnn_mem_richness_ = 0;
   #endif
 
   #ifdef WITH_PYTHON_LAYER
