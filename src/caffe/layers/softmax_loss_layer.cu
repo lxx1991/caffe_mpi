@@ -30,6 +30,23 @@ __global__ void SoftmaxLossForwardGPU(const int nthreads,
 }
 
 template <typename Dtype>
+__global__ void th_clean(const int nthreads,
+          const Dtype* prob_data, const Dtype* label, Dtype* loss,
+          const int num, const int dim, const int spatial_dim,
+          const bool has_ignore_label_, const int ignore_label_,
+          Dtype* counts, Dtype* th) {
+  CUDA_KERNEL_LOOP(index, nthreads) {
+    const int n = index / spatial_dim;
+    const int s = index % spatial_dim;
+    const int label_value = static_cast<int>(label[n * spatial_dim + s]);
+    if ((has_ignore_label_ && label_value == ignore_label_) || loss[index] < th[n]) {
+       loss[index] = 0;
+       counts[index] = 0;
+    }
+  }
+}
+
+template <typename Dtype>
 void SoftmaxWithLossLayer<Dtype>::Forward_gpu(
     const vector<Blob<Dtype>*>& bottom, const vector<Blob<Dtype>*>& top) {
   softmax_layer_->Forward(softmax_bottom_vec_, softmax_top_vec_);
@@ -48,6 +65,32 @@ void SoftmaxWithLossLayer<Dtype>::Forward_gpu(
   SoftmaxLossForwardGPU<Dtype><<<CAFFE_GET_BLOCKS(nthreads),
       CAFFE_CUDA_NUM_THREADS>>>(nthreads, prob_data, label, loss_data,
       outer_num_, dim, inner_num_, has_ignore_label_, ignore_label_, counts);
+
+  
+  if (this->layer_param_.loss_param().hm_ratio() < 1-Dtype(FLT_MIN))
+  {
+    const Dtype *cpu_loss_data = bottom[0]->cpu_diff(), *cpu_counts = prob_.cpu_diff();
+    
+    Blob<Dtype> th(outer_num_, 1, 1, 1);
+    for (int i=0; i<outer_num_; i++)
+    {
+      int temp_cnt = 0;
+      for (int j=0; j<inner_num_; j++)
+        if (cpu_counts[j] > 0.5)
+          temp[temp_cnt++] = cpu_loss_data[j];
+
+      std::sort(temp.begin(), temp.begin() + temp_cnt);
+      th.mutable_cpu_data()[i] = temp[int((1 - this->layer_param_.loss_param().hm_ratio()) * temp_cnt) - 1];
+
+      //LOG(ERROR) << th.mutable_cpu_data()[i];
+      cpu_counts += inner_num_;
+      cpu_loss_data += inner_num_;
+    }
+    th_clean<Dtype><<<CAFFE_GET_BLOCKS(nthreads),
+        CAFFE_CUDA_NUM_THREADS>>>(nthreads, prob_data, label, loss_data,
+        outer_num_, dim, inner_num_, has_ignore_label_, ignore_label_, counts, th.mutable_gpu_data());
+  }
+
   Dtype loss;
   caffe_gpu_asum(nthreads, loss_data, &loss);
   if (normalize_) {
