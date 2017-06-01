@@ -196,11 +196,20 @@ void BBoxVideoDataLayer<Dtype>::gen_bbox_and_mask(Blob<Dtype> &label_data, int c
 			int bbox_h = std::max(0, int(ptr_bbox[4] - ptr_bbox[2]));
 			int bbox_w = std::max(0, int(ptr_bbox[3] - ptr_bbox[1]));
 
-			ptr_bbox[1] += this->data_transformer_->Rand(-bbox_w * 0.15, bbox_w * 0.15) - bbox_w * 0.15;								//start w
-			ptr_bbox[2] += this->data_transformer_->Rand(-bbox_h * 0.15, bbox_h * 0.15) - bbox_h * 0.15;								//start h
-			ptr_bbox[3] += this->data_transformer_->Rand(-bbox_w * 0.15, bbox_w * 0.15) + bbox_w * 0.15;								//end w
-			ptr_bbox[4] += this->data_transformer_->Rand(-bbox_h * 0.15, bbox_h * 0.15) + bbox_h * 0.15;								//end h
+			ptr_bbox[1] += this->data_transformer_->Rand(-bbox_w * 0.40, bbox_w * 0.40);								//start w
+			ptr_bbox[2] += this->data_transformer_->Rand(-bbox_h * 0.40, bbox_h * 0.40);								//start h
+			ptr_bbox[3] += this->data_transformer_->Rand(-bbox_w * 0.40, bbox_w * 0.40);								//end w
+			ptr_bbox[4] += this->data_transformer_->Rand(-bbox_h * 0.40, bbox_h * 0.40);								//end h
+			
+			bbox_h = std::max(0, int(ptr_bbox[4] - ptr_bbox[2]));
+			bbox_w = std::max(0, int(ptr_bbox[3] - ptr_bbox[1]));
+
+			ptr_bbox[1] -= bbox_w * 0.40;								//start w
+			ptr_bbox[2] -= bbox_h * 0.40;								//start h
+			ptr_bbox[3] += bbox_w * 0.40;								//end w
+			ptr_bbox[4] += bbox_h * 0.40;								//end h
 		}
+
 		ptr_bbox[0] = 0;
 		ptr_bbox[1] = std::min(std::max(0.0, round(ptr_bbox[1] / stride_) * stride_), label_data.width() - 1.0);								//start w
 		ptr_bbox[2] = std::min(std::max(0.0, round(ptr_bbox[2] / stride_) * stride_), label_data.height() - 1.0);								//start h
@@ -290,7 +299,7 @@ void BBoxVideoDataLayer<Dtype>::InternalThreadEntry(){
 
 
 
-	int current_frame = this->data_transformer_->Rand(labels_[lines_id_].second), dist = 10;
+	int current_frame = this->data_transformer_->Rand(labels_[lines_id_].second), dist = labels_[lines_id_].second  / 2;
 	while(current_frame == 0)
 		current_frame = this->data_transformer_->Rand(labels_[lines_id_].second);
 
@@ -364,7 +373,7 @@ void BBoxVideoDataLayer<Dtype>::InternalThreadEntry(){
 			while(current_frame == 0)
 				current_frame = this->data_transformer_->Rand(labels_[lines_id_].second);
 		}
-		dist = dist / 2;
+		dist = dist * 2 / 3;
 	}
 
 	this->data_transformer_->Transform(datum_data, datum_label, &data_buff, &label_buff, 0);
