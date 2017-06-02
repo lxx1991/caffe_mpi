@@ -8,6 +8,7 @@
 #include "caffe/util/io.hpp"
 #include "caffe/util/math_functions.hpp"
 #include "caffe/util/rng.hpp"
+#include "caffe/util/CThinPlateSpline.hpp"
 
 namespace caffe {
 
@@ -461,7 +462,7 @@ void DataTransformer<Dtype>::Transform(const Datum& datum_data, const Datum& dat
     cv::resize(M, M, cv::Size(width, height), 0, 0, CV_INTER_NN);
 
     if (angl != 0)
-       Rotation(M, angl, true, param_.ignore_label());
+       Rotation(M, angl, true, 0);
 
     for (int h = 0; h < crop_height; ++h)
       for (int w = 0; w < crop_width; ++w) 
@@ -471,145 +472,119 @@ void DataTransformer<Dtype>::Transform(const Datum& datum_data, const Datum& dat
         else 
           top_index = (c * crop_height + h) * crop_width + w;
 
-        ptr[top_index] = ((h+h_off)>=0) && ((h+h_off)<height) && ((w+w_off)>=0) && ((w+w_off)<width) ? static_cast<Dtype>(M.at<uint8_t>(h+h_off, w+w_off)) : param_.ignore_label();
+        ptr[top_index] = ((h+h_off)>=0) && ((h+h_off)<height) && ((w+w_off)>=0) && ((w+w_off)<width) ? static_cast<Dtype>(M.at<uint8_t>(h+h_off, w+w_off)) : 0;
       }
     M.release();
   }
 }
 
 template<typename Dtype>
-void DataTransformer<Dtype>::Transform_aug(Datum& datum_label, bool aug_data) {
-
-  string* label = datum_label.mutable_data();
-
-  const int datum_height = datum_label.height();
-  const int datum_width = datum_label.width();
+void DataTransformer<Dtype>::Transform_aug(Datum& datum_instance, Datum& datum_mask, int max_idx) {
 
   
+  CHECK_EQ(datum_instance.channels(), 1);
 
-  if (!aug_data)
+  const int datum_height = datum_instance.height();
+  const int datum_width = datum_instance.width();
+  string* instance = datum_instance.mutable_data();
+
+  datum_mask.set_channels(max_idx);
+  datum_mask.set_height(datum_height);
+  datum_mask.set_width(datum_width);
+  datum_mask.clear_data();
+  datum_mask.clear_float_data();
+  string* mask = datum_mask.mutable_data();
+
+  cv::Mat instance_label(datum_height, datum_width, CV_8UC1);
+  for (int data_index = 0; data_index < datum_height * datum_width; ++data_index)
   {
-    int max_idx = 0;
-    for (int c = 1; c <=1; ++c)
-      for (int h = 0; h < datum_height; ++h)
-        for (int w = 0; w < datum_width; ++w)
-        {
-          int data_index = (c * datum_height + h) * datum_width + w;
-          if ((int)(*label)[data_index] != param_.ignore_label())
-            max_idx = std::max(max_idx, (int)(*label)[data_index]);
-        }
-    if (max_idx == 0)
-      return;
-    int choose_idx = Rand(max_idx) + 1;
-
-    for (int c = 0; c <datum_label.channels(); ++c)
-      for (int h = 0; h < datum_height; ++h)
-        for (int w = 0; w < datum_width; ++w)
-        {
-          int data_index = (c * datum_height + h) * datum_width + w;
-          (*label)[data_index] = ((uint8_t)(*label)[data_index] == choose_idx) ? 1 : 0;
-        }
+    int label_value = (int)(*instance)[data_index];
+    instance_label.data[data_index] = (uint8_t)label_value;
   }
-  else
+
+
+  for (int idx = 1; idx<max_idx + 1; idx++)
   {
-    int max_idx = 0;
-    cv::Mat orig_inst(datum_height, datum_width, CV_8UC1);
+    cv::Mat single_instance(datum_height, datum_width, CV_8UC1);
 
-    for (int c = 2; c < datum_label.channels(); ++c)
-      for (int h = 0; h < datum_height; ++h)
-        for (int w = 0; w < datum_width; ++w)
-        {
-          int data_index = (c * datum_height + h) * datum_width + w;
-          orig_inst.at<uchar>(h, w) = (uint8_t)(*label)[data_index];
-          if ((int)orig_inst.at<uchar>(h, w) != param_.ignore_label())
-            max_idx = std::max(max_idx, (int)orig_inst.at<uchar>(h, w));
-        }
-    if (max_idx == 0)
-    {
-      orig_inst.release();
-      return;
-    }
-    cv::Mat inst = cv::Mat::zeros(orig_inst.size(), orig_inst.type());
-
-    int choose_idx = Rand(max_idx) + 1;
-    for (int c = 1; c <= 1; ++c)
-      for (int h = 0; h < datum_height; ++h)
-        for (int w = 0; w < datum_width; ++w)
-        {
-          int data_index = (c * datum_height + h) * datum_width + w;
-          (*label)[data_index] = ((uint8_t)(*label)[data_index] == choose_idx) ? 1 : 0;
-        }
-
-    for (int h = 0; h < datum_height; ++h)
-        for (int w = 0; w < datum_width; ++w)
-          inst.at<uchar>(h, w) = (orig_inst.at<uchar>(h, w) == choose_idx) ? 1 : 0;
-
-    //rotation -5~5
-    double angl = -10 + Rand(int((10 - (-10)) * 1000.0) + 1) / 1000.0;
-    Rotation(inst, angl, false, 0);
-
-    //thin-plate splines
-
-    //resize 95%~105%
-    cv::resize(inst, inst, cv::Size(datum_width / 8, datum_height / 8), 0, 0);
-    cv::resize(inst, inst, cv::Size(datum_width, datum_height), 0, 0);
-
-    float scale_ratios = std::max(Rand(int((1.10 - 0.90) * 1000.0) + 1) / 1000.0, 0.0) + 0.90;
-
-    cv::resize(inst, inst, cv::Size(int(datum_width * scale_ratios), int(datum_height * scale_ratios)), 0, 0);
+    int min_h = datum_height, min_w = datum_width, max_h = -1, max_w = -1;
 
 
-    double tot_h = 0, tot_w = 0, tot = 0, tot_h2 = 0, tot_w2 = 0, tot2 = 0;
     for (int h = 0; h < datum_height; ++h)
       for (int w = 0; w < datum_width; ++w)
-        if (orig_inst.at<uchar>(h, w) == choose_idx)
+        if (instance_label.at<uint8_t>(h, w) == idx)
         {
-          tot_h = tot_h + h;
-          tot_w = tot_w + w;
-          tot++;
-        }
+          single_instance.at<uint8_t>(h, w) = 1;
 
-    int min_h = inst.rows, max_h = 0, min_w = inst.cols, max_w = 0;
-    double th = Rand(1000) / 1000.0;
-    for (int h = 0; h < inst.rows; ++h)
-      for (int w = 0; w < inst.cols; ++w)
-        if (inst.at<uchar>(h, w) > th)
-        {
           min_h = std::min(min_h, h);
-          max_h = std::max(max_h, h);
           min_w = std::min(min_w, w);
+          max_h = std::max(max_h, h);
           max_w = std::max(max_w, w);
-
-          tot_h2 = tot_h2 + h;
-          tot_w2 = tot_w2 + w;
-          tot2++;
         }
+        else
+          single_instance.at<uint8_t>(h, w) = 0;
 
-    if (tot2>=1)
+    vector< vector<cv::Point> > contours;
+    vector<cv::Point> contour;
+    vector<cv::Vec4i> hierarchy;
+    cv::findContours(single_instance, contours, hierarchy, CV_RETR_LIST, CV_CHAIN_APPROX_NONE);
+
+    for (int i=0; i<contours.size(); i++)
+      for (int j=0; j<contours[i].size(); j++)
+        contour.push_back(contours[i][j]);
+
+    cv::Mat warp_mask;
+    int match_point = 5;
+
+    if (contour.size() > match_point * 10)
     {
-      int shift_h = (Rand(1000) / 1000.0 * 0.2 - 0.1) * (max_h - min_h);
-      int shift_w = (Rand(1000) / 1000.0 * 0.2 - 0.1) * (max_w - min_w);
+      for (int i=0; i<match_point; i++)
+        swap(contour[i], contour[Rand(contour.size()*(i+1)/match_point - contour.size()*i/match_point) + contour.size()*i/match_point]);
 
-      shift_h += int(tot_h / tot - tot_h2 / tot2);
-      shift_w += int(tot_w / tot - tot_w2 / tot2);
 
+      vector<cv::Point> s_point;
+      vector<cv::Point> t_point;
+
+      for (int i=0; i<match_point; i++)
+      {
+        s_point.push_back(contour[i]);
+        cv::Point p(contour[i]);
+        p.x += Rand(-0.1 * (max_w - min_w + 1.0), 0.1 * (max_w - min_w + 1.0));
+        p.y += Rand(-0.1 * (max_h - min_h + 1.0), 0.1 * (max_h - min_h + 1.0));
+        t_point.push_back(p);
+      }
+
+      CThinPlateSpline tps(s_point, t_point);
+      tps.warpImage(single_instance, warp_mask, 0.001, CV_INTER_CUBIC, BACK_WARP);
+
+
+      // for (int i=0; i<match_point; i++)
+      // {
+      //   circle(single_instance, s_point[i], 5, 255);
+      //   LOG(ERROR) << s_point[i];
+      // }
+      // cv::imshow("single", single_instance * 200);
+      // for (int i=0; i<match_point; i++)
+      // {
+      //   circle(warp_mask, t_point[i], 5, 255);
+      //   LOG(ERROR) << t_point[i];
+      // }
+      // cv::imshow("warp_mask", warp_mask * 200);
+
+
+      warp_mask.copyTo(single_instance);
+    }
       
 
-      orig_inst = cv::Mat::zeros(orig_inst.size(), orig_inst.type());
-      for (int h = 0; h < inst.rows; ++h)
-        for (int w = 0; w < inst.cols; ++w)
-          if (inst.at<uchar>(h, w) > th &&  h+shift_h>=0 && h+shift_h<orig_inst.rows && w+shift_w>=0 && w+shift_w<orig_inst.cols)
-            orig_inst.at<uchar>(h+shift_h, w+shift_w) = 1;
-    }
-    for (int c = 2; c < datum_label.channels(); ++c)
-      for (int h = 0; h < datum_height; ++h)
-        for (int w = 0; w < datum_width; ++w)
-        {
-          int data_index = (c * datum_height + h) * datum_width + w;
-          (*label)[data_index] = static_cast<char>(orig_inst.at<uchar>(h, w));
-        }
-    inst.release();
-    orig_inst.release();
+    int dilation_size = Rand(3) * 2 + 1;
+    Mat element = getStructuringElement(cv::MORPH_ELLIPSE, Size(dilation_size * 2 + 1, dilation_size * 2 + 1), cv::Point(dilation_size, dilation_size));
+
+    dilate(single_instance, warp_mask, element);
+    // cv::imshow("dilate", warp_mask * 200);
+    // cv::waitKey();
+    for (int h = 0; h < datum_height; ++h)
+      for (int w = 0; w < datum_width; ++w)
+        mask->push_back((warp_mask.at<uint8_t>(h, w) > 0) ? 1 : 0);
   }
 }
 

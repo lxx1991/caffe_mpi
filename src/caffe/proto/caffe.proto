@@ -1042,6 +1042,7 @@ message SegRefineParameter{
   optional bool balance = 4 [default = false];
   optional uint32 batch_size = 5  [default = 1];
   optional bool aug_data = 6 [default = false];
+  optional uint32 instance_num = 7 [default = 1];
 }
 
 message SigmoidParameter {

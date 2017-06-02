@@ -95,8 +95,11 @@ bool ReadImageToDatum(const string& filename, const int label,
     const int height, const int width, const bool is_color,
     const std::string & encoding, Datum* datum);
 
+bool ReadSegDataToDatum(const string& img_filename, Datum* datum_data, bool is_color);
+
 bool ReadSegDataToDatum(const string& img_filename, const string& label_filename, 
                         Datum* datum_data, Datum* datum_label, bool is_color);
+
 bool ReadSegVideoToDatum(const vector<string>& img_filename, const vector<string>& label_filename,
                         Datum* datum_data, Datum* datum_label, bool is_color);
 

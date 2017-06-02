@@ -42,7 +42,7 @@ class DataTransformer {
   void Transform(const Datum& datum_data, const Datum& datum_label, 
                Blob<Dtype>* transformed_data, Blob<Dtype>* transformed_label, int batch_iter = 0);
 
-  void Transform_aug(Datum& datum_label, bool aug_data);
+  void Transform_aug(Datum& datum_instance, Datum& datum_mask, int max_id = 1);
 
   /**
    * @brief Applies the transformation defined in the data layer's

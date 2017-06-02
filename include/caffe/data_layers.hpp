@@ -467,7 +467,7 @@ public:
 
 	virtual inline const char* type() const { return "SegRefine"; }
 	virtual inline int ExactNumBottomBlobs() const { return 0; }
-	virtual inline int ExactNumTopBlobs() const { return 2; }
+	virtual inline int ExactNumTopBlobs() const { return 4; }
 
 protected:
 	shared_ptr<Caffe::RNG> prefetch_rng_;
