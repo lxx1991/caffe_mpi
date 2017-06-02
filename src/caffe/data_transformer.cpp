@@ -539,7 +539,7 @@ void DataTransformer<Dtype>::Transform_aug(Datum& datum_instance, Datum& datum_m
     if (contour.size() > match_point * 10)
     {
       for (int i=0; i<match_point; i++)
-        swap(contour[i], contour[Rand(contour.size()*(i+1)/match_point - contour.size()*i/match_point) + contour.size()*i/match_point]);
+        std::swap(contour[i], contour[Rand(contour.size()*(i+1)/match_point - contour.size()*i/match_point) + contour.size()*i/match_point]);
 
 
       vector<cv::Point> s_point;
