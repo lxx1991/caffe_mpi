@@ -1043,6 +1043,10 @@ message SegRefineParameter{
   optional uint32 batch_size = 5  [default = 1];
   optional bool aug_data = 6 [default = false];
   optional uint32 instance_num = 7 [default = 1];
+  optional string image_pattern = 8;
+  optional string instance_pattern = 9;
+  optional string flow_pattern = 10;
+  optional string warp_pattern = 11;
 }
 
 message SigmoidParameter {

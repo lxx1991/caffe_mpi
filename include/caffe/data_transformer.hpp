@@ -42,6 +42,9 @@ class DataTransformer {
   void Transform(const Datum& datum_data, const Datum& datum_label, 
                Blob<Dtype>* transformed_data, Blob<Dtype>* transformed_label, int batch_iter = 0);
 
+  void Transform(const vector<Datum>& datum_data, const vector<Datum>& datum_label, cv::Mat &flow_data, 
+               vector<Blob<Dtype>*>& transformed_data, vector<Blob<Dtype>*>& transformed_label, Blob<Dtype>* transformed_flow, int batch_iter = 0);
+
   void Transform_aug(Datum& datum_instance, Datum& datum_mask, int max_id = 1);
 
   /**

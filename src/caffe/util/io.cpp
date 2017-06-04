@@ -483,6 +483,25 @@ bool ReadSegVideoToDatum(const vector<string>& img_filename, const vector<string
 }
 
 
+bool ReadFlowToCVMat(const string& flow_filename, cv::Mat& flow_data)
+{
+  int width, height;
+
+  FILE * fid = fopen(flow_filename.c_str(), "rb");
+  char buffer[10];
+  CHECK_EQ(fread(buffer, sizeof(char), 4, fid), 4);
+
+  CHECK_EQ(fread(&width, sizeof(int), 1, fid), 1);
+  CHECK_EQ(fread(&height, sizeof(int), 1, fid), 1);
+
+  flow_data = cv::Mat::zeros(height, width, CV_32FC2);
+
+  CHECK_EQ(fread(flow_data.data, sizeof(float), height * width * 2, fid), height * width * 2);
+
+  fclose(fid);
+  return true;
+}
+
 
 // bool ReadSegVideoBBoxToDatum(const vector<string>& img_filename, const vector<string>& label_filename, Datum* datum_data, Datum* datum_label, bool is_color) {
   

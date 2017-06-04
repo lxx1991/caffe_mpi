@@ -496,6 +496,55 @@ protected:
 
 
 
+
+/**
+ * @brief Provides data to the Net from video files.
+ *
+ * TODO(dox): thorough documentation for Forward and proto params.
+ */
+template <typename Dtype>
+class SegRefineVideoLayer : public BasePrefetchingDataLayer<Dtype> {
+public:
+	explicit SegRefineVideoLayer(const LayerParameter& param)
+	: BasePrefetchingDataLayer<Dtype>(param) {}
+	virtual ~SegRefineVideoLayer();
+	virtual void DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
+			const vector<Blob<Dtype>*>& top);
+
+	virtual inline const char* type() const { return "SegRefineVideo"; }
+	virtual inline int ExactNumBottomBlobs() const { return 0; }
+	virtual inline int ExactNumTopBlobs() const { return 6; }
+
+protected:
+	shared_ptr<Caffe::RNG> prefetch_rng_;
+	virtual void ShuffleImages();
+	virtual void InternalThreadEntry();
+	virtual void IndexToProb(Datum &datum_data, int instance_num);
+
+#ifdef USE_MPI
+	inline virtual void advance_cursor(){
+		lines_id_++;
+		if (lines_id_ >= lines_.size()) {
+			// We have reached the end. Restart from the first.
+			DLOG(INFO) << "Restarting data prefetching from start.";
+			lines_id_ = 0;
+			if (this->layer_param_.seg_refine_param().shuffle()) {
+				ShuffleImages();
+			}
+		}
+	}
+#endif
+	std::vector< std::pair<std::string,int> > lines_;
+	int lines_id_;
+	int batch_size_;
+
+	std::string image_pattern_, instance_pattern_, flow_pattern_, warp_pattern_;
+	bool use_warp_;
+	char string_buf[255];
+};
+
+
+
 /**
  * @brief Provides data to the Net from video files.
  *

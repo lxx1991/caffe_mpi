@@ -478,6 +478,211 @@ void DataTransformer<Dtype>::Transform(const Datum& datum_data, const Datum& dat
   }
 }
 
+
+template<typename Dtype>
+void DataTransformer<Dtype>::Transform(const vector<Datum>& datum_data, const vector<Datum>& datum_label, cv::Mat &flow_data, 
+                                       vector<Blob<Dtype>*>& transformed_data, vector<Blob<Dtype>*>& transformed_label, Blob<Dtype>* transformed_flow, int batch_iter) {
+
+  CHECK_EQ(datum_data.size(), transformed_data.size());
+  CHECK_EQ(datum_label.size(), transformed_label.size());
+
+  CHECK_EQ(datum_data[0].height(), datum_label[0].height());
+  CHECK_EQ(datum_data[0].width(), datum_label[0].width());
+
+  if (transformed_flow!=NULL)
+  {
+    CHECK_EQ(datum_data[0].height(), flow_data.rows);
+    CHECK_EQ(datum_data[0].width(), flow_data.cols);
+  }
+
+  // const string& data = datum_data.data();
+  // const string& label = datum_label.data();
+
+  const int datum_channels = datum_data[0].channels();
+  const int datum_height = datum_data[0].height();
+  const int datum_width = datum_data[0].width();
+
+  float lower_scale = 1, upper_scale = 1;
+  if (param_.scale_ratios_size() == 2)
+  {
+    lower_scale = param_.scale_ratios(0);
+    upper_scale = param_.scale_ratios(1);
+  }
+
+  const Dtype scale = param_.scale();
+  const bool do_mirror = param_.mirror() && Rand(2);
+  const bool has_mean_values = mean_values_.size() > 0;
+  if (param_.has_mean_file()) {
+    NOT_IMPLEMENTED;
+  }
+  const int stride = param_.stride();
+
+  if (has_mean_values) {
+    CHECK(mean_values_.size() == 1 || mean_values_.size() == datum_channels || datum_channels % mean_values_.size() == 0) <<
+     "Specify either 1 mean_value or as many as channels: " << datum_channels;
+    if (datum_channels > 1 && datum_channels % mean_values_.size() == 0) {
+      // Replicate the mean_value for simplicity
+      int temp = mean_values_.size();
+      for (int c = mean_values_.size(); c < datum_channels; ++c) {
+        mean_values_.push_back(mean_values_[c - temp]);
+      }
+    }
+  }
+
+  float scale_ratios = Rand(lower_scale, upper_scale);
+  int height = int(datum_height * scale_ratios + 0.5);
+  int width = int(datum_width * scale_ratios + 0.5);
+  
+  flow_data = flow_data * scale_ratios;
+
+  int crop_height = ((height - 1) / stride + 1) * stride + 1;
+  int crop_width = ((width - 1) / stride + 1) * stride + 1;
+  
+  if (param_.has_crop_size())
+  {
+    crop_height = param_.crop_size();
+    crop_width = param_.crop_size();
+  }
+  else if (param_.has_crop_height() && param_.has_crop_width())
+  {
+    crop_height = param_.crop_height();
+    crop_width = param_.crop_width();
+  }
+
+  int h_off, w_off;
+  if (height < crop_height)
+    h_off = -Rand(crop_height - height + 1);
+  else
+    h_off = Rand(height - crop_height + 1);
+
+  if (width < crop_width)
+    w_off = -Rand(crop_width - width + 1);
+  else
+    w_off = Rand(width - crop_width + 1);
+
+  if (batch_iter == 0)
+  {
+    for (int i=0; i<transformed_data.size(); i++)
+      transformed_data[i]->Reshape(transformed_data[i]->num(), datum_channels, crop_height, crop_width);
+
+    for (int i=0; i<transformed_label.size(); i++)
+      transformed_label[i]->Reshape(transformed_label[i]->num(), datum_label[i].channels(), crop_height, crop_width);
+
+    if (transformed_flow!=NULL)
+      transformed_flow->Reshape(transformed_flow->num(), 2, crop_height, crop_width);
+  }
+
+  float angl = 0; 
+  if (param_.rand_rotate_size() > 0 && Rand(2)){
+    CHECK_EQ(this->param_.rand_rotate_size(), 2) << "Exactly two rand_rotate param required";
+    angl = Rand(param_.rand_rotate(0), param_.rand_rotate(1));
+  }
+
+  float rand_sigma = 0;
+  if (param_.gaussian_blur() && Rand(2)) {
+    rand_sigma = Rand(0.0, 0.6);
+  }
+
+  //for image data
+  // 
+  
+  for (int i=0; i<transformed_data.size(); i++)
+  {
+    const string& data = datum_data[i].data();
+    int top_index;
+    Dtype* ptr = transformed_data[i]->mutable_cpu_data() + transformed_data[i]->offset(batch_iter);
+    for (int c = 0; c < datum_channels; ++c) {
+      cv::Mat M(datum_height, datum_width, CV_8UC1);
+      for (int h = 0; h < datum_height; ++h)
+        for (int w = 0; w < datum_width; ++w) 
+        {
+          int data_index = (c * datum_height + h) * datum_width + w;
+          M.at<uchar>(h, w) = static_cast<uint8_t>(data[data_index]);
+        }
+
+      cv::resize(M, M, cv::Size(width, height));
+
+      if (angl != 0)
+         Rotation(M, angl, false, uint8_t(mean_values_[c]));
+      if (rand_sigma != 0)
+         cv::GaussianBlur(M, M, cv::Size( 5, 5 ), rand_sigma, rand_sigma);
+      
+      for (int h = 0; h < crop_height; ++h)
+        for (int w = 0; w < crop_width; ++w)
+        {
+          if (do_mirror) 
+            top_index = (c * crop_height + h) * crop_width + (crop_width - 1 - w);
+          else 
+            top_index = (c * crop_height + h) * crop_width + w;
+
+          if (has_mean_values) 
+            ptr[top_index] =((h+h_off)>=0) && ((h+h_off)<height) && ((w+w_off)>=0) && ((w+w_off)<width) ? (static_cast<Dtype>(M.at<uint8_t>(h+h_off, w+w_off)) - mean_values_[c]) * scale : 0;
+          else 
+            ptr[top_index] = ((h+h_off)>=0) && ((h+h_off)<height) && ((w+w_off)>=0) && ((w+w_off)<width) ? static_cast<Dtype>(M.at<uint8_t>(h+h_off, w+w_off)) * scale : 0;
+        }
+      M.release();
+    }
+  }
+
+  //for label
+  for (int i=0; i<transformed_label.size(); i++)
+  {
+    const string& label = datum_label[i].data();
+    int top_index;
+    Dtype* ptr = transformed_label[i]->mutable_cpu_data() + transformed_label[i]->offset(batch_iter);
+    for (int c = 0; c < datum_label[i].channels(); ++c) {
+      cv::Mat M(datum_height, datum_width, CV_8UC1);
+      for (int h = 0; h < datum_height; ++h)
+        for (int w = 0; w < datum_width; ++w)
+        {
+          int data_index = (c * datum_height + h) * datum_width + w;
+          M.at<uchar>(h, w) = static_cast<uint8_t>(label[data_index]);
+        }
+
+      cv::resize(M, M, cv::Size(width, height), 0, 0, CV_INTER_NN);
+
+      if (angl != 0)
+         Rotation(M, angl, true, 0);
+
+      for (int h = 0; h < crop_height; ++h)
+        for (int w = 0; w < crop_width; ++w) 
+        {
+          if (do_mirror) 
+            top_index = (c * crop_height + h) * crop_width + (crop_width - 1 - w);
+          else 
+            top_index = (c * crop_height + h) * crop_width + w;
+
+          ptr[top_index] = ((h+h_off)>=0) && ((h+h_off)<height) && ((w+w_off)>=0) && ((w+w_off)<width) ? static_cast<Dtype>(M.at<uint8_t>(h+h_off, w+w_off)) : 0;
+        }
+      M.release();
+    }
+  }
+
+
+  //for flow
+  if (transformed_flow!=NULL)
+  {
+    int top_index;
+    Dtype* ptr = transformed_flow->mutable_cpu_data() + transformed_flow->offset(batch_iter);
+    cv::resize(flow_data, flow_data, cv::Size(width, height), 0, 0);
+    if (angl != 0)
+       Rotation(flow_data, angl, false, 0);
+
+    for (int c = 0; c < 2; ++c) {
+      for (int h = 0; h < crop_height; ++h)
+        for (int w = 0; w < crop_width; ++w) 
+        {
+          if (do_mirror) 
+            top_index = (c * crop_height + h) * crop_width + (crop_width - 1 - w);
+          else 
+            top_index = (c * crop_height + h) * crop_width + w;
+
+          ptr[top_index] = ((h+h_off)>=0) && ((h+h_off)<height) && ((w+w_off)>=0) && ((w+w_off)<width) ? static_cast<Dtype>(flow_data.at<Vec2f>(h+h_off, w+w_off)[c]) : 0;
+        }
+    }
+  }
+}
+
 template<typename Dtype>
 void DataTransformer<Dtype>::Transform_aug(Datum& datum_instance, Datum& datum_mask, int max_idx) {
 
@@ -527,7 +732,7 @@ void DataTransformer<Dtype>::Transform_aug(Datum& datum_instance, Datum& datum_m
     vector< vector<cv::Point> > contours;
     vector<cv::Point> contour;
     vector<cv::Vec4i> hierarchy;
-    cv::findContours(single_instance, contours, hierarchy, CV_RETR_LIST, CV_CHAIN_APPROX_NONE);
+    cv::findContours(single_instance, contours, hierarchy, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE);
 
     for (int i=0; i<contours.size(); i++)
       for (int j=0; j<contours[i].size(); j++)
@@ -539,7 +744,7 @@ void DataTransformer<Dtype>::Transform_aug(Datum& datum_instance, Datum& datum_m
     if (contour.size() > match_point * 10)
     {
       for (int i=0; i<match_point; i++)
-        std::swap(contour[i], contour[Rand(contour.size()*(i+1)/match_point - contour.size()*i/match_point) + contour.size()*i/match_point]);
+        std::swap(contour[i], contour[Rand(contour.size()*(i*2+1)/(match_point*2) - contour.size()*i*2/(match_point*2)) + contour.size()*i*2/(match_point*2)]);
 
 
       vector<cv::Point> s_point;
@@ -573,11 +778,40 @@ void DataTransformer<Dtype>::Transform_aug(Datum& datum_instance, Datum& datum_m
 
 
       warp_mask.copyTo(single_instance);
+
+      int tot = cv::countNonZero(single_instance);
+      int patch_num = Rand(3) + 1;
+
+      while (patch_num-- > 0)
+      {
+        int j_x = (int)Rand(std::max(0, (min_w - (max_w - min_w) / 2)), std::min(single_instance.cols - 1, (max_w + (max_w - min_w) / 2)));
+        int j_y = (int)Rand(std::max(0, (min_h - (max_h - min_h) / 2)), std::min(single_instance.rows - 1, (max_h + (max_h - min_h) / 2)));
+
+        int key = 1 - single_instance.data[j_y * single_instance.cols + j_x];
+
+        tot = tot * Rand(0, 0.05);
+        for (int i=0; i<tot; i++)
+        {
+          j_x = std::max(0, std::min(single_instance.cols - 1, j_x + Rand(3) - 1));
+          j_y = std::max(0, std::min(single_instance.rows - 1, j_y + Rand(3) - 1));
+
+          for (int dx = -5; dx < 6; dx ++)
+            if (j_x + dx >=0 && j_x + dx <single_instance.cols)
+              for (int dy = -5; dy < 6; dy ++)
+                if (j_y + dy >=0 && j_y + dy <single_instance.rows && dx * dx + dy * dy <= 25)
+                {
+                    int j = (j_y + dy) * single_instance.cols + (j_x + dx);
+                    single_instance.data[j] = key;
+                }
+        }
+      }
     }
       
 
     int dilation_size = Rand(3) * 2 + 1;
     Mat element = getStructuringElement(cv::MORPH_ELLIPSE, Size(dilation_size * 2 + 1, dilation_size * 2 + 1), cv::Point(dilation_size, dilation_size));
+
+
 
     dilate(single_instance, warp_mask, element);
     // cv::imshow("dilate", warp_mask * 200);
