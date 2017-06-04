@@ -216,7 +216,9 @@ void SegRefineVideoLayer<Dtype>::InternalThreadEntry(){
 			  max_idx = std::max(max_idx, label_value);
 		}
 
-		int vis[256]; vis[0] = 0; vis[ignore_label] = ignore_label;
+		int vis[256]; 
+		memset(vis, 0, sizeof(vis));
+		vis[ignore_label] = ignore_label;
 		for (int i=1; i < max_idx + 1; i++)
 		{
 			vis[i] = (i <= instance_num) ? i : 0;
@@ -226,8 +228,14 @@ void SegRefineVideoLayer<Dtype>::InternalThreadEntry(){
 		std::set<int> hash_table;
 		for (int data_index = 0; data_index < datum_height * datum_width; ++data_index)
 		{
-			(*ptr)[data_index] = (uchar)vis[(int)(*ptr)[data_index]];
-			hash_table.insert((*ptr)[data_index]);
+			int label_value = (int)(*ptr)[data_index];
+			if (label_value != ignore_label)
+			{
+				(*ptr)[data_index] = (uchar)vis[label_value];
+				hash_table.insert((*ptr)[data_index]);
+			}
+			else
+				(*ptr)[data_index] = 0;
 		}
 
 		//mask label
@@ -237,7 +245,13 @@ void SegRefineVideoLayer<Dtype>::InternalThreadEntry(){
 			CHECK(ReadSegDataToDatum(string_buf, &datum_label[1], false));
 			ptr = datum_label[1].mutable_data();
 			for (int data_index = 0; data_index < datum_height * datum_width; ++data_index)
-				(*ptr)[data_index] = (uchar)vis[(int)(*ptr)[data_index]];
+			{
+				int label_value = (int)(*ptr)[data_index];
+				if (label_value != ignore_label)
+					(*ptr)[data_index] = (uchar)vis[label_value];
+				else
+					(*ptr)[data_index] = 0;
+			}
 			IndexToProb(datum_label[1], instance_num);
 		}
 		else
@@ -258,8 +272,14 @@ void SegRefineVideoLayer<Dtype>::InternalThreadEntry(){
 			string* ptr = datum_label[2].mutable_data();
 			for (int data_index = 0; data_index < datum_height * datum_width; ++data_index)
 			{
-				(*ptr)[data_index] = (uchar)vis[(int)(*ptr)[data_index]];
-				count_table[(*ptr)[data_index]]++;
+				int label_value = (int)(*ptr)[data_index];
+				if (label_value != ignore_label)
+				{
+					(*ptr)[data_index] = (uchar)vis[label_value];
+					count_table[(*ptr)[data_index]]++;
+				}
+				else
+					(*ptr)[data_index] = 0;
 			}
 
 			bool flag = true;
@@ -268,7 +288,6 @@ void SegRefineVideoLayer<Dtype>::InternalThreadEntry(){
 				if (count_table[*it] == 0)
 					flag = false;
 			}
-
 			if (flag)
 			{
 				sprintf(string_buf, (root_dir + image_pattern_).c_str(), lines_[lines_id_].first.c_str(), hint_frame);
@@ -280,9 +299,7 @@ void SegRefineVideoLayer<Dtype>::InternalThreadEntry(){
 				dist = dist / 2;
 		}
 
-
 		this->data_transformer_->Transform(datum_data, datum_label, flow_data, prefetch_data, prefetch_label, this->prefetch_others_[1], batch_iter);
-		
 		
 		if (false)
 		{
