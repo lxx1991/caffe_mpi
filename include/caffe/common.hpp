@@ -243,6 +243,8 @@ class Caffe {
   DISABLE_COPY_AND_ASSIGN(Caffe);
 };
 
+extern int global_iter;
+
 }  // namespace caffe
 
 #endif  // CAFFE_COMMON_HPP_

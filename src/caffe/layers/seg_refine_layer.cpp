@@ -177,6 +177,32 @@ void SegRefineLayer<Dtype>::InternalThreadEntry(){
 
 		this->data_transformer_->Transform(datum_data, concat_label, &this->prefetch_data_, &label_buff, batch_iter);
 
+
+		if (this->layer_param_.seg_refine_param().balance())
+		{
+			for (int t = 0; t < 20; t++)
+			{
+				std::vector<int> cnt(256, 0); int max_label_cnt = 0;
+				for (int p1 = 0; p1 < label_buff.height(); p1 ++)
+		  	  		for (int p2 = 0; p2 < label_buff.width(); p2 ++)
+		  	  		{
+		  	  			int label_value = (int)label_buff.data_at(batch_iter, 1, p1, p2);
+		  	  			cnt[label_value]++;
+		  	  		}
+		  	  	for (int i = 0; i<cnt.size(); i++)
+		  			max_label_cnt = std::max(max_label_cnt, cnt[i]);
+
+		  		if (max_label_cnt > 0.99 * label_buff.height() * label_buff.width())
+		  			this->data_transformer_->Transform(datum_data, concat_label, &this->prefetch_data_, &label_buff, batch_iter);
+	  			else
+	  				break;
+	  			// if (t == 19)
+	  			// 	LOG(INFO) << "Balance Fail";
+			}
+		}
+
+
+
 		//push back
 
 		if (batch_iter == 0)
@@ -196,7 +222,9 @@ void SegRefineLayer<Dtype>::InternalThreadEntry(){
 
 		caffe_copy(this->prefetch_others_[1]->count(1), label_buff.cpu_data() + tot_offset, this->prefetch_others_[1]->mutable_cpu_data() + this->prefetch_others_[1]->offset(batch_iter));
 		
-		
+#ifdef USE_MPI
+		if  (Caffe::MPI_my_rank() == 0)
+#endif
 		if (false)
 		{
 		  	cv::Mat im_data(this->prefetch_data_.height(), this->prefetch_data_.width(), CV_8UC3);

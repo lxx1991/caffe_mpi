@@ -285,7 +285,7 @@ message ParamSpec {
 // NOTE
 // Update the next available ID when you add a new LayerParameter field.
 //
-// LayerParameter next available layer-specific ID: 168 (last added: bbox_video_data_param)
+// LayerParameter next available layer-specific ID: 169 (last added: show_img_param)
 message LayerParameter {
   optional string name = 1; // the layer name
   optional string type = 2; // the layer type
@@ -370,6 +370,7 @@ message LayerParameter {
   optional SegDataParameter seg_data_param = 141;
   optional SegVideoParameter seg_video_param = 142;
   optional SegRefineParameter seg_refine_param = 143;
+  optional ShowImgParameter show_img_param = 168;
   optional SigmoidParameter sigmoid_param = 124;
   optional SoftmaxParameter softmax_param = 125;
   optional SPPParameter spp_param = 132;
@@ -1047,6 +1048,11 @@ message SegRefineParameter{
   optional string instance_pattern = 9;
   optional string flow_pattern = 10;
   optional string warp_pattern = 11;
+}
+
+message ShowImgParameter{
+  repeated int32 image_type = 1;
+  optional bool pause = 2 [default = false];
 }
 
 message SigmoidParameter {

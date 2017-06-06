@@ -53,6 +53,7 @@ void Solver<Dtype>::Init(const SolverParameter& param) {
     LOG(INFO) << "Pavi init done.";
   }
   iter_ = 0;
+  global_iter = iter_;
   current_step_ = 0;
 }
 
@@ -274,6 +275,7 @@ void Solver<Dtype>::Step(int iters) {
     // Increment the internal iter_ counter -- its value should always indicate
     // the number of times the weights have been updated.
     ++iter_;
+    global_iter = iter_;
 
     // Save a snapshot if needed.
     if (param_.snapshot() && iter_ % param_.snapshot() == 0) {
@@ -543,6 +545,7 @@ void Solver<Dtype>::Restore(const char* state_file) {
     net_->CopyTrainedLayersFrom(net_param);
   }
   iter_ = state.iter();
+  global_iter = iter_;
   current_step_ = state.current_step();
   RestoreSolverState(state);
 }

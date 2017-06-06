@@ -239,7 +239,7 @@ void SegRefineVideoLayer<Dtype>::InternalThreadEntry(){
 		}
 
 		//mask label
-		if (use_warp_)
+		if (use_warp_ && this->data_transformer_->Rand(2))
 		{
 			sprintf(string_buf, (root_dir + warp_pattern_).c_str(), lines_[lines_id_].first.c_str(), current_frame);
 			CHECK(ReadSegDataToDatum(string_buf, &datum_label[1], false));
@@ -341,8 +341,6 @@ void SegRefineVideoLayer<Dtype>::InternalThreadEntry(){
 				}
 			sprintf(temp_path, "temp/%d/instance_label.png", tot);
 			imwrite(temp_path, im_data);
-
-
 
 
 		  	for (int i=0; i < this->prefetch_others_[0]->channels(); i++)

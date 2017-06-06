@@ -67,7 +67,7 @@ void SoftmaxWithLossLayer<Dtype>::Forward_gpu(
       outer_num_, dim, inner_num_, has_ignore_label_, ignore_label_, counts);
 
   
-  if (this->layer_param_.loss_param().hm_ratio() < 1-Dtype(FLT_MIN))
+  if (global_iter > 1000 && this->layer_param_.loss_param().hm_ratio() < 1-Dtype(FLT_MIN))
   {
     const Dtype *cpu_loss_data = bottom[0]->cpu_diff(), *cpu_counts = prob_.cpu_diff();
     

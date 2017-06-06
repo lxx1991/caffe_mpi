@@ -7,6 +7,8 @@
 
 namespace caffe {
 
+int global_iter = 0;
+
 shared_ptr<Caffe> Caffe::singleton_;
 
 // random seeding

@@ -780,12 +780,12 @@ void DataTransformer<Dtype>::Transform_aug(Datum& datum_instance, Datum& datum_m
       warp_mask.copyTo(single_instance);
 
       int tot = cv::countNonZero(single_instance);
-      int patch_num = Rand(3) + 1;
+      int patch_num = Rand(5) + 1;
 
       while (patch_num-- > 0)
       {
-        int j_x = (int)Rand(std::max(0, (min_w - (max_w - min_w) / 2)), std::min(single_instance.cols - 1, (max_w + (max_w - min_w) / 2)));
-        int j_y = (int)Rand(std::max(0, (min_h - (max_h - min_h) / 2)), std::min(single_instance.rows - 1, (max_h + (max_h - min_h) / 2)));
+        int j_x = (int)Rand(std::max(0, (min_w - (max_w - min_w) / 3)), std::min(single_instance.cols - 1, (max_w + (max_w - min_w) / 3)));
+        int j_y = (int)Rand(std::max(0, (min_h - (max_h - min_h) / 3)), std::min(single_instance.rows - 1, (max_h + (max_h - min_h) / 3)));
 
         int key = 1 - single_instance.data[j_y * single_instance.cols + j_x];
 
