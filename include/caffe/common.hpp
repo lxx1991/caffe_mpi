@@ -183,10 +183,43 @@ class Caffe {
 
   //Returns MPI_MY_RANK
   inline static int MPI_my_rank(){return Get().mpi_my_rank_;}
+  inline static int MPI_my_sub_rank(){return Get().mpi_my_sub_rank_;}
   inline static int MPI_all_rank(){return Get().mpi_all_rank_;}
   inline static void MPI_build_rank(){
     MPI_Comm_rank(MPI_COMM_WORLD, &(Get().mpi_my_rank_));
     MPI_Comm_size(MPI_COMM_WORLD, &(Get().mpi_all_rank_));
+
+    //for multi node
+    int name_size = 0, color;
+    char node_name[MPI_MAX_PROCESSOR_NAME];
+    MPI::Get_processor_name(node_name, name_size);
+
+    char *all_node_name = (char *)malloc(sizeof(char) * MPI_MAX_PROCESSOR_NAME * Get().mpi_all_rank_);
+
+    MPI_Allgather(node_name, MPI_MAX_PROCESSOR_NAME, MPI_CHAR, all_node_name, MPI_MAX_PROCESSOR_NAME, MPI_CHAR, MPI_COMM_WORLD); 
+
+    for(int i = 0; i < Get().mpi_all_rank_; i++)
+    {
+      if(all_node_name[MPI_MAX_PROCESSOR_NAME * i] == '\0')
+        continue;
+
+      for(int j=i+1; j < Get().mpi_all_rank_; j++)
+        if(strcmp(all_node_name + MPI_MAX_PROCESSOR_NAME * i, all_node_name + MPI_MAX_PROCESSOR_NAME * j) == 0)
+          all_node_name[MPI_MAX_PROCESSOR_NAME * j] = '\0';
+    }
+
+    for(int i = 0; i < Get().mpi_all_rank_; i++)
+      if(strcmp(node_name, all_node_name + MPI_MAX_PROCESSOR_NAME * i) == 0)
+      {
+        color = i;
+        break;
+      }
+
+    MPI_Comm node_comm;
+    MPI_Comm_split(MPI_COMM_WORLD, color, Get().mpi_my_rank_, &node_comm);
+    MPI_Comm_rank(node_comm, &(Get().mpi_my_sub_rank_));
+
+    free(all_node_name);
   }
   inline static int device_id(){return Get().device_id_;}
   inline static int remaining_sub_iter(){return Get().remaining_sub_iter_;}
@@ -224,6 +257,7 @@ class Caffe {
 
   PARALLEL_MODE parallel_mode_;
   int mpi_my_rank_;
+  int mpi_my_sub_rank_;
   int mpi_all_rank_;
   int device_id_;
   int remaining_sub_iter_;
