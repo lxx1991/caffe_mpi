@@ -281,7 +281,6 @@ void ShowImgLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
 		for (int i=0; i<bottom.size(); i++)
 		{
 			cv::Mat im_data(bottom[i]->height(), bottom[i]->width(), CV_8UC3);
-
 			if (this->layer_param().show_img_param().image_type(i) == 0) 		//gray
 			{
 		  		for (int p1 = 0; p1 < bottom[i]->height(); p1 ++)
@@ -340,15 +339,23 @@ void ShowImgLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
 							}
 					}
 			}
-			cv::resize(im_data, im_data, cv::Size(im_data.cols / im_data.rows * 360, 360));
+			cv::resize(im_data, im_data, cv::Size(im_data.cols * 360 / im_data.rows, 360));
 			char temp_path[30];
 			sprintf(temp_path, "bottom_%d", i);
-			cv::imshow(temp_path, im_data);
+			try
+			{	
+				cv::imshow(temp_path, im_data);
+			}catch(...)
+			{}
 		}
-		if (this->layer_param().show_img_param().pause())
-			cv::waitKey();
-		else
-		    cv::waitKey(10);
+		try
+		{
+			if (this->layer_param().show_img_param().pause())
+				cv::waitKey();
+			else
+			    cv::waitKey(10);
+		}catch(...)
+		{}
 	}
 }
 
