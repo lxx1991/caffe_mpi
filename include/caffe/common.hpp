@@ -192,7 +192,7 @@ class Caffe {
     //for multi node
     int name_size = 0, color;
     char node_name[MPI_MAX_PROCESSOR_NAME];
-    MPI_Get_processor_name(node_name, name_size);
+    MPI_Get_processor_name(node_name, &name_size);
 
     char *all_node_name = (char *)malloc(sizeof(char) * MPI_MAX_PROCESSOR_NAME * Get().mpi_all_rank_);
 
