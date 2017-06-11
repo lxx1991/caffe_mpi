@@ -561,13 +561,13 @@ public:
 
 	virtual inline const char* type() const { return "BBoxMaskData"; }
 	virtual inline int ExactNumBottomBlobs() const { return 0; }
-	virtual inline int ExactNumTopBlobs() const { return 4; }
+	virtual inline int ExactNumTopBlobs() const { return 6; }
 
 protected:
 	shared_ptr<Caffe::RNG> prefetch_rng_;
 	virtual void ShuffleImages();
 	virtual void InternalThreadEntry();
-
+	void gen_bbox_mask(vector<cv::Mat> &mat_data, vector<cv::Mat> &mat_label, vector<Datum> &datum_data, vector<Datum> &datum_label, bool bbox_aug);
 #ifdef USE_MPI
 	inline virtual void advance_cursor(){
 		lines_id_++;
@@ -584,7 +584,7 @@ protected:
 	
 	vector<std::string > lines_;
 	vector<std::pair<std::string, std::string> > labels_;
-	int lines_id_;
+	int lines_id_, bbox_height_, bbox_width_;
 	int batch_size_;
 };
 

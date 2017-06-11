@@ -202,6 +202,31 @@ bool DecodeDatum(Datum* datum, bool is_color) {
   }
 }
 
+void DatumToCVMat(const Datum *datum_data, cv::Mat& cv_img)
+{
+  const int datum_height = datum_data->height();
+  const int datum_width = datum_data->width();
+  const int num_channels = datum_data->channels();
+
+  if (num_channels == 3)
+  {
+    cv_img = cv::Mat::zeros(datum_height, datum_width, CV_8UC3);
+    const string&  str = datum_data->data();
+    for (int c = 0; c < 3; ++c)
+      for (int h = 0; h < datum_height; ++h)
+        for (int w = 0; w < datum_width; ++w)
+          cv_img.at<cv::Vec3b>(h, w)[c] = static_cast<uint8_t>(str[(c * datum_height + h) * datum_width + w]);
+  }
+  else
+  {
+    cv_img = cv::Mat::zeros(datum_height, datum_width, CV_8UC1);
+    const string&  str = datum_data->data();
+    for (int h = 0; h < datum_height; ++h)
+      for (int w = 0; w < datum_width; ++w)
+        cv_img.at<uchar>(h, w) = static_cast<uint8_t>(str[h * datum_width + w]);
+  }
+}
+
 void CVMatToDatum(const cv::Mat& cv_img, Datum* datum) {
   CHECK(cv_img.depth() == CV_8U) << "Image data type must be unsigned byte";
   datum->set_channels(cv_img.channels());
@@ -301,6 +326,22 @@ void hdf5_save_nd_dataset<double>(
   herr_t status = H5LTmake_dataset_double(
       file_id, dataset_name.c_str(), HDF5_NUM_DIMS, dims, blob.cpu_data());
   CHECK_GE(status, 0) << "Failed to make double dataset " << dataset_name;
+}
+
+
+bool ReadSegDataToCVMat(const string& img_filename, cv::Mat& cv_img, bool is_color) {
+  
+  int cv_read_flag = (is_color ? CV_LOAD_IMAGE_COLOR :
+      CV_LOAD_IMAGE_GRAYSCALE);
+
+  cv_img = cv::imread(img_filename, cv_read_flag);
+
+  if (!cv_img.data){
+    LOG(ERROR) << "Could not load file " << img_filename;
+    return false;
+  }
+
+  return true;
 }
 
 bool ReadSegDataToDatum(const string& img_filename, Datum* datum_data, bool is_color) {

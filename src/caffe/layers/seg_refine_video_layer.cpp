@@ -166,7 +166,6 @@ void SegRefineVideoLayer<Dtype>::InternalThreadEntry(){
 	const string& root_dir = this->layer_param_.seg_refine_param().root_dir();
 
 
-
 	vector<Datum> datum_label(3), datum_data(2);
 	cv::Mat flow_data;
 

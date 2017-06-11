@@ -533,7 +533,8 @@ void DataTransformer<Dtype>::Transform(const vector<Datum>& datum_data, const ve
   int height = int(datum_height * scale_ratios + 0.5);
   int width = int(datum_width * scale_ratios + 0.5);
   
-  flow_data = flow_data * scale_ratios;
+  if (transformed_flow!=NULL)
+    flow_data = flow_data * scale_ratios;
 
   int crop_height = ((height - 1) / stride + 1) * stride + 1;
   int crop_width = ((width - 1) / stride + 1) * stride + 1;
@@ -779,26 +780,29 @@ void DataTransformer<Dtype>::Transform_aug(Datum& datum_instance, Datum& datum_m
 
       warp_mask.copyTo(single_instance);
 
-      int tot = cv::countNonZero(single_instance);
+      
       int patch_num = Rand(5) + 1;
 
       while (patch_num-- > 0)
       {
+        int tot = cv::countNonZero(single_instance);
         int j_x = (int)Rand(std::max(0, (min_w - (max_w - min_w) / 3)), std::min(single_instance.cols - 1, (max_w + (max_w - min_w) / 3)));
         int j_y = (int)Rand(std::max(0, (min_h - (max_h - min_h) / 3)), std::min(single_instance.rows - 1, (max_h + (max_h - min_h) / 3)));
 
         int key = 1 - single_instance.data[j_y * single_instance.cols + j_x];
 
-        tot = tot * Rand(0, 0.05);
+        tot = tot * Rand(0.02, 0.05) * (2 - key);
         for (int i=0; i<tot; i++)
         {
           j_x = std::max(0, std::min(single_instance.cols - 1, j_x + Rand(3) - 1));
           j_y = std::max(0, std::min(single_instance.rows - 1, j_y + Rand(3) - 1));
 
-          for (int dx = -5; dx < 6; dx ++)
+          int p_size = (key == 1) ? 2 : 8;
+
+          for (int dx = -p_size; dx <= p_size; dx++)
             if (j_x + dx >=0 && j_x + dx <single_instance.cols)
-              for (int dy = -5; dy < 6; dy ++)
-                if (j_y + dy >=0 && j_y + dy <single_instance.rows && dx * dx + dy * dy <= 25)
+              for (int dy = -p_size; dy <= p_size; dy++)
+                if (j_y + dy >=0 && j_y + dy <single_instance.rows && dx * dx + dy * dy <= p_size * p_size)
                 {
                     int j = (j_y + dy) * single_instance.cols + (j_x + dx);
                     single_instance.data[j] = key;
@@ -820,6 +824,78 @@ void DataTransformer<Dtype>::Transform_aug(Datum& datum_instance, Datum& datum_m
       for (int w = 0; w < datum_width; ++w)
         mask->push_back((warp_mask.at<uint8_t>(h, w) > 0) ? 1 : 0);
   }
+}
+
+
+
+template<typename Dtype>
+void DataTransformer<Dtype>::Transform_aug2(Datum& datum_img, Datum& datum_mask, int idx) {
+
+  const int datum_height = datum_img.height();
+  const int datum_width = datum_img.width();
+
+  cv::Mat image, mask;
+
+  DatumToCVMat(&datum_img, image);
+  DatumToCVMat(&datum_mask, mask);
+  
+ 
+  int min_h = datum_height, min_w = datum_width, max_h = -1, max_w = -1;
+  for (int h = 0; h < datum_height; ++h)
+    for (int w = 0; w < datum_width; ++w)
+      if (mask.at<uint8_t>(h, w) == idx)
+      {
+        mask.at<uint8_t>(h, w) = 1;
+        min_h = std::min(min_h, h);
+        min_w = std::min(min_w, w);
+        max_h = std::max(max_h, h);
+        max_w = std::max(max_w, w);
+      }
+      else
+        mask.at<uint8_t>(h, w) = 0;
+       
+
+  vector< vector<cv::Point> > contours;
+  vector<cv::Point> contour;
+  vector<cv::Vec4i> hierarchy;
+  cv::findContours(mask, contours, hierarchy, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE);
+
+  for (int i=0; i<contours.size(); i++)
+    for (int j=0; j<contours[i].size(); j++)
+      contour.push_back(contours[i][j]);
+
+  cv::Mat warp_mask;
+  int match_point = 5;
+
+  if (contour.size() > match_point * 10)
+  {
+    for (int i=0; i<match_point; i++)
+      std::swap(contour[i], contour[Rand(contour.size()*(i*2+1)/(match_point*2) - contour.size()*i*2/(match_point*2)) + contour.size()*i*2/(match_point*2)]);
+
+
+    vector<cv::Point> s_point;
+    vector<cv::Point> t_point;
+
+    for (int i=0; i<match_point; i++)
+    {
+      s_point.push_back(contour[i]);
+      cv::Point p(contour[i]);
+      p.x += Rand(-0.1 * (max_w - min_w + 1.0), 0.1 * (max_w - min_w + 1.0));
+      p.y += Rand(-0.1 * (max_h - min_h + 1.0), 0.1 * (max_h - min_h + 1.0));
+      t_point.push_back(p);
+    }
+
+    CThinPlateSpline tps(s_point, t_point);
+    tps.warpImage(mask, warp_mask, 0.001, CV_INTER_CUBIC, BACK_WARP);
+    warp_mask.copyTo(mask);
+    tps.warpImage(image, warp_mask, 0.001, CV_INTER_CUBIC, BACK_WARP);
+    warp_mask.copyTo(image);
+
+  }
+  
+  CVMatToDatum(image, &datum_img);
+  CVMatToDatum(mask, &datum_mask);
+
 }
 
 

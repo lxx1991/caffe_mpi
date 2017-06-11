@@ -97,6 +97,7 @@ bool ReadImageToDatum(const string& filename, const int label,
 
 bool ReadFlowToCVMat(const string& flow_filename, cv::Mat& flow_data);
 
+bool ReadSegDataToCVMat(const string& img_filename, cv::Mat& cv_img, bool is_color);
 bool ReadSegDataToDatum(const string& img_filename, Datum* datum_data, bool is_color);
 
 bool ReadSegDataToDatum(const string& img_filename, const string& label_filename, 
@@ -155,6 +156,7 @@ cv::Mat ReadImageToCVMat(const string& filename);
 cv::Mat DecodeDatumToCVMatNative(const Datum& datum);
 cv::Mat DecodeDatumToCVMat(const Datum& datum, bool is_color);
 
+void DatumToCVMat(const Datum* datum_data, cv::Mat& cv_img);
 void CVMatToDatum(const cv::Mat& cv_img, Datum* datum);
 
 template <typename Dtype>

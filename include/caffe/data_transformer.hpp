@@ -46,6 +46,7 @@ class DataTransformer {
                vector<Blob<Dtype>*>& transformed_data, vector<Blob<Dtype>*>& transformed_label, Blob<Dtype>* transformed_flow, int batch_iter = 0);
 
   void Transform_aug(Datum& datum_instance, Datum& datum_mask, int max_id = 1);
+  void Transform_aug2(Datum& datum_img, Datum& datum_mask, int idx = 1);
 
   /**
    * @brief Applies the transformation defined in the data layer's
