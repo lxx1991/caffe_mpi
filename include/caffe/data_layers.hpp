@@ -513,7 +513,8 @@ public:
 
 	virtual inline const char* type() const { return "SegRefineVideo"; }
 	virtual inline int ExactNumBottomBlobs() const { return 0; }
-	virtual inline int ExactNumTopBlobs() const { return 6; }
+	virtual inline int ExactNumTopBlobs() const { return -1; }
+	virtual inline int MinTopBlobs() const { return 6; }
 
 protected:
 	shared_ptr<Caffe::RNG> prefetch_rng_;
@@ -537,7 +538,8 @@ protected:
 	std::vector< std::pair<std::string,int> > lines_;
 	int lines_id_;
 	int batch_size_;
-
+	int frame_num_;
+	
 	std::string image_pattern_, instance_pattern_, flow_pattern_, warp_pattern_;
 	bool use_warp_;
 	char string_buf[255];

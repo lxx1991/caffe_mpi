@@ -37,7 +37,7 @@ void SegRefineVideoLayer<Dtype>:: DataLayerSetUp(const vector<Blob<Dtype>*>& bot
 	const int stride = this->layer_param_.transform_param().stride();
 	const string& source = this->layer_param_.seg_refine_param().source();
 	const string& root_dir = this->layer_param_.seg_refine_param().root_dir();
-	const int instance_num = this->layer_param_.seg_refine_param().instance_num();
+	frame_num_ = (top.size() - 3) / 2;
 
 	batch_size_ = this->layer_param_.seg_refine_param().batch_size();
 	image_pattern_ = this->layer_param_.seg_refine_param().image_pattern();
@@ -52,10 +52,10 @@ void SegRefineVideoLayer<Dtype>:: DataLayerSetUp(const vector<Blob<Dtype>*>& bot
 	std::ifstream infile(source.c_str());
 	
 	string video_name;
-	int frame_num;
+	int fn;
 
-	while (infile >> video_name >> frame_num){
-		lines_.push_back(std::make_pair(video_name, frame_num));
+	while (infile >> video_name >> fn){
+		lines_.push_back(std::make_pair(video_name, fn));
 	}
 
 	if (this->layer_param_.seg_refine_param().shuffle()){
@@ -103,20 +103,23 @@ void SegRefineVideoLayer<Dtype>:: DataLayerSetUp(const vector<Blob<Dtype>*>& bot
 		this->prefetch_others_.push_back(new Blob<Dtype>());
 
 	//mask
-	top[2]->Reshape(batch_size_, instance_num, crop_height, crop_width);
-	this->prefetch_others_[0]->Reshape(batch_size_, instance_num, crop_height, crop_width);
+	top[2]->Reshape(batch_size_, 1, crop_height, crop_width);
+	this->prefetch_others_[0]->Reshape(batch_size_, 1, crop_height, crop_width);
 
 	//flow
 	top[3]->Reshape(batch_size_, 2, crop_height, crop_width);
 	this->prefetch_others_[1]->Reshape(batch_size_, 2, crop_height, crop_width);
 
-	//hint image
-	top[4]->Reshape(batch_size_, datum_data.channels(), crop_height, crop_width);
-	this->prefetch_others_[2]->Reshape(batch_size_, datum_data.channels(), crop_height, crop_width);
+	for (int i=0; i<frame_num_; i++)
+	{
+		//hint image
+		top[i*2 + 4]->Reshape(batch_size_, datum_data.channels(), crop_height, crop_width);
+		this->prefetch_others_[i*2 + 2]->Reshape(batch_size_, datum_data.channels(), crop_height, crop_width);
 
-	//hint label
-	top[5]->Reshape(batch_size_, instance_num, crop_height, crop_width);
-	this->prefetch_others_[3]->Reshape(batch_size_, instance_num, crop_height, crop_width);
+		//hint label
+		top[i*2 + 5]->Reshape(batch_size_, 1, crop_height, crop_width);
+		this->prefetch_others_[i*2 + 3]->Reshape(batch_size_, 1, crop_height, crop_width);
+	}
 
 	LOG(INFO) << "output data size: " << top[0]->num() << "," << top[0]->channels() << "," << top[0]->height() << "," << top[0]->width();
 	LOG(INFO) << "output instance label size: " << top[1]->num() << "," << top[1]->channels() << "," << top[1]->height() << "," << top[1]->width();
@@ -161,12 +164,10 @@ void SegRefineVideoLayer<Dtype>::IndexToProb(Datum &datum_data, int instance_num
 template <typename Dtype>
 void SegRefineVideoLayer<Dtype>::InternalThreadEntry(){
 
-	const int instance_num = this->layer_param_.seg_refine_param().instance_num();
 	const int ignore_label = this->layer_param_.transform_param().ignore_label();
 	const string& root_dir = this->layer_param_.seg_refine_param().root_dir();
 
-
-	vector<Datum> datum_label(3), datum_data(2);
+	vector<Datum> datum_label(2 + frame_num_), datum_data(1 + frame_num_);
 	cv::Mat flow_data;
 
 	const int lines_size = lines_.size();
@@ -174,19 +175,22 @@ void SegRefineVideoLayer<Dtype>::InternalThreadEntry(){
 	vector< Blob<Dtype>* > prefetch_data, prefetch_label;
 
 	prefetch_data.push_back(&this->prefetch_data_);
-	prefetch_data.push_back(this->prefetch_others_[2]);
+	for (int i=0; i<frame_num_; i++)
+		prefetch_data.push_back(this->prefetch_others_[i*2 + 2]);
+
 
 	prefetch_label.push_back(&this->prefetch_label_);
 	prefetch_label.push_back(this->prefetch_others_[0]);
-	prefetch_label.push_back(this->prefetch_others_[3]);
+	for (int i=0; i<frame_num_; i++)
+		prefetch_label.push_back(this->prefetch_others_[i*2 + 3]);
+	
 
 
 	for (int batch_iter = 0; batch_iter < batch_size_; batch_iter++)
 	{
-
 		CHECK_GT(lines_size, lines_id_);
 
-		int current_frame = this->data_transformer_->Rand(lines_[lines_id_].second), dist = lines_[lines_id_].second  / 3;
+		int current_frame = this->data_transformer_->Rand(lines_[lines_id_].second);
 		while(current_frame == 0)
 			current_frame = this->data_transformer_->Rand(lines_[lines_id_].second);
 
@@ -207,35 +211,29 @@ void SegRefineVideoLayer<Dtype>::InternalThreadEntry(){
   		const int datum_width = datum_label[0].width();
 	  	string* ptr = datum_label[0].mutable_data();
 		
-		int max_idx = instance_num;
-		for (int data_index = 0; data_index < datum_height * datum_width; ++data_index)
-		{
-			int label_value = (int)(*ptr)[data_index];
-			if (label_value != ignore_label)
-			  max_idx = std::max(max_idx, label_value);
-		}
-
-		int vis[256]; 
-		memset(vis, 0, sizeof(vis));
-		vis[ignore_label] = ignore_label;
-		for (int i=1; i < max_idx + 1; i++)
-		{
-			vis[i] = (i <= instance_num) ? i : 0;
-			std::swap(vis[i], vis[this->data_transformer_->Rand(i) + 1]);
-		}
-		
 		std::set<int> hash_table;
 		for (int data_index = 0; data_index < datum_height * datum_width; ++data_index)
 		{
 			int label_value = (int)(*ptr)[data_index];
-			if (label_value != ignore_label)
-			{
-				(*ptr)[data_index] = (uchar)vis[label_value];
-				hash_table.insert((*ptr)[data_index]);
-			}
-			else
-				(*ptr)[data_index] = 0;
+			if (label_value != ignore_label && label_value != 0)
+				hash_table.insert(label_value);
 		}
+		int idx = 1;
+		if (hash_table.size() != 0)
+		{
+			std::set<int>::iterator it = hash_table.begin();
+			std::advance(it, this->data_transformer_->Rand(hash_table.size()));
+			idx = *it;
+		}
+			
+		for (int data_index = 0; data_index < datum_height * datum_width; ++data_index)
+		{
+			int label_value = (int)(*ptr)[data_index];
+			if (label_value != ignore_label)
+				(*ptr)[data_index] = (idx == label_value) ? 1 : 0;
+		}
+
+
 
 		//mask label
 		if (use_warp_ && this->data_transformer_->Rand(2))
@@ -247,58 +245,58 @@ void SegRefineVideoLayer<Dtype>::InternalThreadEntry(){
 			{
 				int label_value = (int)(*ptr)[data_index];
 				if (label_value != ignore_label)
-					(*ptr)[data_index] = (uchar)vis[label_value];
-				else
-					(*ptr)[data_index] = 0;
+					(*ptr)[data_index] = (idx == label_value) ? 1 : 0;
 			}
-			IndexToProb(datum_label[1], instance_num);
 		}
 		else
-			this->data_transformer_->Transform_aug(datum_label[0], datum_label[1], instance_num);
+			this->data_transformer_->Transform_aug(datum_label[0], datum_label[1], 1);
+
+
 
 		//hint image and label
-		while (true)
+		vector<int> frame_idx(frame_num_, 0);
+
+		if (frame_num_ > current_frame)
 		{
-			vector<int> count_table(instance_num + 1, 0);
+			for (int i=0; i<current_frame; i++)
+				frame_idx[i] = i;
+			for (int i=current_frame; i<frame_num_; i++)
+				frame_idx[i] = this->data_transformer_->Rand(current_frame);
+		}
+		else
+		{
+			vector<int> temp;
+			for (int i=std::max(0, current_frame - 2 * frame_num_); i <current_frame; i++)
+				temp.push_back(i);
+			for (int i=0; i < frame_num_; i++)
+			{
+				std::swap(temp[i], temp[i + this->data_transformer_->Rand(temp.size() - i)]);
+				frame_idx[i] = temp[i];
+			}
+		}
+		std::sort(frame_idx.begin(), frame_idx.end());
 
-			int hint_frame = this->data_transformer_->Rand(lines_[lines_id_].second);
-			while(std::abs(hint_frame - current_frame) < dist)
-				hint_frame = this->data_transformer_->Rand(lines_[lines_id_].second);
+		for (int i=0; i<frame_num_; i++)
+		{
+			sprintf(string_buf, (root_dir + image_pattern_).c_str(), lines_[lines_id_].first.c_str(), frame_idx[i]);
+			CHECK(ReadSegDataToDatum(string_buf, &datum_data[i + 1], true));
+			sprintf(string_buf, (root_dir + instance_pattern_).c_str(), lines_[lines_id_].first.c_str(), frame_idx[i]);
+			CHECK(ReadSegDataToDatum(string_buf, &datum_label[i + 2], false));
 
-			sprintf(string_buf, (root_dir + instance_pattern_).c_str(), lines_[lines_id_].first.c_str(), hint_frame);
-			CHECK(ReadSegDataToDatum(string_buf, &datum_label[2], false));
-
-			string* ptr = datum_label[2].mutable_data();
+			ptr = datum_label[i + 2].mutable_data();
 			for (int data_index = 0; data_index < datum_height * datum_width; ++data_index)
 			{
 				int label_value = (int)(*ptr)[data_index];
 				if (label_value != ignore_label)
-				{
-					(*ptr)[data_index] = (uchar)vis[label_value];
-					count_table[(*ptr)[data_index]]++;
-				}
-				else
-					(*ptr)[data_index] = 0;
+					(*ptr)[data_index] = (idx == label_value) ? 1 : 0;
 			}
-
-			bool flag = true;
-			for (std::set<int>::iterator it = hash_table.begin(); it!=hash_table.end(); it++)
-			{
-				if (count_table[*it] == 0)
-					flag = false;
-			}
-			if (flag)
-			{
-				sprintf(string_buf, (root_dir + image_pattern_).c_str(), lines_[lines_id_].first.c_str(), hint_frame);
-				CHECK(ReadSegDataToDatum(string_buf, &datum_data[1], true));
-				IndexToProb(datum_label[2], instance_num);
-				break;
-			}
-			else
-				dist = dist / 2;
 		}
 
 		this->data_transformer_->Transform(datum_data, datum_label, flow_data, prefetch_data, prefetch_label, this->prefetch_others_[1], batch_iter);
+
+		int drop = this->data_transformer_->Rand(10);
+		if (drop < 3)
+			caffe_set(this->prefetch_others_[0]->count(1), Dtype(0), this->prefetch_others_[0]->mutable_cpu_data() + this->prefetch_others_[0]->offset(batch_iter));
 		
 		if (false)
 		{
@@ -342,18 +340,15 @@ void SegRefineVideoLayer<Dtype>::InternalThreadEntry(){
 			imwrite(temp_path, im_data);
 
 
-		  	for (int i=0; i < this->prefetch_others_[0]->channels(); i++)
-		  	{
-		  		for (int p1 = 0; p1 < this->prefetch_others_[0]->height(); p1 ++)
-		  	  		for (int p2 = 0; p2 < this->prefetch_others_[0]->width(); p2 ++)
-		  	  		{
-	  	  				im_data.at<uchar>(p1, p2*3+0) = color_map[(int)this->prefetch_others_[0]->data_at(batch_iter, i, p1, p2) < 0.5 ? 0 : i+1][0];
-	  	  				im_data.at<uchar>(p1, p2*3+1) = color_map[(int)this->prefetch_others_[0]->data_at(batch_iter, i, p1, p2) < 0.5 ? 0 : i+1][1];
-	  	  				im_data.at<uchar>(p1, p2*3+2) = color_map[(int)this->prefetch_others_[0]->data_at(batch_iter, i, p1, p2) < 0.5 ? 0 : i+1][2];
-	  	  			}
-			  	sprintf(temp_path, "temp/%d/mask_%02d.png", tot, i);
-			  	imwrite(temp_path, im_data);
-			}
+	  		for (int p1 = 0; p1 < this->prefetch_others_[0]->height(); p1 ++)
+	  	  		for (int p2 = 0; p2 < this->prefetch_others_[0]->width(); p2 ++)
+	  	  		{
+  	  				im_data.at<uchar>(p1, p2*3+0) = color_map[(int)this->prefetch_others_[0]->data_at(batch_iter, 0, p1, p2) < 0.5 ? 0 : 1][0];
+  	  				im_data.at<uchar>(p1, p2*3+1) = color_map[(int)this->prefetch_others_[0]->data_at(batch_iter, 0, p1, p2) < 0.5 ? 0 : 1][1];
+  	  				im_data.at<uchar>(p1, p2*3+2) = color_map[(int)this->prefetch_others_[0]->data_at(batch_iter, 0, p1, p2) < 0.5 ? 0 : 1][2];
+  	  			}
+		  	sprintf(temp_path, "temp/%d/mask.png", tot);
+		  	imwrite(temp_path, im_data);
 
 
 			double max_flow, min_flow;
@@ -369,25 +364,28 @@ void SegRefineVideoLayer<Dtype>::InternalThreadEntry(){
 			imwrite(temp_path, im_data);
 
 
-	  		for (int p1 = 0; p1 < this->prefetch_others_[2]->height(); p1 ++)
-	  	  		for (int p2 = 0; p2 < this->prefetch_others_[2]->width(); p2 ++)
-	  	  		{
-  	  				im_data.at<uchar>(p1, p2*3+0) = (uchar)(this->prefetch_others_[2]->data_at(batch_iter, 0 , p1, p2)+104);
-  	  				im_data.at<uchar>(p1, p2*3+1) = (uchar)(this->prefetch_others_[2]->data_at(batch_iter, 1 , p1, p2)+117);
-  	  				im_data.at<uchar>(p1, p2*3+2) = (uchar)(this->prefetch_others_[2]->data_at(batch_iter, 2 , p1, p2)+123);
-  	  			}
-		  	sprintf(temp_path, "temp/%d/hint_image.png", tot);
-		  	imwrite(temp_path, im_data);
+		  	for (int i=0; i < frame_num_; i++)
+		  	{
+		  		for (int p1 = 0; p1 < this->prefetch_others_[i*2 + 2]->height(); p1 ++)
+		  	  		for (int p2 = 0; p2 < this->prefetch_others_[i*2 + 2]->width(); p2 ++)
+		  	  		{
+	  	  				im_data.at<uchar>(p1, p2*3+0) = (uchar)(this->prefetch_others_[i*2 + 2]->data_at(batch_iter, 0 , p1, p2)+104);
+	  	  				im_data.at<uchar>(p1, p2*3+1) = (uchar)(this->prefetch_others_[i*2 + 2]->data_at(batch_iter, 1 , p1, p2)+117);
+	  	  				im_data.at<uchar>(p1, p2*3+2) = (uchar)(this->prefetch_others_[i*2 + 2]->data_at(batch_iter, 2 , p1, p2)+123);
+	  	  			}
+			  	sprintf(temp_path, "temp/%d/hint_image_%d.png", tot, i);
+			  	imwrite(temp_path, im_data);
+			 }
 			
 
-		  	for (int i=0; i < this->prefetch_others_[3]->channels(); i++)
+		  	for (int i=0; i < frame_num_; i++)
 		  	{
-		  		for (int p1 = 0; p1 < this->prefetch_others_[3]->height(); p1 ++)
-		  	  		for (int p2 = 0; p2 < this->prefetch_others_[3]->width(); p2 ++)
+		  		for (int p1 = 0; p1 < this->prefetch_others_[i*2 + 3]->height(); p1 ++)
+		  	  		for (int p2 = 0; p2 < this->prefetch_others_[i*2 + 3]->width(); p2 ++)
 		  	  		{
-	  	  				im_data.at<uchar>(p1, p2*3+0) = color_map[(int)this->prefetch_others_[3]->data_at(batch_iter, i, p1, p2) < 0.5 ? 0 : i+1][0];
-	  	  				im_data.at<uchar>(p1, p2*3+1) = color_map[(int)this->prefetch_others_[3]->data_at(batch_iter, i, p1, p2) < 0.5 ? 0 : i+1][1];
-	  	  				im_data.at<uchar>(p1, p2*3+2) = color_map[(int)this->prefetch_others_[3]->data_at(batch_iter, i, p1, p2) < 0.5 ? 0 : i+1][2];
+	  	  				im_data.at<uchar>(p1, p2*3+0) = color_map[(int)this->prefetch_others_[i*2 + 3]->data_at(batch_iter, 0, p1, p2) < 0.5 ? 0 : 1][0];
+	  	  				im_data.at<uchar>(p1, p2*3+1) = color_map[(int)this->prefetch_others_[i*2 + 3]->data_at(batch_iter, 0, p1, p2) < 0.5 ? 0 : 1][1];
+	  	  				im_data.at<uchar>(p1, p2*3+2) = color_map[(int)this->prefetch_others_[i*2 + 3]->data_at(batch_iter, 0, p1, p2) < 0.5 ? 0 : 1][2];
 	  	  			}
 			  	sprintf(temp_path, "temp/%d/hint_%02d.png", tot, i);
 			  	imwrite(temp_path, im_data);
