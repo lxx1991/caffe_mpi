@@ -577,7 +577,7 @@ protected:
 			// We have reached the end. Restart from the first.
 			DLOG(INFO) << "Restarting data prefetching from start.";
 			lines_id_ = 0;
-			if (this->layer_param_.bbox_mask_data_param().shuffle()) {
+			if (this->layer_param_.seg_refine_param().shuffle()) {
 				ShuffleImages();
 			}
 		}
@@ -608,14 +608,14 @@ public:
 
 	virtual inline const char* type() const { return "BBoxVideoData"; }
 	virtual inline int ExactNumBottomBlobs() const { return 0; }
-	virtual inline int ExactNumTopBlobs() const { return 7; }
+	virtual inline int ExactNumTopBlobs() const { return -1; }
+	virtual inline int MinTopBlobs() const { return 6; }
 
 protected:
 	shared_ptr<Caffe::RNG> prefetch_rng_;
 	virtual void ShuffleImages();
 	virtual void InternalThreadEntry();
-	void gen_bbox_and_mask(Blob<Dtype> &label_data, int channel, Blob<Dtype> &bbox, Blob<Dtype> &mask, vector<int>& instance_ids, bool bbox_aug);
-	void gen_mask(Blob<Dtype> &label_data, int channel, Blob<Dtype> &bbox, Blob<Dtype> &mask, vector<int>& instance_ids);
+	void gen_bbox_mask(vector<cv::Mat> &mat_data, vector<cv::Mat> &mat_label, vector<Datum> &datum_data, vector<Datum> &datum_label, bool bbox_aug, cv::Mat *flow_data=NULL);
 
 #ifdef USE_MPI
 	inline virtual void advance_cursor(){
@@ -624,20 +624,20 @@ protected:
 			// We have reached the end. Restart from the first.
 			DLOG(INFO) << "Restarting data prefetching from start.";
 			lines_id_ = 0;
-			if (this->layer_param_.bbox_video_data_param().shuffle()) {
+			if (this->layer_param_.seg_refine_param().shuffle()) {
 				ShuffleImages();
 			}
 		}
 	}
 #endif
 	
-	vector<std::pair<std::string, std::string> > lines_;
-	vector<std::pair<std::string, int> > labels_;
+	vector<std::pair<std::string, int> > lines_;
 	int lines_id_;
-	int batch_size_, bbox_height_, bbox_width_, stride_, ignore_label_;
-
-	std::string image_pattern_;
-	std::string label_pattern_;
+	int batch_size_, bbox_height_, bbox_width_, ignore_label_;
+	int frame_num_;
+	
+	std::string image_pattern_, instance_pattern_, flow_pattern_, warp_pattern_;
+	bool use_warp_;
 
 	char string_buf[255];
 };
