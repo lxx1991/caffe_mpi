@@ -125,8 +125,6 @@ void SegRefineVideoLayer<Dtype>:: DataLayerSetUp(const vector<Blob<Dtype>*>& bot
 	LOG(INFO) << "output instance label size: " << top[1]->num() << "," << top[1]->channels() << "," << top[1]->height() << "," << top[1]->width();
 	LOG(INFO) << "output mask size: " << top[2]->num() << "," << top[2]->channels() << "," << top[2]->height() << "," << top[2]->width();
 	LOG(INFO) << "output flow size: " << top[3]->num() << "," << top[3]->channels() << "," << top[3]->height() << "," << top[3]->width();
-	LOG(INFO) << "output hint image size: " << top[4]->num() << "," << top[4]->channels() << "," << top[4]->height() << "," << top[4]->width();
-	LOG(INFO) << "output hint label size: " << top[5]->num() << "," << top[5]->channels() << "," << top[5]->height() << "," << top[5]->width();
 }
 
 template <typename Dtype>

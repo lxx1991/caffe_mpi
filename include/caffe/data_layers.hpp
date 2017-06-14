@@ -514,7 +514,7 @@ public:
 	virtual inline const char* type() const { return "SegRefineVideo"; }
 	virtual inline int ExactNumBottomBlobs() const { return 0; }
 	virtual inline int ExactNumTopBlobs() const { return -1; }
-	virtual inline int MinTopBlobs() const { return 6; }
+	virtual inline int MinTopBlobs() const { return 4; }
 
 protected:
 	shared_ptr<Caffe::RNG> prefetch_rng_;
@@ -609,7 +609,7 @@ public:
 	virtual inline const char* type() const { return "BBoxVideoData"; }
 	virtual inline int ExactNumBottomBlobs() const { return 0; }
 	virtual inline int ExactNumTopBlobs() const { return -1; }
-	virtual inline int MinTopBlobs() const { return 6; }
+	virtual inline int MinTopBlobs() const { return 4; }
 
 protected:
 	shared_ptr<Caffe::RNG> prefetch_rng_;

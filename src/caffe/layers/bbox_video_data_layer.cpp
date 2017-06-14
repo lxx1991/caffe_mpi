@@ -38,7 +38,7 @@ void BBoxVideoDataLayer<Dtype>:: DataLayerSetUp(const vector<Blob<Dtype>*>& bott
 
 	const string& source = this->layer_param_.seg_refine_param().source();
 	const string& root_dir = this->layer_param_.seg_refine_param().root_dir();
-	frame_num_ = (top.size() - 3) / 2;
+	frame_num_ = (top.size() - 4) / 2;
 
 	batch_size_ = this->layer_param_.seg_refine_param().batch_size();
 	image_pattern_ = this->layer_param_.seg_refine_param().image_pattern();
@@ -130,8 +130,6 @@ void BBoxVideoDataLayer<Dtype>:: DataLayerSetUp(const vector<Blob<Dtype>*>& bott
 	LOG(INFO) << "output instance label size: " << top[1]->num() << "," << top[1]->channels() << "," << top[1]->height() << "," << top[1]->width();
 	LOG(INFO) << "output mask size: " << top[2]->num() << "," << top[2]->channels() << "," << top[2]->height() << "," << top[2]->width();
 	LOG(INFO) << "output flow size: " << top[3]->num() << "," << top[3]->channels() << "," << top[3]->height() << "," << top[3]->width();
-	LOG(INFO) << "output hint image size: " << top[4]->num() << "," << top[4]->channels() << "," << top[4]->height() << "," << top[4]->width();
-	LOG(INFO) << "output hint label size: " << top[5]->num() << "," << top[5]->channels() << "," << top[5]->height() << "," << top[5]->width();
 }
 
 template <typename Dtype>
@@ -221,19 +219,15 @@ void BBoxVideoDataLayer<Dtype>::InternalThreadEntry(){
 	const string& root_dir = this->layer_param_.seg_refine_param().root_dir();
 
 	const int lines_size = lines_.size();
-	vector< Blob<Dtype>* > prefetch_data, prefetch_label;
-
-	prefetch_data.push_back(&this->prefetch_data_);
-	prefetch_label.push_back(&this->prefetch_label_);
-	prefetch_label.push_back(this->prefetch_others_[0]);
-
-
-	vector< Blob<Dtype>* > prefetch_hint_data(1), prefetch_hint_label(1);
-
-	
 
 	for (int batch_iter = 0; batch_iter < batch_size_; batch_iter++)
 	{
+
+		vector< Blob<Dtype>* > prefetch_data, prefetch_label;
+
+		prefetch_data.push_back(&this->prefetch_data_);
+		prefetch_label.push_back(&this->prefetch_label_);
+		prefetch_label.push_back(this->prefetch_others_[0]);
 
 		vector<Datum> datum_label(1), datum_data(1);
 		vector<cv::Mat> mat_label(1), mat_data(1);
@@ -310,13 +304,6 @@ void BBoxVideoDataLayer<Dtype>::InternalThreadEntry(){
 			this->data_transformer_->Transform_aug(datum_label[0], datum_label[1], 1);
 		}
 
-		this->data_transformer_->Transform(datum_data, datum_label, flow_data, prefetch_data, prefetch_label, this->prefetch_others_[1], batch_iter);
-
-		int drop = this->data_transformer_->Rand(10);
-		if (drop < 3)
-			caffe_set(this->prefetch_others_[0]->count(1), Dtype(0), this->prefetch_others_[0]->mutable_cpu_data() + this->prefetch_others_[0]->offset(batch_iter));
-
-
 		//hint image and label
 		vector<int> frame_idx(frame_num_, 0);
 
@@ -327,25 +314,29 @@ void BBoxVideoDataLayer<Dtype>::InternalThreadEntry(){
 			for (int i=current_frame; i<frame_num_; i++)
 				frame_idx[i] = this->data_transformer_->Rand(current_frame);
 		}
-		else
+		else if (frame_num_ > 0)
 		{
 			vector<int> temp;
-			for (int i=std::max(0, current_frame - 2 * frame_num_); i <current_frame; i++)
+			for (int i=std::max(0, current_frame - 3 * frame_num_); i <current_frame; i++)
 				temp.push_back(i);
+
+			frame_idx[0] = this->data_transformer_->Rand(lines_[lines_id_].second);
+			
 			for (int i=0; i < frame_num_ - 1; i++)
 			{
 				std::swap(temp[i], temp[i + this->data_transformer_->Rand(temp.size() - i)]);
 				frame_idx[i + 1] = temp[i];
 			}
 		}
-		std::sort(frame_idx.begin(), frame_idx.end());
-		mat_data.resize(1); mat_label.resize(1); datum_data.resize(1); datum_label.resize(1);
+		
+		if (frame_num_ > 0)
+			std::sort(frame_idx.begin() + 1, frame_idx.end());
+
+		mat_data.resize(1); mat_label.resize(1);
+		vector <Datum> temp_datum_data(1), temp_datum_label(1);
 
 		for (int i=0; i<frame_num_; i++)
 		{
-			prefetch_hint_data[0] = (this->prefetch_others_[i*2 + 2]);
-			prefetch_hint_label[0] = (this->prefetch_others_[i*2 + 3]);
-
 			sprintf(string_buf, (root_dir + image_pattern_).c_str(), lines_[lines_id_].first.c_str(), frame_idx[i]);
 			CHECK(ReadSegDataToCVMat(string_buf, mat_data[0], true));
 
@@ -353,16 +344,25 @@ void BBoxVideoDataLayer<Dtype>::InternalThreadEntry(){
 			sprintf(string_buf, (root_dir + instance_pattern_).c_str(), lines_[lines_id_].first.c_str(), frame_idx[i]);
 			CHECK(ReadSegDataToCVMat(string_buf, mat_label[0], false));
 
-			for (int i = 0; i<datum_height; i++)
-				for (int j=0; j<datum_width; j++)
+			for (int h = 0; h<datum_height; h++)
+				for (int w=0; w<datum_width; w++)
 				{
-					int label_value = (int)mat_label[0].at<uchar>(i, j);
+					int label_value = (int)mat_label[0].at<uchar>(h, w);
 					if (label_value != ignore_label)
-						mat_label[0].at<uchar>(i, j) = (idx == label_value) ? 1 : 0;
+						mat_label[0].at<uchar>(h, w) = (idx == label_value) ? 1 : 0;
 				}
-			gen_bbox_mask(mat_data, mat_label, datum_data, datum_label, true, NULL);
-			this->data_transformer_->Transform(datum_data, datum_label, flow_data, prefetch_hint_data, prefetch_hint_label, NULL, batch_iter);
+			gen_bbox_mask(mat_data, mat_label, temp_datum_data, temp_datum_label, true, NULL);
+			datum_data.push_back(temp_datum_data[0]);
+			datum_label.push_back(temp_datum_label[0]);
+			prefetch_data.push_back(this->prefetch_others_[i*2 + 2]);
+			prefetch_label.push_back(this->prefetch_others_[i*2 + 3]);
 		}
+
+		this->data_transformer_->Transform(datum_data, datum_label, flow_data, prefetch_data, prefetch_label, this->prefetch_others_[1], batch_iter);
+
+		// int drop = this->data_transformer_->Rand(10);
+		// if (drop < 3)
+		// 	caffe_set(this->prefetch_others_[0]->count(1), Dtype(0), this->prefetch_others_[0]->mutable_cpu_data() + this->prefetch_others_[0]->offset(batch_iter));
 
 		if (false)
 		{
