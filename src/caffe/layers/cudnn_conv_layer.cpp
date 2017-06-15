@@ -124,31 +124,31 @@ void CuDNNConvolutionLayer<Dtype>::Reshape(
   // However this can be tuned by the "richness" parameter in the solver protobuf
   // By setting richness, you can increase the memory available to cuDNN and thus
   // let it choose fast but space consuming algorithms.
+  for (int i = 0; i < bottom.size(); i++) {
+
+    cudnn::setTensor4dDesc<Dtype>(&bottom_descs_[i],
+                                  this->num_,
+                                  this->channels_ / this->group_,
+                                  this->height_, this->width_,
+                                  this->channels_ * this->height_ * this->width_,
+                                  this->height_ * this->width_,
+                                  this->width_, 1);
+    cudnn::setTensor4dDesc<Dtype>(&top_descs_[i],
+                                  this->num_,
+                                  this->num_output_ / this->group_,
+                                  this->height_out_, this->width_out_,
+                                  this->num_output_ * this->height_out_ * this->width_out_,
+                                  this->height_out_ * this->width_out_,
+                                  this->width_out_, 1);
+    cudnn::setConvolutionDesc<Dtype>(&conv_descs_[i], bottom_descs_[i],
+                                     filter_desc_, this->pad_h_, this->pad_w_,
+#if CUDNN_VERSION_MIN(6, 0, 0)
+                                   this->stride_h_, this->stride_w_, this->dilation_h_, this->dilation_w_);
+#else
+                                   this->stride_h_, this->stride_w_);
+#endif
+
   if (need_benchmark_){
-    for (int i = 0; i < bottom.size(); i++) {
-
-      cudnn::setTensor4dDesc<Dtype>(&bottom_descs_[i],
-                                    this->num_,
-                                    this->channels_ / this->group_,
-                                    this->height_, this->width_,
-                                    this->channels_ * this->height_ * this->width_,
-                                    this->height_ * this->width_,
-                                    this->width_, 1);
-      cudnn::setTensor4dDesc<Dtype>(&top_descs_[i],
-                                    this->num_,
-                                    this->num_output_ / this->group_,
-                                    this->height_out_, this->width_out_,
-                                    this->num_output_ * this->height_out_ * this->width_out_,
-                                    this->height_out_ * this->width_out_,
-                                    this->width_out_, 1);
-      cudnn::setConvolutionDesc<Dtype>(&conv_descs_[i], bottom_descs_[i],
-                                       filter_desc_, this->pad_h_, this->pad_w_,
-  #if CUDNN_VERSION_MIN(6, 0, 0)
-                                       this->stride_h_, this->stride_w_, this->dilation_h_, this->dilation_w_);
-  #else
-                                       this->stride_h_, this->stride_w_);
-  #endif
-
       // choose forward and backward algorithms + workspace(s)
       const int kRequestedForwardAlgoCount = 6;
       vector<cudnnConvolutionFwdAlgoPerf_t> fwd_perf;
