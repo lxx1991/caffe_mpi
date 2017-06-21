@@ -115,11 +115,9 @@ void BNLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
         batch_sum_multiplier_.cpu_data(), Dtype(0),
         batch_statistic_.mutable_cpu_data());
     // Add to the moving average
-    if (!frozen_) {
-      caffe_cpu_axpby(batch_statistic_.count(),
-          Dtype(1) - bn_momentum_, batch_statistic_.cpu_data(),
-          bn_momentum_, this->blobs_[2]->mutable_cpu_data());
-    }
+    caffe_cpu_axpby(batch_statistic_.count(),
+        Dtype(1) - bn_momentum_, batch_statistic_.cpu_data(),
+        bn_momentum_, this->blobs_[2]->mutable_cpu_data());
   }
   // Broadcast the mean vector
   caffe_cpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, num_, channels_, 1,
