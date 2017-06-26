@@ -236,7 +236,7 @@ void BBoxVideoDataLayer<Dtype>::InternalThreadEntry(){
 		CHECK_GT(lines_size, lines_id_);
 
 		int current_frame = this->data_transformer_->Rand(lines_[lines_id_].second);
-		while(current_frame == 0)
+		while(current_frame == 0 and lines_[lines_id_].second > 1)
 			current_frame = this->data_transformer_->Rand(lines_[lines_id_].second);
 
 		//image
@@ -281,7 +281,7 @@ void BBoxVideoDataLayer<Dtype>::InternalThreadEntry(){
 			}
 		
 		//mask label
-		if (use_warp_ && this->data_transformer_->Rand(2))
+		if (use_warp_ && current_frame!=0 && this->data_transformer_->Rand(2))
 		{
 			mat_label.push_back(cv::Mat());
 			datum_label.push_back(Datum());
