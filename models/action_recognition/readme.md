@@ -1,11 +1,11 @@
-##Spatial net (RGB input) models:
+## Spatial net (RGB input) models:
 | name | caffemodel | caffemodel_url | license | caffe_commit |
 | --- | --- | --- | --- | --- |
 | Spatial UCF101 Split1 | cuhk_action_spatial_vgg_16_split1.caffemodel | http://mmlab.siat.ac.cn/very_deep_two_stream_model/cuhk_action_spatial_vgg_16_split1.caffemodel | license: non-commercial | d26b3b8b8eec182a27ce9871752fedd374b63650 
 | Spatial UCF101 Split2 | cuhk_action_spatial_vgg_16_split2.caffemodel | http://mmlab.siat.ac.cn/very_deep_two_stream_model/cuhk_action_spatial_vgg_16_split2.caffemodel | license: non-commercial | d26b3b8b8eec182a27ce9871752fedd374b63650
 | Spatial UCF101 Split3 | cuhk_action_spatial_vgg_16_split3.caffemodel | http://mmlab.siat.ac.cn/very_deep_two_stream_model/cuhk_action_spatial_vgg_16_split3.caffemodel | license: non-commercial | d26b3b8b8eec182a27ce9871752fedd374b63650
 
-##Temporal net (optical flow input) models:
+## Temporal net (optical flow input) models:
 | name | caffemodel | caffemodel_url | license | caffe_commit |
 | --- | --- | --- | --- | --- |
 | Temporal UCF101 Split1 | cuhk_action_temporal_vgg_16_split1.caffemodel | http://mmlab.siat.ac.cn/very_deep_two_stream_model/cuhk_action_temporal_vgg_16_split1.caffemodel | license: non-commercial | d26b3b8b8eec182a27ce9871752fedd374b63650 
