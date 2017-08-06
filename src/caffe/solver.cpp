@@ -1,5 +1,6 @@
 #include <cstdio>
 
+#include <ctime>
 #include <algorithm>
 #include <string>
 #include <vector>
@@ -165,6 +166,10 @@ void Solver<Dtype>::InitTestNets() {
 
 template <typename Dtype>
 void Solver<Dtype>::Step(int iters) {
+  static struct timespec start, end;
+  static int time_start_iter;
+  static bool time_spec_start=false;
+
   vector<Blob<Dtype>*> bottom_vec;
   const int start_iter = iter_;
   const int stop_iter = iter_ + iters;
@@ -256,6 +261,32 @@ void Solver<Dtype>::Step(int iters) {
               << score_index++ << ": " << output_name << " = "
               << result_vec[k] << loss_msg_stream.str();
         }
+      }
+
+      if(time_spec_start)
+      {
+        clock_gettime(CLOCK_MONOTONIC_RAW, &end);
+        if(iter_ > 0){
+            float average_time = ((end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) * 1E-9)/(iter_ - time_start_iter);
+            float remaining_time = average_time * (param_.max_iter() - iter_);
+            int remaining_hour = floor(remaining_time / 3600);
+            int remaining_min = round(remaining_time / 60 - remaining_hour * 60);
+
+            LOG(INFO) << "Speed: "
+                    << average_time
+                    << "s / iter."
+                    << "  "
+                    << remaining_hour
+                    << ":"
+                    << remaining_min
+                    << " (H:M) to go.";
+        }
+      }
+      else
+      {
+        clock_gettime(CLOCK_MONOTONIC_RAW, &start);
+        time_spec_start=true;
+        time_start_iter = iter_;
       }
     }
     ApplyUpdate();

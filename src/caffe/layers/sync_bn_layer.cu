@@ -115,10 +115,13 @@ __global__ void kernel_backward_bottom(
 template <typename Dtype>
 void SyncBNLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
     const vector<Blob<Dtype>*>& top) {
+
+  int spatial_dim = height_ * width_;
+
   if (this->phase_ == TEST) {
-    kernel_test_forward<<<CAFFE_GET_BLOCKS(bottom[0]->count()),
+    kernel_test_forward<<<CAFFE_GET_BLOCKS(num_ * channels_ * spatial_dim),
         CAFFE_CUDA_NUM_THREADS>>>(
-      num_, channels_, height_ * width_,
+      num_, channels_, spatial_dim,
       this->blobs_[0]->gpu_data(),
       this->blobs_[1]->gpu_data(),
       this->blobs_[2]->gpu_data(),
@@ -129,10 +132,10 @@ void SyncBNLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
     );
     CUDA_POST_KERNEL_CHECK;
   } else {
-    const int m = num_ * height_ * width_ * Caffe::MPI_all_rank();
+    const int m = num_ * spatial_dim * Caffe::MPI_all_rank();
     // compute local E[x] and E[x^2]
     kernel_local_stats<<<channels_, CAFFE_CUDA_NUM_THREADS>>>(
-      num_, channels_, height_ * width_,
+      num_, channels_, spatial_dim,
       static_cast<Dtype>(m),
       bottom[0]->gpu_data(),
       mean_buffer_.mutable_gpu_data(),
@@ -149,10 +152,10 @@ void SyncBNLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
                   top[0]->mutable_gpu_data());  // reuse the top buffer
     caffe_gpu_sub(channels_, var_buffer_.gpu_data(), top[0]->gpu_data(),
                   var_buffer_.mutable_gpu_data());
-    if (m > 1) {
-      caffe_gpu_scal(channels_, Dtype(m) / (m-1),
-                     var_buffer_.mutable_gpu_data());
-    }
+    // if (m > 1) {
+    //   caffe_gpu_scal(channels_, Dtype(m) / (m-1),
+    //                  var_buffer_.mutable_gpu_data());
+    // }
     // update running mean and var
     caffe_gpu_axpby(mean_buffer_.count(),
         Dtype(1) - bn_momentum_, mean_buffer_.gpu_data(),
@@ -161,9 +164,9 @@ void SyncBNLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
         Dtype(1) - bn_momentum_, var_buffer_.gpu_data(),
         bn_momentum_, this->blobs_[3]->mutable_gpu_data());
     // compute output
-    kernel_test_forward<<<CAFFE_GET_BLOCKS(bottom[0]->count()),
+    kernel_test_forward<<<CAFFE_GET_BLOCKS(num_ * channels_ * spatial_dim),
         CAFFE_CUDA_NUM_THREADS>>>(
-      num_, channels_, height_ * width_,
+      num_, channels_, spatial_dim,
       this->blobs_[0]->gpu_data(),
       this->blobs_[1]->gpu_data(),
       mean_buffer_.gpu_data(),
@@ -179,12 +182,15 @@ void SyncBNLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
 template <typename Dtype>
 void SyncBNLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
     const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom) {
+
+  int spatial_dim = height_ * width_;
+
   if (propagate_down[0]) {
     CHECK(this->param_propagate_down_[0] && this->param_propagate_down_[1])
         << "SyncBN layer params should backprop when the layer backprops";
     // compute local scale and bias diff
     kernel_backward_scale_bias<<<channels_, CAFFE_CUDA_NUM_THREADS>>>(
-      num_, channels_, height_ * width_,
+      num_, channels_, spatial_dim,
       mean_buffer_.gpu_data(),
       var_buffer_.gpu_data(),
       bn_eps_,
@@ -207,21 +213,28 @@ void SyncBNLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
                    var_buffer_.gpu_diff(),
                    this->blobs_[1]->mutable_gpu_diff());
     // compute bottom diff
-    kernel_backward_bottom<<<CAFFE_GET_BLOCKS(bottom[0]->count()),
+    kernel_backward_bottom<<<CAFFE_GET_BLOCKS(num_ * channels_ * spatial_dim),
         CAFFE_CUDA_NUM_THREADS>>>(
-      num_, channels_, height_ * width_,
+      num_, channels_, spatial_dim,
       this->blobs_[0]->gpu_data(),
       this->blobs_[1]->gpu_data(),
       mean_buffer_.gpu_data(),
       var_buffer_.gpu_data(),
       bn_eps_,
-      static_cast<Dtype>(num_ * height_ * width_ * Caffe::MPI_all_rank()),
+      static_cast<Dtype>(num_ * spatial_dim * Caffe::MPI_all_rank()),
       top[0]->gpu_diff(),
       mean_buffer_.gpu_diff(),
       var_buffer_.gpu_diff(),
       bottom[0]->gpu_data(),
       bottom[0]->mutable_gpu_diff()
     );
+    // scale mean and variance
+    caffe_gpu_scal(this->channels_, Dtype(1) / Caffe::MPI_all_rank(), this->blobs_[2]->mutable_gpu_data());
+    caffe_gpu_scal(this->channels_, Dtype(1) / Caffe::MPI_all_rank(), this->blobs_[3]->mutable_gpu_data());    
+    mpi_force_synchronize();
+    caffe_iallreduce(this->blobs_[2]->mutable_cpu_data(), this->channels_);
+    caffe_iallreduce(this->blobs_[3]->mutable_cpu_data(), this->channels_);
+    mpi_force_synchronize();    
   }
 }
 

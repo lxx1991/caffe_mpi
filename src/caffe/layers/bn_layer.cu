@@ -5,6 +5,7 @@
 #include "caffe/filler.hpp"
 #include "caffe/layer.hpp"
 #include "caffe/util/math_functions.hpp"
+#include "caffe/util/mpi_functions.hpp"
 
 namespace caffe {
 
@@ -249,6 +250,17 @@ void BNLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
     caffe_gpu_mul(broadcast_buffer_.count(), const_bottom_diff,
         broadcast_buffer_.gpu_data(), bottom_diff);
   }
+  // scale mean and variance
+  #ifdef USE_MPI
+  caffe_gpu_scal(this->channels_, Dtype(1) / Caffe::MPI_all_rank(), this->blobs_[2]->mutable_gpu_data());
+  caffe_gpu_scal(this->channels_, Dtype(1) / Caffe::MPI_all_rank(), this->blobs_[3]->mutable_gpu_data());
+  cudaDeviceSynchronize();
+  mpi_force_synchronize();
+  caffe_iallreduce(this->blobs_[2]->mutable_cpu_data(), this->channels_);
+  caffe_iallreduce(this->blobs_[3]->mutable_cpu_data(), this->channels_);
+  mpi_force_synchronize();
+  #endif
+
 }
 
 INSTANTIATE_LAYER_GPU_FUNCS(BNLayer);

@@ -380,6 +380,8 @@ message TransformationParameter {
   optional bool mirror = 2 [default = false];
   // Specify if we would like to randomly crop an image.
   optional uint32 crop_size = 3 [default = 0];
+  optional uint32 crop_height = 24;
+  optional uint32 crop_width = 25;
   // mean_file and mean_value cannot be specified at the same time
   optional string mean_file = 4;
   // if specified can be repeated once (would substract it from all the channels)
@@ -418,6 +420,10 @@ message TransformationParameter {
   optional int32 upper_size = 17;
   optional int32 upper_height = 18;
   optional int32 upper_width = 19;
+  optional int32 ignore_label = 21;
+
+  repeated float rand_rotate = 22;
+  optional bool gaussian_blur = 23 [default = false]; 
 }
 
 // Message that stores parameters shared by loss layers
@@ -937,6 +943,7 @@ message SegDataParameter{
   // Whether or not ImageLayer should shuffle the list of files at every epoch.
   optional bool shuffle = 3 [default = false];
   optional bool balance = 4 [default = false];
+  optional uint32 batch_size = 5 [default = 1];
 }
 
 message SigmoidParameter {
