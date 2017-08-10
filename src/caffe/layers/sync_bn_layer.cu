@@ -230,11 +230,12 @@ void SyncBNLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
     );
     // scale mean and variance
     caffe_gpu_scal(this->channels_, Dtype(1) / Caffe::MPI_all_rank(), this->blobs_[2]->mutable_gpu_data());
-    caffe_gpu_scal(this->channels_, Dtype(1) / Caffe::MPI_all_rank(), this->blobs_[3]->mutable_gpu_data());    
+    caffe_gpu_scal(this->channels_, Dtype(1) / Caffe::MPI_all_rank(), this->blobs_[3]->mutable_gpu_data());
+        
     mpi_force_synchronize();
     caffe_iallreduce(this->blobs_[2]->mutable_cpu_data(), this->channels_);
     caffe_iallreduce(this->blobs_[3]->mutable_cpu_data(), this->channels_);
-    mpi_force_synchronize();    
+    mpi_force_synchronize(); 
   }
 }
 
