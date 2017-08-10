@@ -95,8 +95,14 @@ bool ReadImageToDatum(const string& filename, const int label,
     const int height, const int width, const bool is_color,
     const std::string & encoding, Datum* datum);
 
+bool ReadSegDataToCVMat(const string& img_filename, cv::Mat& cv_img, bool is_color);
+
+bool ReadSegDataToDatum(const string& img_filename, Datum* datum_data, bool is_color);
+
 bool ReadSegDataToDatum(const string& img_filename, const string& label_filename, 
                         Datum* datum_data, Datum* datum_label, bool is_color);
+
+bool ReadFlowToCVMat(const string& flow_filename, cv::Mat& flow_data);
 
 bool ReadSegmentFlowToDatum(const string& filename, const int label,
     const vector<int> offsets, const int height, const int width, const int length, Datum* datum, const char* name_pattern);

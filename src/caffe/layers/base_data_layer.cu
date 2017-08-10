@@ -20,6 +20,15 @@ void BasePrefetchingDataLayer<Dtype>::Forward_gpu(
     // Copy the labels.
     caffe_copy(prefetch_label_.count(), prefetch_label_.cpu_data(),
         top[1]->mutable_gpu_data());
+
+    if (top.size() > 2)
+      for (int i=2; i<top.size(); i++)
+      {
+        top[i]->ReshapeLike(*prefetch_others_[i-2]);
+        // Copy the labels.
+        caffe_copy(prefetch_others_[i-2]->count(), prefetch_others_[i-2]->cpu_data(),
+                  top[i]->mutable_gpu_data());
+      }
   }
 #ifdef USE_MPI
   //advance (all_rank - (my_rank+1)) mini-batches to be ready for next run

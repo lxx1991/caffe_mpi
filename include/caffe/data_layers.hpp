@@ -99,6 +99,7 @@ class BasePrefetchingDataLayer :
 		protected:
 	Blob<Dtype> prefetch_data_;
 	Blob<Dtype> prefetch_label_;
+	vector<Blob<Dtype>*> prefetch_others_;
 	Blob<Dtype> transformed_data_;
 };
 
@@ -485,6 +486,57 @@ protected:
 	bool has_mean_values_;
 	bool cache_images_;
 	vector<std::pair<std::string, Datum > > image_database_cache_;
+};
+
+
+/**
+ * @brief Provides data to the Net from video files.
+ *
+ * TODO(dox): thorough documentation for Forward and proto params.
+ */
+template <typename Dtype>
+class BBoxVideoDataLayer : public BasePrefetchingDataLayer<Dtype> {
+public:
+	explicit BBoxVideoDataLayer(const LayerParameter& param)
+	: BasePrefetchingDataLayer<Dtype>(param) {}
+	virtual ~BBoxVideoDataLayer();
+	virtual void DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
+			const vector<Blob<Dtype>*>& top);
+
+	virtual inline const char* type() const { return "BBoxVideoData"; }
+	virtual inline int ExactNumBottomBlobs() const { return 0; }
+	virtual inline int ExactNumTopBlobs() const { return -1; }
+	virtual inline int MinTopBlobs() const { return 4; }
+
+protected:
+	shared_ptr<Caffe::RNG> prefetch_rng_;
+	virtual void ShuffleImages();
+	virtual void InternalThreadEntry();
+	void gen_bbox_mask(vector<cv::Mat> &mat_data, vector<cv::Mat> &mat_label, vector<Datum> &datum_data, vector<Datum> &datum_label, bool bbox_aug, cv::Mat *flow_data=NULL);
+
+#ifdef USE_MPI
+	inline virtual void advance_cursor(){
+		lines_id_++;
+		if (lines_id_ >= lines_.size()) {
+			// We have reached the end. Restart from the first.
+			DLOG(INFO) << "Restarting data prefetching from start.";
+			lines_id_ = 0;
+			if (this->layer_param_.seg_refine_param().shuffle()) {
+				ShuffleImages();
+			}
+		}
+	}
+#endif
+	
+	vector<std::pair<std::string, int> > lines_;
+	int lines_id_;
+	int batch_size_, bbox_height_, bbox_width_, ignore_label_;
+	int frame_num_;
+	
+	std::string image_pattern_, instance_pattern_, flow_pattern_, warp_pattern_;
+	bool use_warp_;
+
+	char string_buf[255];
 };
 
 }  // namespace caffe

@@ -303,6 +303,65 @@ void hdf5_save_nd_dataset<double>(
   CHECK_GE(status, 0) << "Failed to make double dataset " << dataset_name;
 }
 
+bool ReadSegDataToCVMat(const string& img_filename, cv::Mat& cv_img, bool is_color) {
+  
+  int cv_read_flag = (is_color ? CV_LOAD_IMAGE_COLOR :
+      CV_LOAD_IMAGE_GRAYSCALE);
+
+  cv_img = cv::imread(img_filename, cv_read_flag);
+
+  if (!cv_img.data){
+    LOG(ERROR) << "Could not load file " << img_filename;
+    return false;
+  }
+
+  return true;
+}
+
+bool ReadSegDataToDatum(const string& img_filename, Datum* datum_data, bool is_color) {
+  
+  string *datum_data_string;
+
+  int cv_read_flag = (is_color ? CV_LOAD_IMAGE_COLOR :
+      CV_LOAD_IMAGE_GRAYSCALE);
+
+  cv::Mat cv_img = cv::imread(img_filename, cv_read_flag);
+
+  if (!cv_img.data){
+    LOG(ERROR) << "Could not load file " << img_filename;
+    return false;
+  }
+  
+  int num_channels = (is_color ? 3 : 1);
+  datum_data->set_channels(num_channels);
+  datum_data->set_height(cv_img.rows);
+  datum_data->set_width(cv_img.cols);
+  datum_data->clear_data();
+  datum_data->clear_float_data();
+  datum_data_string = datum_data->mutable_data();
+
+
+  if (is_color) {
+      for (int c = 0; c < num_channels; ++c) {
+        for (int h = 0; h < cv_img.rows; ++h) {
+          for (int w = 0; w < cv_img.cols; ++w) {
+            datum_data_string->push_back(
+              static_cast<char>(cv_img.at<cv::Vec3b>(h, w)[c]));
+          }
+        }
+      }
+    } else {  // Faster than repeatedly testing is_color for each pixel w/i loop
+      for (int h = 0; h < cv_img.rows; ++h) {
+        for (int w = 0; w < cv_img.cols; ++w) {
+          datum_data_string->push_back(
+            static_cast<char>(cv_img.at<uchar>(h, w)));
+          }
+        }
+    }
+  return true;
+}
+
+
 bool ReadSegDataToDatum(const string& img_filename, const string& label_filename, Datum* datum_data, Datum* datum_label, bool is_color) {
   
   string *datum_data_string, *datum_label_string;
@@ -419,6 +478,27 @@ bool ReadSegmentRGBToDatum(const string& filename, const int label,
 	}
 	return true;
 }
+
+
+bool ReadFlowToCVMat(const string& flow_filename, cv::Mat& flow_data)
+{
+  int width, height;
+
+  FILE * fid = fopen(flow_filename.c_str(), "rb");
+  char buffer[10];
+  CHECK_EQ(fread(buffer, sizeof(char), 4, fid), 4);
+
+  CHECK_EQ(fread(&width, sizeof(int), 1, fid), 1);
+  CHECK_EQ(fread(&height, sizeof(int), 1, fid), 1);
+
+  flow_data = cv::Mat::zeros(height, width, CV_32FC2);
+
+  CHECK_EQ(fread(flow_data.data, sizeof(float), height * width * 2, fid), height * width * 2);
+
+  fclose(fid);
+  return true;
+}
+
 
 bool ReadSegmentFlowToDatum(const string& filename, const int label,
     const vector<int> offsets, const int height, const int width, const int length, Datum* datum,

@@ -38,6 +38,10 @@ void BasePrefetchingDataLayer<Dtype>::LayerSetUp(
   this->prefetch_data_.mutable_cpu_data();
   if (this->output_labels_) {
     this->prefetch_label_.mutable_cpu_data();
+
+    if (top.size() > 2)
+      for (int i=2; i<top.size(); i++)
+          this->prefetch_others_[i-2]->mutable_cpu_data();
   }
 #ifdef USE_MPI
   //advance (my_rank) mini-batches to be ready for first run
@@ -77,6 +81,15 @@ void BasePrefetchingDataLayer<Dtype>::Forward_cpu(
     // Copy the labels.
     caffe_copy(prefetch_label_.count(), prefetch_label_.cpu_data(),
                top[1]->mutable_cpu_data());
+
+    if (top.size() > 2)
+      for (int i=2; i<top.size(); i++)
+      {
+        top[i]->ReshapeLike(*prefetch_others_[i-2]);
+        // Copy the labels.
+        caffe_copy(prefetch_others_[i-2]->count(), prefetch_others_[i-2]->cpu_data(),
+                  top[i]->mutable_cpu_data());
+      }
   }
 
 #ifdef USE_MPI

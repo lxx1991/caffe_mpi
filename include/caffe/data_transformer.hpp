@@ -42,6 +42,11 @@ class DataTransformer {
   void Transform(const Datum& datum_data, const Datum& datum_label, 
                Blob<Dtype>* transformed_data, Blob<Dtype>* transformed_label, int batch_iter = 0);
 
+  void Transform(const vector<Datum>& datum_data, const vector<Datum>& datum_label, cv::Mat &flow_data, 
+             vector<Blob<Dtype>*>& transformed_data, vector<Blob<Dtype>*>& transformed_label, Blob<Dtype>* transformed_flow, int batch_iter = 0);
+
+  void Transform_aug(Datum& datum_instance, Datum& datum_mask, int max_id = 1);
+
   /**
    * @brief Applies the transformation defined in the data layer's
    * transform_param block to a vector of Datum.
@@ -129,7 +134,6 @@ class DataTransformer {
   vector<int> InferBlobShape(const cv::Mat& cv_img);
 
 
- protected:
    /**
    * @brief Generates a random integer from Uniform({0, 1, ..., n-1}).
    *
@@ -141,6 +145,9 @@ class DataTransformer {
   virtual int Rand(int n);
 
   virtual float Rand(float l, float r);
+
+ protected:
+
 
   virtual void Rotation(cv::Mat& src, int degree, bool islabel, uint8_t mean_v = 0);
 
